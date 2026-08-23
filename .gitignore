@@ -9,7 +9,7 @@ coverage/
 
 # GGUF model weights — too large for git, download separately (see README)
 GGUF/*.gguf
-models/
+/models/
 *.gguf
 
 # Android build output / IDE / native build caches
