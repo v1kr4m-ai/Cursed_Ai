@@ -15,7 +15,9 @@ import {
   Lock,
   Mic,
   MicOff,
-  Archive
+  Archive,
+  ChevronDown,
+  CheckCircle2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -32,21 +34,37 @@ interface ChatWindowProps {
   chat: Chat | null;
   onUpdateChat: (chat: Chat) => void;
   onArchiveChat: (id: string) => void;
+  onCreateChat: () => Chat;
+  models: AIModel[];
   selectedModel: AIModel;
+  onSelectModel: (id: string) => void;
   settings: AppSettings;
 }
 
-export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, settings }: ChatWindowProps) {
+export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings }: ChatWindowProps) {
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [liveTps, setLiveTps] = useState<number | null>(null);
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const dictationRef = useRef<any>(null);
+  const modelPickerRef = useRef<HTMLDivElement>(null);
   const speechSupported = typeof window !== "undefined" &&
     !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  useEffect(() => {
+    if (!showModelPicker) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
+        setShowModelPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [showModelPicker]);
 
   const toggleDictation = () => {
     if (!speechSupported) return;
@@ -86,6 +104,13 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, s
     onArchiveChat(chat.id);
   };
 
+  // Sending from the empty-state screen: no chat exists yet, so create one
+  // first, then send into it directly (see the targetChat param above).
+  const handleWelcomeSend = () => {
+    if (!input.trim() || isGenerating) return;
+    handleSendMessage(onCreateChat());
+  };
+
   // Auto scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -100,8 +125,12 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, s
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isGenerating || !chat) return;
+  // Pass targetChat explicitly when sending from the empty-state screen,
+  // where a chat was just created this same tick and hasn't reached the
+  // `chat` prop yet (App.tsx's setState is async).
+  const handleSendMessage = async (targetChat?: Chat) => {
+    const activeChat = targetChat ?? chat;
+    if (!input.trim() || isGenerating || !activeChat) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -117,11 +146,11 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, s
       timestamp: Date.now() + 1,
     };
 
-    const updatedMessages = [...chat.messages, userMessage, assistantMessagePlaceholder];
+    const updatedMessages = [...activeChat.messages, userMessage, assistantMessagePlaceholder];
     const updatedChat = {
-      ...chat,
+      ...activeChat,
       messages: updatedMessages,
-      title: chat.messages.length === 0 ? (input.slice(0, 30) + (input.length > 30 ? "..." : "")) : chat.title
+      title: activeChat.messages.length === 0 ? (input.slice(0, 30) + (input.length > 30 ? "..." : "")) : activeChat.title
     };
 
     onUpdateChat(updatedChat);
@@ -137,7 +166,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, s
     try {
       let finalContent = "";
       await AIService.generate(
-        [...chat.messages, userMessage],
+        [...activeChat.messages, userMessage],
         selectedModel.id,
         {
           onToken: (token) => {
@@ -185,30 +214,139 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, s
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const modelPicker = (
+    <div className="relative" ref={modelPickerRef}>
+      <button
+        onClick={() => setShowModelPicker(v => !v)}
+        title="Select model"
+        className="h-10 px-3 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 border border-white/5"
+      >
+        <Cpu size={16} className="text-violet-400" />
+        <span className="text-xs font-bold max-w-[100px] truncate">{selectedModel.name}</span>
+        <ChevronDown size={14} className={cn("transition-transform", showModelPicker && "rotate-180")} />
+      </button>
+      <AnimatePresence>
+        {showModelPicker && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            className="absolute bottom-full mb-2 left-0 w-64 glass border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-20"
+          >
+            {models.map((m) => (
+              <button
+                key={m.id}
+                disabled={!m.isDownloaded}
+                onClick={() => {
+                  onSelectModel(m.id);
+                  setShowModelPicker(false);
+                }}
+                className={cn(
+                  "w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors",
+                  m.isDownloaded ? "hover:bg-white/5 text-zinc-200" : "text-zinc-600 cursor-not-allowed"
+                )}
+              >
+                <div>
+                  <p className="text-sm font-bold">{m.name}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                    {m.isDownloaded ? m.type : "Not downloaded"}
+                  </p>
+                </div>
+                {selectedModel.id === m.id && <CheckCircle2 size={16} className="text-violet-400 shrink-0" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
+  const inputBar = (onSend: () => void, placeholder: string) => (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-2 flex items-end gap-2 focus-within:border-white/20 transition-all shadow-2xl shadow-black/40">
+      <div className="flex gap-1 mb-1 ml-1">
+        {modelPicker}
+        {speechSupported && (
+          <button
+            onClick={toggleDictation}
+            title={isDictating ? "Stop dictation" : "Dictate message"}
+            className={cn(
+              "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
+              isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500"
+            )}
+          >
+            {isDictating ? <MicOff size={18} /> : <Mic size={18} />}
+          </button>
+        )}
+      </div>
+      <div className="flex-1">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder={placeholder}
+          rows={1}
+          className="w-full bg-transparent border-none focus:ring-0 text-white placeholder:text-white/20 resize-none p-3 py-4 max-h-48 scrollbar-hide text-[15px]"
+          style={{ height: 'auto' }}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = 'auto';
+            target.style.height = `${target.scrollHeight}px`;
+          }}
+        />
+      </div>
+      <button
+        onClick={onSend}
+        disabled={!input.trim() || isGenerating}
+        className={cn(
+          "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
+          input.trim() && !isGenerating
+           ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
+           : "bg-white/5 text-zinc-600 cursor-not-allowed"
+        )}
+      >
+        <Send size={20} />
+      </button>
+    </div>
+  );
+
   if (!chat) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center glass rounded-[2.5rem] h-full">
-        <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-8 shadow-2xl shadow-violet-500/10">
-          <Bot size={40} className="text-violet-400" />
+      <div className="flex-1 flex flex-col h-full glass rounded-[2.5rem] overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center overflow-y-auto">
+          <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-8 shadow-2xl shadow-violet-500/10">
+            <Bot size={40} className="text-violet-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Sunayna local AI Studio</h1>
+          <p className="text-zinc-500 max-w-sm mb-10 text-sm leading-relaxed">
+            Your private offline laboratory. Messages are processed locally on-device using the <span className="text-violet-400 font-mono">{selectedModel.name}</span> model.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
+            {["Explain quantum computing in simple terms", "Write a secure local API script", "Analyze this system architecture", "Creative writing: Dark academia"].map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => setInput(prompt)}
+                className="p-4 text-xs font-medium text-zinc-400 border border-white/5 rounded-2xl hover:border-white/20 hover:bg-white/5 text-left transition-all group"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                   <div className="w-1.5 h-1.5 rounded-full bg-violet-600 group-hover:bg-violet-400"></div>
+                   <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Example Prompt</span>
+                </div>
+                {prompt}
+              </button>
+            ))}
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Sunayna local AI Studio</h1>
-        <p className="text-zinc-500 max-w-sm mb-10 text-sm leading-relaxed">
-          Your private offline laboratory. Messages are processed locally on-device using the <span className="text-violet-400 font-mono">{selectedModel.name}</span> model.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
-          {["Explain quantum computing in simple terms", "Write a secure local API script", "Analyze this system architecture", "Creative writing: Dark academia"].map((prompt) => (
-            <button 
-              key={prompt}
-              onClick={() => setInput(prompt)}
-              className="p-4 text-xs font-medium text-zinc-400 border border-white/5 rounded-2xl hover:border-white/20 hover:bg-white/5 text-left transition-all group"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                 <div className="w-1.5 h-1.5 rounded-full bg-violet-600 group-hover:bg-violet-400"></div>
-                 <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Example Prompt</span>
-              </div>
-              {prompt}
-            </button>
-          ))}
+
+        {/* Input bar pinned to the bottom of the main page, same as an active chat */}
+        <div className="p-6 bg-transparent border-t border-white/5 shrink-0">
+          <div className="max-w-4xl mx-auto">
+            {inputBar(handleWelcomeSend, `Command ${selectedModel.name} via local core...`)}
+          </div>
         </div>
       </div>
     );
@@ -288,55 +426,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, s
             </AnimatePresence>
           </div>
           
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-2 flex items-end gap-2 focus-within:border-white/20 transition-all shadow-2xl shadow-black/40">
-             <div className="flex gap-1 mb-1 ml-1">
-                {speechSupported && (
-                  <button
-                    onClick={toggleDictation}
-                    title={isDictating ? "Stop dictation" : "Dictate message"}
-                    className={cn(
-                      "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
-                      isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500"
-                    )}
-                  >
-                    {isDictating ? <MicOff size={18} /> : <Mic size={18} />}
-                  </button>
-                )}
-             </div>
-             <div className="flex-1">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder={`Command ${selectedModel.name} via local core...`}
-                  rows={1}
-                  className="w-full bg-transparent border-none focus:ring-0 text-white placeholder:text-white/20 resize-none p-3 py-4 max-h-48 scrollbar-hide text-[15px]"
-                  style={{ height: 'auto' }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${target.scrollHeight}px`;
-                  }}
-                />
-             </div>
-             <button
-               onClick={handleSendMessage}
-               disabled={!input.trim() || isGenerating}
-               className={cn(
-                 "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
-                 input.trim() && !isGenerating
-                  ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
-                  : "bg-white/5 text-zinc-600 cursor-not-allowed"
-               )}
-             >
-               <Send size={20} />
-             </button>
-          </div>
+          {inputBar(() => handleSendMessage(), `Command ${selectedModel.name} via local core...`)}
           <div className="mt-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-4">
               <p className="text-[10px] text-zinc-500 flex items-center gap-1.5 font-bold uppercase tracking-widest">

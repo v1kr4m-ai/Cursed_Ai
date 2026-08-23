@@ -106,7 +106,7 @@ export default function App() {
   const selectedModel = models.find(m => m.id === selectedModelId) || models[0];
   const activeChat = chats.find(c => c.id === activeChatId) || null;
 
-  const createNewChat = () => {
+  const createNewChat = (): Chat => {
     const newChat: Chat = {
       id: Date.now().toString(),
       title: "New Interaction",
@@ -115,22 +115,28 @@ export default function App() {
       updatedAt: Date.now(),
       modelId: selectedModelId,
     };
-    setChats([newChat, ...chats]);
+    // Functional update: createNewChat and the onUpdateChat it's immediately
+    // followed by (sending the first message from the welcome screen) both
+    // fire in the same synchronous tick. A plain `setChats([newChat, ...chats])`
+    // reads the stale `chats` closure, and whichever of the two setChats
+    // calls applies second silently clobbers the other's result.
+    setChats(prev => [newChat, ...prev]);
     setActiveChatId(newChat.id);
     setActiveTab("chat");
+    return newChat;
   };
 
   const updateChat = (updatedChat: Chat) => {
-    setChats(chats.map(c => c.id === updatedChat.id ? updatedChat : c));
+    setChats(prev => prev.map(c => c.id === updatedChat.id ? updatedChat : c));
   };
 
   const archiveChat = (id: string) => {
-    setChats(chats.map(c => c.id === id ? { ...c, archived: true } : c));
+    setChats(prev => prev.map(c => c.id === id ? { ...c, archived: true } : c));
     if (activeChatId === id) setActiveChatId(undefined);
   };
 
   const unarchiveChat = (id: string) => {
-    setChats(chats.map(c => c.id === id ? { ...c, archived: false } : c));
+    setChats(prev => prev.map(c => c.id === id ? { ...c, archived: false } : c));
   };
 
   const updateModel = (id: string, patch: Partial<AIModel>) => {
@@ -217,7 +223,10 @@ export default function App() {
                 chat={activeChat}
                 onUpdateChat={updateChat}
                 onArchiveChat={archiveChat}
+                onCreateChat={createNewChat}
+                models={models}
                 selectedModel={selectedModel}
+                onSelectModel={setSelectedModelId}
                 settings={settings}
               />
             )}
@@ -242,7 +251,7 @@ export default function App() {
                       updatedAt: Date.now(),
                       modelId: selectedModelId,
                     };
-                    setChats([newChat, ...chats]);
+                    setChats(prev => [newChat, ...prev]);
                     setActiveChatId(newChat.id);
                   }
                 }}
