@@ -1,21 +1,21 @@
 import React, { useState, useRef, useEffect } from "react";
-import { 
-  Send, 
-  RotateCcw, 
-  Square, 
-  Copy, 
-  Check, 
-  MoreVertical, 
-  Trash2, 
-  Volume2, 
-  Cpu, 
+import {
+  Send,
+  RotateCcw,
+  Square,
+  Copy,
+  Check,
+  MoreVertical,
+  Trash2,
+  Volume2,
+  Cpu,
   Zap,
   User,
   Bot,
   Lock,
-  Image as ImageIcon,
-  X,
-  Mic
+  Mic,
+  MicOff,
+  Archive
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -31,36 +31,59 @@ import { cn } from "@/lib/utils";
 interface ChatWindowProps {
   chat: Chat | null;
   onUpdateChat: (chat: Chat) => void;
+  onArchiveChat: (id: string) => void;
   selectedModel: AIModel;
   settings: AppSettings;
 }
 
-export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: ChatWindowProps) {
+export function ChatWindow({ chat, onUpdateChat, onArchiveChat, selectedModel, settings }: ChatWindowProps) {
   const [input, setInput] = useState("");
-  const [images, setImages] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isDictating, setIsDictating] = useState(false);
+  const [liveTps, setLiveTps] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const dictationRef = useRef<any>(null);
+  const speechSupported = typeof window !== "undefined" &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const toggleDictation = () => {
+    if (!speechSupported) return;
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        const pureBase64 = base64.split(',')[1];
-        setImages(prev => [...prev, pureBase64]);
-      };
-      reader.readAsDataURL(file);
-    });
+    if (isDictating) {
+      dictationRef.current?.stop();
+      setIsDictating(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((r: any) => r[0].transcript)
+        .join("");
+      setInput(transcript);
+    };
+    recognition.onend = () => setIsDictating(false);
+    recognition.onerror = () => setIsDictating(false);
+    dictationRef.current = recognition;
+    setIsDictating(true);
+    recognition.start();
   };
 
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+  const handleClearChat = () => {
+    if (!chat) return;
+    if (!window.confirm("Clear all messages in this chat? This can't be undone.")) return;
+    onUpdateChat({ ...chat, messages: [] });
+  };
+
+  const handleArchive = () => {
+    if (!chat) return;
+    onArchiveChat(chat.id);
   };
 
   // Auto scroll to bottom
@@ -78,13 +101,12 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
   };
 
   const handleSendMessage = async () => {
-    if ((!input.trim() && images.length === 0) || isGenerating || !chat) return;
+    if (!input.trim() || isGenerating || !chat) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: MessageRole.USER,
       content: input,
-      images: images.length > 0 ? images : undefined,
       timestamp: Date.now(),
     };
 
@@ -96,19 +118,21 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
     };
 
     const updatedMessages = [...chat.messages, userMessage, assistantMessagePlaceholder];
-    const updatedChat = { 
-      ...chat, 
+    const updatedChat = {
+      ...chat,
       messages: updatedMessages,
       title: chat.messages.length === 0 ? (input.slice(0, 30) + (input.length > 30 ? "..." : "")) : chat.title
     };
 
     onUpdateChat(updatedChat);
     setInput("");
-    setImages([]);
     setIsGenerating(true);
+    setLiveTps(null);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    const generationStart = performance.now();
+    let tokenCount = 0;
 
     try {
       let finalContent = "";
@@ -118,6 +142,9 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
         {
           onToken: (token) => {
             finalContent += token;
+            tokenCount++;
+            const elapsedSec = (performance.now() - generationStart) / 1000;
+            if (elapsedSec > 0) setLiveTps(tokenCount / elapsedSec);
             const currentMessages = [...updatedChat.messages];
             currentMessages[currentMessages.length - 1] = {
               ...assistantMessagePlaceholder,
@@ -137,7 +164,8 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
           signal: controller.signal,
           temperature: settings.temperature,
           topP: settings.topP,
-          maxTokens: settings.maxTokens
+          maxTokens: settings.maxTokens,
+          memoryEnabled: settings.memoryEnabled
         }
       );
     } catch (error) {
@@ -228,7 +256,7 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
                   {isGenerating && idx === chat.messages.length - 1 && (
                     <div className="flex items-center gap-2 mt-4 text-[10px] font-mono opacity-40 uppercase tracking-widest italic group">
                       <span className="pulse-anim">Streaming tokens...</span>
-                      <span className="text-emerald-400">14.2 t/s</span>
+                      {liveTps !== null && <span className="text-emerald-400">{liveTps.toFixed(1)} t/s</span>}
                     </div>
                   )}
                 </div>
@@ -243,26 +271,6 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
       {/* Input area */}
       <div className="p-6 bg-transparent border-t border-white/5">
         <div className="max-w-4xl mx-auto relative">
-          {images.length > 0 && (
-            <div className="flex gap-3 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-              {images.map((img, idx) => (
-                 <div key={idx} className="relative group shrink-0">
-                    <img 
-                      src={`data:image/jpeg;base64,${img}`} 
-                      className="w-16 h-16 rounded-xl object-cover border border-white/10" 
-                      alt="upload preview"
-                    />
-                    <button 
-                      onClick={() => removeImage(idx)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X size={10} />
-                    </button>
-                 </div>
-              ))}
-            </div>
-          )}
-          
           <div className="absolute -top-12 left-0 right-0 flex justify-center pointer-events-none">
             <AnimatePresence>
                {isGenerating && (
@@ -282,25 +290,18 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
           
           <div className="bg-white/5 border border-white/10 rounded-2xl p-2 flex items-end gap-2 focus-within:border-white/20 transition-all shadow-2xl shadow-black/40">
              <div className="flex gap-1 mb-1 ml-1">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  hidden 
-                  accept="image/*" 
-                  multiple 
-                  onChange={handleImageUpload} 
-                />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-10 h-10 rounded-xl hover:bg-white/5 text-zinc-500 transition-colors flex items-center justify-center"
-                >
-                  <ImageIcon size={18} />
-                </button>
-                <button 
-                  className="w-10 h-10 rounded-xl hover:bg-white/5 text-zinc-500 transition-colors flex items-center justify-center"
-                >
-                  <Mic size={18} />
-                </button>
+                {speechSupported && (
+                  <button
+                    onClick={toggleDictation}
+                    title={isDictating ? "Stop dictation" : "Dictate message"}
+                    className={cn(
+                      "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
+                      isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500"
+                    )}
+                  >
+                    {isDictating ? <MicOff size={18} /> : <Mic size={18} />}
+                  </button>
+                )}
              </div>
              <div className="flex-1">
                 <textarea
@@ -323,13 +324,13 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
                   }}
                 />
              </div>
-             <button 
+             <button
                onClick={handleSendMessage}
-               disabled={(!input.trim() && images.length === 0) || isGenerating}
+               disabled={!input.trim() || isGenerating}
                className={cn(
                  "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
-                 (input.trim() || images.length > 0) && !isGenerating 
-                  ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40" 
+                 input.trim() && !isGenerating
+                  ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
                   : "bg-white/5 text-zinc-600 cursor-not-allowed"
                )}
              >
@@ -348,8 +349,10 @@ export function ChatWindow({ chat, onUpdateChat, selectedModel, settings }: Chat
               </p>
             </div>
             <div className="flex gap-4">
-               <button className="text-[10px] text-zinc-600 hover:text-zinc-300 font-bold uppercase tracking-widest">Clear</button>
-               <button className="text-[10px] text-zinc-600 hover:text-zinc-300 font-bold uppercase tracking-widest">Archive</button>
+               <button onClick={handleClearChat} className="text-[10px] text-zinc-600 hover:text-zinc-300 font-bold uppercase tracking-widest">Clear</button>
+               <button onClick={handleArchive} className="text-[10px] text-zinc-600 hover:text-zinc-300 font-bold uppercase tracking-widest flex items-center gap-1.5">
+                 <Archive size={10} /> Archive
+               </button>
             </div>
           </div>
         </div>

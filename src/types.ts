@@ -23,6 +23,7 @@ export interface Chat {
   createdAt: number;
   updatedAt: number;
   modelId: string;
+  archived?: boolean;
 }
 
 export interface AIModel {
@@ -35,6 +36,8 @@ export interface AIModel {
   downloadProgress?: number;
   parameters: string;
   type: 'General' | 'Vision' | 'Fast' | 'Reasoning';
+  /** Direct HTTPS URL to the .gguf file. Omitted for models with no working download path yet. */
+  downloadUrl?: string;
 }
 
 export interface AppSettings {
@@ -47,4 +50,8 @@ export interface AppSettings {
   temperature: number;
   topP: number;
   maxTokens: number;
+  /** CPU threads handed to the local llama.cpp context. */
+  threads: number;
+  /** Context window size (tokens) requested when the model is loaded. */
+  kvCacheSize: number;
 }

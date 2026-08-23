@@ -86,25 +86,15 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                 <div className="grid grid-cols-2 gap-3">
                   <div className="glass p-3 rounded-2xl border-white/5">
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                      <Cpu size={10} /> Architecture
+                      <Cpu size={10} /> Category
                     </p>
-                    <p className="text-zinc-300 font-mono text-xs">Llama 3 Core</p>
+                    <p className="text-zinc-300 font-mono text-xs">{model.type}</p>
                   </div>
                   <div className="glass p-3 rounded-2xl border-white/5">
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                       <Gauge size={10} /> Magnitude
                     </p>
                     <p className="text-zinc-300 font-mono text-xs">{model.parameters}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between text-[10px] text-zinc-600 font-bold uppercase tracking-[0.2em]">
-                    <span>Inference Capability</span>
-                    <span className="text-violet-400">High Resolution</span>
-                  </div>
-                  <div className="stat-bar">
-                    <div className="stat-progress bg-gradient-to-r from-violet-600 to-emerald-400" style={{ width: '85%' }}></div>
                   </div>
                 </div>
 
@@ -120,12 +110,14 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
               </CardContent>
               <CardFooter className="p-6 pt-0 flex gap-3">
                 {!model.isDownloaded ? (
-                  <Button 
-                    className="flex-1 bg-violet-600 hover:bg-violet-500 text-white gap-3 font-bold h-12 rounded-[1.25rem] shadow-xl shadow-violet-900/40"
+                  <Button
+                    className="flex-1 bg-violet-600 hover:bg-violet-500 text-white gap-3 font-bold h-12 rounded-[1.25rem] shadow-xl shadow-violet-900/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-500 disabled:shadow-none"
+                    disabled={!model.downloadUrl}
+                    title={!model.downloadUrl ? "Not wired up in this build yet" : undefined}
                     onClick={() => onDownloadModel(model.id)}
                   >
                     <Download size={18} />
-                    Download Weights
+                    {model.downloadUrl ? "Download Weights" : "Not Supported Yet"}
                   </Button>
                 ) : (
                   <>

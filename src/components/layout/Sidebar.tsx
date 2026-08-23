@@ -13,7 +13,8 @@ import {
   Terminal,
   Download,
   Info,
-  Cpu
+  Cpu,
+  ArchiveRestore
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,24 +32,31 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   chats: Chat[];
+  archivedChats?: Chat[];
   activeChatId?: string;
   setActiveChatId: (id: string) => void;
   createNewChat: () => void;
+  onUnarchiveChat?: (id: string) => void;
+  voiceEnabled?: boolean;
 }
 
-export function Sidebar({ 
-  activeTab, 
-  setActiveTab, 
-  chats, 
-  activeChatId, 
+export function Sidebar({
+  activeTab,
+  setActiveTab,
+  chats,
+  archivedChats = [],
+  activeChatId,
   setActiveChatId,
-  createNewChat
+  createNewChat,
+  onUnarchiveChat,
+  voiceEnabled = true
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [showArchived, setShowArchived] = React.useState(false);
 
   const navItems = [
     { id: "chat", label: "Chat", icon: MessageSquare },
-    { id: "voice", label: "Assistant", icon: Mic },
+    ...(voiceEnabled ? [{ id: "voice", label: "Assistant", icon: Mic }] : []),
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
@@ -145,6 +153,36 @@ export function Sidebar({
             </div>
           </div>
         )}
+
+        {!isCollapsed && activeTab === "chat" && archivedChats.length > 0 && (
+          <div className="mt-6 px-1">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="w-full px-3 text-[10px] font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-[0.2em] mb-3 text-left"
+            >
+              {showArchived ? "Hide" : "Show"} Archived ({archivedChats.length})
+            </button>
+            {showArchived && (
+              <div className="space-y-1">
+                {archivedChats.map((chat) => (
+                  <div
+                    key={chat.id}
+                    className="w-full flex items-center justify-between h-10 text-[13px] px-3 rounded-xl text-zinc-600 group"
+                  >
+                    <span className="truncate opacity-60">{chat.title || "Untitled History"}</span>
+                    <button
+                      title="Unarchive"
+                      onClick={() => onUnarchiveChat?.(chat.id)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-violet-400 transition-opacity shrink-0 ml-2"
+                    >
+                      <ArchiveRestore size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </ScrollArea>
 
       <div className="p-4 border-t border-white/5">
@@ -169,7 +207,7 @@ export function Sidebar({
   );
 }
 
-export function MobileHeader({ setActiveTab, activeTab }: { setActiveTab: (tab: string) => void, activeTab: string }) {
+export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: { setActiveTab: (tab: string) => void, activeTab: string, voiceEnabled?: boolean }) {
   return (
     <div className="h-16 glass rounded-2xl flex items-center px-6 justify-between md:hidden mb-4 border-white/5 shadow-lg">
       <div className="flex items-center gap-3">
@@ -188,7 +226,7 @@ export function MobileHeader({ setActiveTab, activeTab }: { setActiveTab: (tab: 
                <h2 className="text-xl font-bold text-white tracking-tight">Sunayna</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "voice", "models", "memory", "vision", "settings"].map((tab) => (
+               {["chat", ...(voiceEnabled ? ["voice"] : []), "models", "memory", "vision", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

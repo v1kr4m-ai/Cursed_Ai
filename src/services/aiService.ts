@@ -11,6 +11,7 @@ export interface AIGenerationOptions {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
+  memoryEnabled?: boolean;
   signal?: AbortSignal;
 }
 
@@ -91,24 +92,21 @@ export class AIService {
     options?: AIGenerationOptions
   ) {
     try {
-      const lastMessage = messages[messages.length - 1];
-      const sessionImages = lastMessage.role === MessageRole.USER ? lastMessage.images : undefined;
-
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: options?.signal,
         body: JSON.stringify({
-          messages: messages.map(m => ({ 
-            role: m.role === MessageRole.USER ? "user" : "assistant", 
-            content: m.content 
+          messages: messages.map(m => ({
+            role: m.role === MessageRole.USER ? "user" : "assistant",
+            content: m.content
           })),
-          images: sessionImages,
           model: modelId,
           options: {
             temperature: options?.temperature,
             topP: options?.topP,
-            maxTokens: options?.maxTokens
+            maxTokens: options?.maxTokens,
+            memoryEnabled: options?.memoryEnabled
           }
         })
       });

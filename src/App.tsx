@@ -22,9 +22,10 @@ const INITIAL_MODELS: AIModel[] = [
     description: "Microsoft's efficient small language model. Perfect for general assistant tasks on mobile.",
     size: "2.3 GB",
     format: "GGUF",
-    isDownloaded: true,
+    isDownloaded: false,
     parameters: "3.8B",
     type: "General",
+    downloadUrl: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
   },
   {
     id: "tinyllama",
@@ -35,6 +36,7 @@ const INITIAL_MODELS: AIModel[] = [
     isDownloaded: false,
     parameters: "1.1B",
     type: "Fast",
+    downloadUrl: "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
   },
   {
     id: "mistral-7b",
@@ -45,16 +47,19 @@ const INITIAL_MODELS: AIModel[] = [
     isDownloaded: false,
     parameters: "7B",
     type: "Reasoning",
+    downloadUrl: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
   },
   {
     id: "moondream",
     name: "Moondream 2",
-    description: "Vision-capable model. Can describe images and answer visual questions locally.",
+    description: "Vision-capable model. Image understanding isn't wired up in this build yet — downloading it won't enable vision chat.",
     size: "1.6 GB",
     format: "GGUF",
     isDownloaded: false,
     parameters: "1.6B",
     type: "Vision",
+    // No downloadUrl on purpose: there's no local vision-inference path yet,
+    // so we don't offer a download that would silently do nothing useful.
   }
 ];
 
@@ -87,13 +92,15 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({
     vulkanEnabled: true,
     theme: "dark",
-    apiPort: 11434,
+    apiPort: 3000,
     apiEnabled: false,
     memoryEnabled: true,
-    voiceEnabled: false,
+    voiceEnabled: true,
     temperature: 0.7,
     topP: 0.9,
     maxTokens: 1024,
+    threads: 4,
+    kvCacheSize: 4096,
   });
 
   const selectedModel = models.find(m => m.id === selectedModelId) || models[0];
@@ -117,45 +124,65 @@ export default function App() {
     setChats(chats.map(c => c.id === updatedChat.id ? updatedChat : c));
   };
 
-  const handleDownloadModel = (id: string) => {
-    setModels(prev => prev.map(m => {
-      if (m.id === id) {
-        return { ...m, downloadProgress: 0 };
-      }
-      return m;
-    }));
-
-    // Simulate download
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 2;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        setModels(prev => prev.map(m => {
-          if (m.id === id) {
-            return { ...m, isDownloaded: true, downloadProgress: undefined };
-          }
-          return m;
-        }));
-      } else {
-        setModels(prev => prev.map(m => {
-          if (m.id === id) {
-            return { ...m, downloadProgress: progress };
-          }
-          return m;
-        }));
-      }
-    }, 300);
+  const archiveChat = (id: string) => {
+    setChats(chats.map(c => c.id === id ? { ...c, archived: true } : c));
+    if (activeChatId === id) setActiveChatId(undefined);
   };
 
-  const handleDeleteModel = (id: string) => {
-    setModels(prev => prev.map(m => {
-      if (m.id === id) {
-        return { ...m, isDownloaded: false };
+  const unarchiveChat = (id: string) => {
+    setChats(chats.map(c => c.id === id ? { ...c, archived: false } : c));
+  };
+
+  const updateModel = (id: string, patch: Partial<AIModel>) => {
+    setModels(prev => prev.map(m => (m.id === id ? { ...m, ...patch } : m)));
+  };
+
+  const handleDownloadModel = async (id: string) => {
+    const model = models.find(m => m.id === id);
+    if (!model?.downloadUrl) return;
+
+    updateModel(id, { downloadProgress: 0 });
+
+    try {
+      const response = await fetch("/api/models/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, url: model.downloadUrl }),
+      });
+      if (!response.ok || !response.body) throw new Error("Failed to start download");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        for (const line of decoder.decode(value).split("\n\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const data = JSON.parse(line.slice(6));
+          if (data.error) throw new Error(data.error);
+          if (typeof data.progress === "number") {
+            updateModel(id, { downloadProgress: data.progress === 100 ? undefined : data.progress });
+          }
+          if (data.done) {
+            updateModel(id, { isDownloaded: true, downloadProgress: undefined });
+          }
+        }
       }
-      return m;
-    }));
+    } catch (e) {
+      console.error(`Failed to download ${id}:`, e);
+      updateModel(id, { downloadProgress: undefined });
+    }
+  };
+
+  const handleDeleteModel = async (id: string) => {
+    try {
+      await fetch(`/api/models/${id}`, { method: "DELETE" });
+    } catch (e) {
+      console.error(`Failed to delete ${id}:`, e);
+      return;
+    }
+    updateModel(id, { isDownloaded: false });
     if (selectedModelId === id) {
        setSelectedModelId("phi-3-mini");
     }
@@ -167,30 +194,34 @@ export default function App() {
         <div className="atmosphere"></div>
         {/* Desktop Sidebar */}
         <div className="hidden md:block h-full">
-          <Sidebar 
-            activeTab={activeTab} 
+          <Sidebar
+            activeTab={activeTab}
             setActiveTab={setActiveTab}
-            chats={chats}
+            chats={chats.filter(c => !c.archived)}
+            archivedChats={chats.filter(c => c.archived)}
             activeChatId={activeChatId}
             setActiveChatId={setActiveChatId}
             createNewChat={createNewChat}
+            onUnarchiveChat={unarchiveChat}
+            voiceEnabled={settings.voiceEnabled}
           />
         </div>
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
-          <MobileHeader activeTab={activeTab} setActiveTab={setActiveTab} />
-          
+          <MobileHeader activeTab={activeTab} setActiveTab={setActiveTab} voiceEnabled={settings.voiceEnabled} />
+
           <main className="flex-1 overflow-hidden h-full">
             {activeTab === "chat" && (
-              <ChatWindow 
-                chat={activeChat} 
-                onUpdateChat={updateChat} 
+              <ChatWindow
+                chat={activeChat}
+                onUpdateChat={updateChat}
+                onArchiveChat={archiveChat}
                 selectedModel={selectedModel}
                 settings={settings}
               />
             )}
-            {activeTab === "voice" && (
+            {activeTab === "voice" && settings.voiceEnabled && (
               <VoiceAssistant 
                 selectedModel={selectedModel}
                 settings={settings}

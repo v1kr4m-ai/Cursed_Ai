@@ -118,7 +118,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         signal: controller.signal,
         temperature: settings.temperature,
         topP: settings.topP,
-        maxTokens: settings.maxTokens
+        maxTokens: settings.maxTokens,
+        memoryEnabled: settings.memoryEnabled
       });
     } catch (error) {
       console.error("Voice processing failed:", error);

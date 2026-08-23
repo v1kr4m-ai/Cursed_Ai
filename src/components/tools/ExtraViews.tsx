@@ -42,6 +42,9 @@ export function MemoryView() {
   const [memories, setMemories] = React.useState<{ text: string, timestamp: number }[]>([]);
   const [newMemory, setNewMemory] = React.useState("");
   const [isAdding, setIsAdding] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+
+  const filteredMemories = memories.filter(m => m.text.toLowerCase().includes(search.toLowerCase()));
 
   const fetchMemories = async () => {
     const data = await AIService.getMemories();
@@ -97,20 +100,24 @@ export function MemoryView() {
         <div className="glass rounded-[2rem] overflow-hidden flex flex-col flex-1 shadow-2xl shadow-black/40 border-white/5">
            <div className="p-5 border-b border-white/5 flex items-center gap-4 bg-white/3">
              <Search size={18} className="text-zinc-500" />
-             <input 
-              placeholder="Search vector space..." 
+             <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search vector space..."
               className="bg-transparent border-none focus:ring-0 text-sm text-zinc-100 w-full placeholder:text-zinc-700 font-medium"
              />
            </div>
            <ScrollArea className="flex-1">
              <div className="divide-y divide-white/5">
-               {memories.length === 0 && (
+               {filteredMemories.length === 0 && (
                  <div className="p-20 text-center space-y-4">
                     <Database className="mx-auto text-zinc-800" size={48} />
-                    <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">Semantic store is empty</p>
+                    <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">
+                      {memories.length === 0 ? "Semantic store is empty" : "No memories match your search"}
+                    </p>
                  </div>
                )}
-               {memories.map((m, i) => (
+               {filteredMemories.map((m, i) => (
                  <div key={i} className="p-6 hover:bg-white/5 transition-colors group relative overflow-hidden">
                     <div className="flex justify-between items-start mb-3">
                       <div className="model-tag text-[9px]">Memory Chunk</div>
@@ -139,8 +146,8 @@ export function MemoryView() {
 
 export function EngineView() {
   const [stats, setStats] = React.useState<any>(null);
-  const [gpuLayers, setGpuLayers] = React.useState(32);
   const [isUpdatingMode, setIsUpdatingMode] = React.useState(false);
+  const [isBusyAction, setIsBusyAction] = React.useState(false);
 
   const fetchStats = async () => {
     try {
@@ -166,11 +173,34 @@ export function EngineView() {
     }
   };
 
+  const unloadEngine = async () => {
+    setIsBusyAction(true);
+    try {
+      await fetch("/api/engine/unload", { method: "POST" });
+      fetchStats();
+    } finally {
+      setIsBusyAction(false);
+    }
+  };
+
+  const wipeMemory = async () => {
+    if (!window.confirm("Delete every stored memory entry? This can't be undone.")) return;
+    setIsBusyAction(true);
+    try {
+      await fetch("/api/memory", { method: "DELETE" });
+    } finally {
+      setIsBusyAction(false);
+    }
+  };
+
   React.useEffect(() => {
     fetchStats();
     const timer = setInterval(fetchStats, 5000);
     return () => clearInterval(timer);
   }, []);
+
+  const tps: number | undefined = stats?.engine?.tps;
+  const msPerToken = tps ? Math.round(1000 / tps) : undefined;
 
   return (
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
@@ -187,24 +217,24 @@ export function EngineView() {
            <div className="glass p-6 rounded-[2rem] border-white/5 relative overflow-hidden">
                 <div className="absolute top-4 right-4"><Activity className="text-cyan-500/50" size={16} /></div>
                 <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold mb-2">Engine State</p>
-                <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">{stats?.native?.state || stats?.engine_state || stats?.model?.status || "READY"}</h4>
+                <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">{stats?.model?.status || "IDLE"}</h4>
            </div>
            <div className="glass p-6 rounded-[2rem] border-white/5 relative overflow-hidden">
                <div className="absolute top-4 right-4"><Zap className="text-yellow-500/50" size={16} /></div>
                <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold mb-2">Power Mode</p>
                <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">
-                 {stats?.performance_mode || (stats?.model?.status === "busy" ? "PERFORMANCE" : "BALANCED")}
+                 {stats?.performanceMode || "BALANCED"}
                </h4>
            </div>
            <div className="glass p-6 rounded-[2rem] border-white/5 relative overflow-hidden">
-               <div className="absolute top-4 right-4"><Eye className="text-pink-500/50" size={16} /></div>
-               <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold mb-2">Vision Pipeline</p>
-               <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">LOCAL-CLIP</h4>
+               <div className="absolute top-4 right-4"><Cpu className="text-violet-500/50" size={16} /></div>
+               <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold mb-2">Active Model</p>
+               <h4 className="text-lg font-black text-white italic tracking-tighter uppercase truncate">{stats?.model?.active || "None"}</h4>
            </div>
            <div className="glass p-6 rounded-[2rem] border-white/5 relative overflow-hidden">
-               <div className="absolute top-4 right-4"><Mic className="text-emerald-500/50" size={16} /></div>
-               <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold mb-2">Speech Pipeline</p>
-               <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">WHISPER</h4>
+               <div className="absolute top-4 right-4"><Zap className="text-emerald-500/50" size={16} /></div>
+               <p className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold mb-2">Tokens This Session</p>
+               <h4 className="text-2xl font-black text-white italic tracking-tighter uppercase">{stats?.engine?.totalTokens ?? 0}</h4>
            </div>
         </div>
 
@@ -226,7 +256,7 @@ export function EngineView() {
                         key={mode.id}
                         onClick={() => setMode(mode.id)}
                         disabled={isUpdatingMode}
-                        className={`glass p-6 rounded-[2rem] border-white/5 flex flex-col items-center gap-3 transition-all hover:bg-white/5 ${stats?.performance_mode === mode.id ? 'ring-2 ring-cyan-500/50 bg-white/5' : ''}`}
+                        className={`glass p-6 rounded-[2rem] border-white/5 flex flex-col items-center gap-3 transition-all hover:bg-white/5 ${stats?.performanceMode === mode.id ? 'ring-2 ring-cyan-500/50 bg-white/5' : ''}`}
                       >
                         <mode.icon className={`${mode.color}`} size={24} />
                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{mode.label}</span>
@@ -239,29 +269,29 @@ export function EngineView() {
                  <div className="grid grid-cols-2 gap-6">
                    <div className="glass p-8 rounded-[2rem] border-white/5 space-y-4">
                       <div className="flex items-center gap-3 mb-2">
-                        <ImageIcon className="text-pink-500" size={18} />
+                        <ImageIcon className="text-zinc-500" size={18} />
                         <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Image Reasoning</h3>
                       </div>
                       <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-                        Multimodal vision encoder enabled. Support for Moondream/LLaVA path projection.
+                        Not wired up in this build — see the Vision tab. No local vision model is loaded yet.
                       </p>
                       <div className="flex items-center gap-2 pt-2">
-                         <div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>
-                         <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Projection active</span>
+                         <div className="w-1.5 h-1.5 rounded-full bg-zinc-600"></div>
+                         <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Not available</span>
                       </div>
                    </div>
 
                    <div className="glass p-8 rounded-[2rem] border-white/5 space-y-4">
                       <div className="flex items-center gap-3 mb-2">
                         <Mic className="text-emerald-500" size={18} />
-                        <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Local Transcription</h3>
+                        <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Speech-to-Text</h3>
                       </div>
                       <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-                        Whisper tiny/base engine available for secure, offline speech-to-text.
+                        Handled by your browser's built-in speech recognition (Voice tab / mic button) — no local model needed.
                       </p>
                       <div className="flex items-center gap-2 pt-2">
                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                         <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Whisper ready</span>
+                         <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Browser API</span>
                       </div>
                    </div>
                  </div>
@@ -278,7 +308,7 @@ export function EngineView() {
                        <p className="text-zinc-600 text-[8px] uppercase tracking-widest font-bold">Inference Speed</p>
                        <div className="flex items-baseline gap-2">
                          <span className="text-2xl font-black text-white italic tracking-tighter">
-                           {stats?.native?.tps?.toFixed(1) || "---"}
+                           {tps ? tps.toFixed(1) : "---"}
                          </span>
                          <span className="text-[10px] font-bold text-zinc-500 uppercase">tokens/sec</span>
                        </div>
@@ -287,7 +317,7 @@ export function EngineView() {
                        <p className="text-zinc-600 text-[8px] uppercase tracking-widest font-bold">Total Processed</p>
                        <div className="flex items-baseline gap-2">
                          <span className="text-2xl font-black text-white italic tracking-tighter">
-                           {stats?.native?.total_tokens || "---"}
+                           {stats?.engine?.totalTokens ?? "---"}
                          </span>
                          <span className="text-[10px] font-bold text-zinc-500 uppercase">tokens</span>
                        </div>
@@ -297,42 +327,29 @@ export function EngineView() {
                  <div className="grid grid-cols-2 gap-4">
                     <div className="glass p-4 rounded-3xl border-white/5 flex items-center justify-between">
                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Compute Threads</span>
-                       <span className="text-sm font-black text-cyan-400 font-mono">{stats?.native?.threads || "---"}</span>
+                       <span className="text-sm font-black text-cyan-400 font-mono">{stats?.engine?.threads ?? "---"}</span>
                     </div>
                     <div className="glass p-4 rounded-3xl border-white/5 flex items-center justify-between">
                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Batch Size</span>
-                       <span className="text-sm font-black text-emerald-400 font-mono">{stats?.native?.batch || "---"}</span>
+                       <span className="text-sm font-black text-emerald-400 font-mono">{stats?.engine?.batch ?? "---"}</span>
                     </div>
                  </div>
 
                  <div className="space-y-8 glass p-8 rounded-[2rem] border-white/5 shadow-2xl">
                     <div className="space-y-3">
                        <div className="flex justify-between items-end">
-                          <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Inference Response Delay (Native)</Label>
-                          <span className="text-xs font-mono text-cyan-500">12ms / token</span>
-                       </div>
-                       <div className="stat-bar h-1.5">
-                          <div className="stat-progress bg-cyan-500" style={{ width: "15%" }}></div>
+                          <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Response Delay (last generation)</Label>
+                          <span className="text-xs font-mono text-cyan-500">{msPerToken ? `${msPerToken}ms / token` : "---"}</span>
                        </div>
                     </div>
 
                     <div className="space-y-3">
                        <div className="flex justify-between items-end">
-                          <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">System Memory Usage (RAM)</Label>
-                          <span className="text-xs font-mono text-white">{stats?.native?.ram || stats?.ram?.heapUsed || "---"} / 8GB</span>
+                          <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Node Heap Usage (RAM)</Label>
+                          <span className="text-xs font-mono text-white">{stats?.ram?.heapUsed || "---"} / {stats?.ram?.heapTotal || "---"}</span>
                        </div>
                        <div className="stat-bar h-1.5">
-                          <div className="stat-progress bg-white" style={{ width: stats?.native?.ram ? "55%" : (stats?.ram?.heapUsed ? "30%" : "52%") }}></div>
-                       </div>
-                    </div>
-
-                    <div className="space-y-3">
-                       <div className="flex justify-between items-end">
-                          <Label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Core Temperature</Label>
-                          <span className="text-xs font-mono text-red-500">{stats?.native?.temp || "39°C"}</span>
-                       </div>
-                       <div className="stat-bar h-1.5">
-                          <div className="stat-progress bg-red-600" style={{ width: "39%" }}></div>
+                          <div className="stat-progress bg-white" style={{ width: `${stats?.ram?.heapUsedPct ?? 0}%` }}></div>
                        </div>
                     </div>
                  </div>
@@ -347,29 +364,37 @@ export function EngineView() {
                       <Cpu size={80} />
                     </div>
                     <h3 className="text-lg font-black text-white italic mb-1 tracking-tighter uppercase">
-                      {stats?.active_model ? stats.active_model.split('/').pop() : "NONE"}
+                      {stats?.model?.active || "NONE"}
                     </h3>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed mb-4">GGUF Warm Cache</p>
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${stats?.active_model ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${stats?.active_model ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {stats?.active_model ? 'Cached in RAM' : 'Cold Storage'}
+                      <div className={`w-2 h-2 rounded-full ${stats?.model?.active ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${stats?.model?.active ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {stats?.model?.active ? 'Cached in RAM' : 'Cold Storage'}
                       </span>
                     </div>
                  </div>
               </section>
 
               <section className="space-y-6">
-                 <h2 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] border-b border-white/5 pb-3">Mobile Safety</h2>
+                 <h2 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] border-b border-white/5 pb-3">Runtime Controls</h2>
                  <div className="space-y-4">
-                    <div className="glass p-4 rounded-2xl border-white/5 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors">
+                    <button
+                      onClick={unloadEngine}
+                      disabled={isBusyAction}
+                      className="w-full glass p-4 rounded-2xl border-white/5 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors disabled:opacity-40"
+                    >
                       <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Unload Engine</span>
                       <RotateCcw size={14} className="text-zinc-600 group-hover:text-red-500 transition-colors" />
-                    </div>
-                    <div className="glass p-4 rounded-2xl border-white/5 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Wipe Shared Cache</span>
+                    </button>
+                    <button
+                      onClick={wipeMemory}
+                      disabled={isBusyAction}
+                      className="w-full glass p-4 rounded-2xl border-white/5 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors disabled:opacity-40"
+                    >
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Wipe Memory Store</span>
                       <Database size={14} className="text-zinc-600 group-hover:text-violet-500 transition-colors" />
-                    </div>
+                    </button>
                  </div>
               </section>
            </div>
@@ -392,6 +417,18 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
     return () => clearInterval(interval);
   }, []);
 
+  const updateEngineConfig = async (patch: { threads?: number; kvCacheSize?: number }) => {
+    try {
+      await fetch("/api/engine-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+    } catch (e) {
+      console.error("Failed to update engine config", e);
+    }
+  };
+
   return (
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
       <div className="max-w-4xl mx-auto h-full flex flex-col">
@@ -400,7 +437,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
               <Settings className="text-violet-500" size={32} />
               Engine Config
             </h1>
-            <p className="text-zinc-500 text-sm font-medium uppercase tracking-[0.2em]">System Optimization • Adreno 750 Core</p>
+            <p className="text-zinc-500 text-sm font-medium uppercase tracking-[0.2em]">System Optimization • Local Runtime</p>
         </header>
 
         <ScrollArea className="flex-1 pr-2 scrollbar-hide">
@@ -414,9 +451,9 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                          <div className="p-2 rounded-xl bg-violet-600/20 text-violet-400">
                            <Database size={16} />
                          </div>
-                         <span className="text-sm font-bold text-zinc-300">Native RAM</span>
+                         <span className="text-sm font-bold text-zinc-300">Node Heap</span>
                       </div>
-                      <span className="text-sm font-mono text-violet-400">{stats.native?.ram || stats.ram?.heapUsed || "---"}</span>
+                      <span className="text-sm font-mono text-violet-400">{stats.ram?.heapUsed || "---"}</span>
                     </div>
                     <div className="glass p-5 rounded-3xl border-white/5 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -425,8 +462,8 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                          </div>
                          <span className="text-sm font-bold text-zinc-300">Engine Status</span>
                       </div>
-                      <Badge variant="outline" className={`text-[9px] uppercase font-bold tracking-widest ${(stats.native?.state || stats.engine_state || stats.model?.status) === 'busy' ? 'border-amber-500 text-amber-500' : 'border-emerald-500 text-emerald-500'}`}>
-                         {stats.native?.state || stats.engine_state || stats.model?.status || "READY"}
+                      <Badge variant="outline" className={`text-[9px] uppercase font-bold tracking-widest ${stats.model?.status === 'busy' ? 'border-amber-500 text-amber-500' : 'border-emerald-500 text-emerald-500'}`}>
+                         {stats.model?.status || "IDLE"}
                       </Badge>
                     </div>
                  </div>
@@ -516,45 +553,54 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="glass p-6 rounded-[2rem] border-white/5">
                      <Label className="text-zinc-100 font-bold text-sm mb-6 block tracking-tight">Inference Threads</Label>
-                     <Slider defaultValue={[4]} max={8} step={1} className="mb-6" />
+                     <Slider
+                        value={[settings.threads]}
+                        min={1}
+                        max={16}
+                        step={1}
+                        className="mb-6"
+                        onValueChange={(val) => {
+                          const threads = Array.isArray(val) ? val[0] : val;
+                          setSettings({ ...settings, threads });
+                          updateEngineConfig({ threads });
+                        }}
+                     />
                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Efficiency Mode</span>
-                        <span className="text-violet-400 font-mono text-xs">4 Cores Active</span>
+                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Applied on next reply</span>
+                        <span className="text-violet-400 font-mono text-xs">{settings.threads} Cores</span>
                      </div>
                   </div>
                   <div className="glass p-6 rounded-[2rem] border-white/5">
                      <Label className="text-zinc-100 font-bold text-sm mb-6 block tracking-tight">KV Cache Size</Label>
-                     <Slider defaultValue={[4096]} max={32768} step={1024} className="mb-6" />
+                     <Slider
+                        value={[settings.kvCacheSize]}
+                        min={1024}
+                        max={32768}
+                        step={1024}
+                        className="mb-6"
+                        onValueChange={(val) => {
+                          const kvCacheSize = Array.isArray(val) ? val[0] : val;
+                          setSettings({ ...settings, kvCacheSize });
+                          updateEngineConfig({ kvCacheSize });
+                        }}
+                     />
                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Memory Limit</span>
-                        <span className="text-violet-400 font-mono text-xs">4096 Tokens</span>
+                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Applied on next model load</span>
+                        <span className="text-violet-400 font-mono text-xs">{settings.kvCacheSize} Tokens</span>
                      </div>
                   </div>
                </div>
             </section>
 
             <section className="space-y-6">
-               <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] border-b border-white/5 pb-3">Integrations</h3>
-               <div className="flex items-center justify-between rounded-3xl glass p-6 border-white/5 shadow-xl transition-all hover:bg-white/[0.02]">
-                 <div className="space-y-2">
-                   <Label className="text-zinc-100 font-bold text-lg tracking-tight">Ollama-Compatible API</Label>
-                   <p className="text-sm text-zinc-500">Expose local host for external connections via Wi-Fi.</p>
-                 </div>
-                 <Switch 
-                   checked={settings.apiEnabled} 
-                   onCheckedChange={(val) => setSettings({ ...settings, apiEnabled: val })} 
-                   className="data-[state=checked]:bg-violet-600"
-                 />
+               <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] border-b border-white/5 pb-3">Network</h3>
+               <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4 group">
+                  <Globe size={18} className="text-emerald-400 animate-pulse" />
+                  <div>
+                    <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-1">Reachable On Your Network At</p>
+                    <p className="text-emerald-300 font-mono text-sm tracking-tight italic">{stats?.localAddress || `http://localhost:${settings.apiPort}/api/*`}</p>
+                  </div>
                </div>
-               {settings.apiEnabled && (
-                 <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4 group">
-                    <Globe size={18} className="text-emerald-400 animate-pulse" />
-                    <div>
-                      <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-1">Local Address</p>
-                      <p className="text-emerald-300 font-mono text-sm tracking-tight italic">http://192.168.1.15:{settings.apiPort}/api/*</p>
-                    </div>
-                 </div>
-               )}
             </section>
 
             <section className="space-y-6">
@@ -587,7 +633,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                   <Shield size={12} className="text-emerald-400" />
                   <span className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Zero-Cloud Security Architecture</span>
                </div>
-               <p className="text-[9px] text-zinc-700 font-mono">SUNAYNA CORE v0.9.2-STABLE • ANDROID RUNTIME</p>
+               <p className="text-[9px] text-zinc-700 font-mono">SUNAYNA CORE • LOCAL RUNTIME</p>
             </div>
           </div>
         </ScrollArea>
