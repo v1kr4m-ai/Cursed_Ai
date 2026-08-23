@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application' version '9.2.1' apply false
     id 'com.android.library' version '9.2.1' apply false
     id 'org.jetbrains.kotlin.android' version '2.2.10' apply false
+    // Required for @Serializable to actually generate a serializer at compile
+    // time - without this plugin, the annotation is inert and every
+    // kotlinx.serialization lookup fails at runtime with "Serializer for
+    // class 'X' is not found", which is exactly what was happening here.
+    id 'org.jetbrains.kotlin.plugin.serialization' version '2.2.10' apply false
 }
 
 task clean(type: Delete) {

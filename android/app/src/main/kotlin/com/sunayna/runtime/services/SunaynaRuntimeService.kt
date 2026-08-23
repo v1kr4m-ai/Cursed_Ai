@@ -55,6 +55,7 @@ class SunaynaRuntimeService : Service() {
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
 
         // Start the localhost API server
+        ModelManager.configure(applicationContext)
         apiServer = ApiServer(context = this)
         apiServer?.start()
     }

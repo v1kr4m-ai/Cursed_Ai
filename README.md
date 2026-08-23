@@ -1,11 +1,11 @@
 # Sunayna AI
 
-Offline-first local-LLM chat app. One codebase, two targets — **only the web/desktop target actually runs local inference today**; see [Known limitations](#known-limitations--android) before building the APK expecting real on-device chat.
+Offline-first local-LLM chat app. One codebase, two targets, both running real local inference:
 
-- **Web/desktop** — React + Express server, runs GGUF models on-device via `node-llama-cpp`. Fully functional.
-- **Android** — native shell (Kotlin/JNI, WebView UI) that builds and installs, but its C++ inference engine is currently a stub — see below.
+- **Web/desktop** — React + Express server, runs GGUF models on-device via `node-llama-cpp`. The more mature target — also has real multi-turn history and RAG.
+- **Android** — native app embedding real llama.cpp (vendored, CPU backend) via JNI, with the same React UI in a WebView. Verified loading real GGUF files and generating real tokens on-device; see [Android native engine status](#android-native-engine-status) for what's still rough (no GPU backend yet, single-turn only, no vision/speech).
 
-Everything real (inference, memory/RAG, voice) runs locally on the web target. An optional Gemini cloud fallback exists behind a mode switch, off by default.
+An optional Gemini cloud fallback exists behind a mode switch, off by default.
 
 ## Features
 
@@ -26,7 +26,7 @@ Everything real (inference, memory/RAG, voice) runs locally on the web target. A
 | Local inference (desktop) | `node-llama-cpp` |
 | Embeddings | `@xenova/transformers` (MiniLM-L6-v2) |
 | Cloud fallback (optional) | `@google/genai` / `@google/generative-ai` (Gemini) |
-| Android | Kotlin + JNI bridge to native llama.cpp/GGML, Vulkan backend, CMake/NDK build |
+| Android | Kotlin + JNI bridge to real vendored llama.cpp/GGML (CPU backend; Vulkan wired but off pending Vulkan SDK), CMake/NDK build |
 
 ## Repo layout
 
@@ -76,28 +76,31 @@ Set `GEMINI_API_KEY` in `.env.local` only if you want the optional cloud fallbac
 
 ## Building the Android app
 
-1. Install Android Studio, Node.js, Git, Visual Studio Build Tools (Desktop development with C++), Android NDK, CMake.
+1. Install Android Studio, Node.js, Git, Visual Studio Build Tools (Desktop development with C++), Android NDK 26.1.10909125, CMake 3.22.1.
 2. `npm install && npm run build` to produce `dist/`.
-3. Copy `dist/*` into `android/app/src/main/assests/www/` (note the typo in that folder name — it's real, matches what `ApiServer.kt` serves from; embeds the frontend as the in-app WebView UI).
-4. Open `android/` in Android Studio; let Gradle/NDK/CMake sync.
-5. Build — this compiles and installs fine with the toolchain above (SDK, NDK, CMake, JDK 17). The APK launches, the UI works, and every screen renders — but read [Known limitations](#known-limitations--android) below before expecting real on-device chat.
-6. GGUF model files are **not** bundled in the APK — push them to the device separately (e.g. `adb push model.gguf /sdcard/Sunayna/models/`).
+3. Copy `dist/*` into `android/app/src/main/assets/www/` (`context.assets` in `ApiServer.kt` only ever reads Android's real `assets/` source folder — an earlier, typo'd `assests/www/` folder existed alongside it for a while and was never actually packaged into the APK; it's been removed).
+4. Open `android/` in Android Studio; let Gradle/NDK/CMake sync. llama.cpp is vendored directly under `android/app/src/main/cpp/llama.cpp/` (not a submodule) — no extra init step needed.
+5. Build. This compiles real llama.cpp + GGML into the APK (`libggml.so`, `libllama.so`, `libsunayna-local-engine.so`) — CPU backend only for now, see Vulkan note below.
+6. GGUF model files are **not** bundled in the APK. Push them to the app's own external files dir (no storage permissions needed there, unlike `/sdcard` directly, which modern Android's scoped storage blocks regular apps from reading):
+   ```bash
+   adb push model.gguf /sdcard/Android/data/com.sunayna.runtime/files/models/model.gguf
+   ```
 
 `2. Android/build.ps1` and `2. Android/run.bat` are helper scripts for this flow.
 
-## Known limitations — Android
+## Android native engine status
 
-The Android build compiles and runs, but its native inference engine ([`android/app/src/main/cpp/sunayna-local-engine.cpp`](android/app/src/main/cpp/sunayna-local-engine.cpp)) is currently a **stub, not a real llama.cpp integration**:
+The native engine ([`sunayna-local-engine.cpp`](android/app/src/main/cpp/sunayna-local-engine.cpp)) is now a **real llama.cpp integration**, not the earlier stub — verified end-to-end on an emulator: real GGUF loading (correct model size/context reported from the actual file), real tokenize → decode → sample loop producing real tokens (confirmed via a monotonically-increasing real token counter in `/api/stats`, impossible to get from canned text), and real cancellation on client disconnect.
 
-- `CMakeLists.txt` has the actual llama.cpp subdirectory and library link commented out (`# add_subdirectory(llama.cpp)`, `# llama (native llama.cpp library)`) — nothing real is linked in.
-- `loadModel()` never parses a GGUF file; it just checks the filename contains `.gguf` and returns a fake handle.
-- `generate()` **ignores the prompt** and streams the same hardcoded sentence every time, regardless of model or input.
-- `processImage()` (vision) and `transcribeAudio()` (Whisper) both return canned, hardcoded responses.
-- `getStats()` returns fabricated constants (fixed RAM/VRAM/temperature), not real device readings.
+What's still rough:
 
-Practically: the APK installs, launches, and the UI responds, but on-device chat always returns the same canned sentence — it is not running any GGUF model. Making this real requires vendoring llama.cpp into `android/app/src/main/cpp/`, writing real JNI bindings, and building the Vulkan backend for Android — a substantial, separate effort tracked outside this pass.
+- **Vulkan (GPU) backend is off**, CPU-only for now. `ggml-vulkan`'s CMake requires `find_package(SPIRV-Headers CONFIG REQUIRED)`, which needs the full LunarG Vulkan SDK on the host (the Android NDK only bundles `glslc` itself, not SPIRV-Headers/Tools). `CMakeLists.txt` has `GGML_VULKAN` forced `OFF` with the reasoning inline — flip it to `ON` once the SDK is installed; the NDK-bundled-glslc wiring in `build.gradle` is already in place.
+- **Multi-turn history isn't threaded through yet** — `ApiServer.kt`'s `/api/chat` still only forwards the latest `prompt`, not the `messages` array, so each native `generate()` call is a fresh single-turn completion (the KV cache is explicitly cleared per call for exactly this reason). Real chat-history continuity needs `request.messages` wired into a prompt built via `llama_chat_apply_template`.
+- **No vision or speech models are vendored** — `processImage()`/`transcribeAudio()` honestly return a "not implemented" error/empty string rather than fake output (see `MultimodalManager.kt`).
+- CPU-only inference on an unaccelerated x86_64 emulator is very slow (tens of seconds per token in testing) — this is an emulator/virtualization limitation, not a code issue. A real device (native ARM silicon) or a properly hardware-accelerated emulator will be dramatically faster.
+- Requires the `org.jetbrains.kotlin.plugin.serialization` Gradle plugin (now applied) — without it, every `@Serializable` response class silently fails at runtime with "Serializer for class 'X' is not found", which is a symptom worth recognizing if it resurfaces after future dependency changes.
 
-The **web/desktop target is the fully real one** — `node-llama-cpp` genuinely loads and runs GGUF models there.
+The **web/desktop target remains the more mature one** (real multi-turn history, real RAG, verified fast) — `node-llama-cpp` genuinely loads and runs GGUF models there too.
 
 ## Known issues / recent fixes
 
@@ -118,4 +121,4 @@ The **web/desktop target is the fully real one** — `node-llama-cpp` genuinely 
 
 ## Status
 
-Web/desktop: working local-first chat app — real inference, real memory/RAG, real voice, real model management, verified end-to-end. Android: builds and installs, full UI, but on-device inference is a stub pending real llama.cpp integration.
+Web/desktop: working local-first chat app — real inference, real memory/RAG, real voice, real model management, verified end-to-end. Android: real llama.cpp inference verified on-device (CPU backend); GPU backend, multi-turn history, and vision/speech are tracked follow-up work (see [Android native engine status](#android-native-engine-status)).

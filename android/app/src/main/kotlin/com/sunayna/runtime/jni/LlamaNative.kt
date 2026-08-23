@@ -18,10 +18,12 @@ object LlamaNative {
     /**
      * Generates tokens based on a prompt.
      * @param modelHandler the pointer returned by loadModel
-     * @param options JSON string of inference options (temperature, top_p, etc.)
+     * @param temperature sampling temperature (<= 0 uses the native default)
+     * @param topP nucleus sampling threshold (<= 0 uses the native default)
+     * @param maxTokens maximum tokens to generate (<= 0 uses the native default)
      * @param callback a callback to receive tokens in real-time
      */
-    external fun generate(modelHandler: Long, prompt: String, options: String, callback: ModelCallback)
+    external fun generate(modelHandler: Long, prompt: String, temperature: Float, topP: Float, maxTokens: Int, callback: ModelCallback)
 
     /**
      * Stops the current generation process.
@@ -34,12 +36,15 @@ object LlamaNative {
     external fun releaseModel(modelHandler: Long)
 
     /**
-     * Process an image for vision reasoning (Moondream/LLaVA).
+     * Not implemented: no CLIP model is vendored in this build. Returns a
+     * JSON error string rather than pretending to embed the image.
      */
     external fun processImage(modelHandler: Long, imageData: ByteArray): String
 
     /**
-     * Transcribe audio using Whisper.
+     * Not implemented: no Whisper model is vendored in this build (voice
+     * input uses the browser's Web Speech API instead, which never calls
+     * this). Returns an empty string.
      */
     external fun transcribeAudio(modelHandler: Long, pcmData: ShortArray): String
 

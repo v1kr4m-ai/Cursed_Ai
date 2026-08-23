@@ -1,7 +1,24 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.serialization'
 }
+
+// The ggml Vulkan backend compiles GLSL compute shaders to SPIR-V at build
+// time via glslc. Rather than requiring a separate LunarG Vulkan SDK install,
+// point CMake at the copy the Android NDK already bundles for native Vulkan
+// game development.
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localProps.load(new FileInputStream(localPropsFile))
+}
+def sdkDir = localProps.getProperty('sdk.dir') ?: System.getenv('ANDROID_HOME')
+def ndkVer = "26.1.10909125"
+def isWindows = org.gradle.internal.os.OperatingSystem.current().isWindows()
+def isMac = org.gradle.internal.os.OperatingSystem.current().isMacOsX()
+def hostTag = isWindows ? "windows-x86_64" : (isMac ? "darwin-x86_64" : "linux-x86_64")
+def glslcPath = "${sdkDir}/ndk/${ndkVer}/shader-tools/${hostTag}/glslc${isWindows ? '.exe' : ''}"
 
 android {
     namespace 'com.sunayna.runtime'
@@ -20,7 +37,11 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++17 -fexceptions"
-                arguments "-DGGML_VULKAN=1" // Enable Vulkan in pre-config
+                // Vulkan is force-disabled in CMakeLists.txt until the LunarG Vulkan SDK
+                // is installed (see the comment there). -DVulkan_GLSLC_EXECUTABLE is inert
+                // while that's the case, but stays wired so flipping GGML_VULKAN back on
+                // there is the only change needed once the SDK is present.
+                arguments "-DVulkan_GLSLC_EXECUTABLE=${glslcPath}"
             }
         }
         

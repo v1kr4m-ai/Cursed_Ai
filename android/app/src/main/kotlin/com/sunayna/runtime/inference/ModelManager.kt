@@ -1,9 +1,24 @@
 package com.sunayna.runtime.inference
 
+import android.content.Context
 import com.sunayna.runtime.jni.LlamaNative
 import java.io.File
 
 object ModelManager {
+    // Default before configure() runs. Real devices from Android 10+ enforce
+    // scoped storage, which makes plain "/sdcard/..." paths unreadable to
+    // this app's process even with READ/WRITE_EXTERNAL_STORAGE declared (that
+    // permission is effectively a no-op for shared storage on modern
+    // Android) - configure() switches this to the app's own external files
+    // dir, which needs zero runtime permissions.
+    var modelsDir: String = "/sdcard/Sunayna/models"
+        private set
+
+    fun configure(context: Context) {
+        modelsDir = context.getExternalFilesDir("models")?.absolutePath ?: modelsDir
+        android.util.Log.i("ModelManager", "Models directory: $modelsDir")
+    }
+
     var modelHandler: Long = 0
         private set
     private var activeModelPath: String? = null
@@ -41,7 +56,7 @@ object ModelManager {
     fun isModelLoaded(): Boolean = modelHandler != 0L
 
     fun getOrLoadModel(modelName: String, gpuLayers: Int = 32): Long {
-        val path = "/sdcard/Sunayna/models/$modelName.gguf"
+        val path = "$modelsDir/$modelName.gguf"
         
         // Caching Logic: If already loaded, just reuse
         if (activeModelPath == path && modelHandler != 0L) {
