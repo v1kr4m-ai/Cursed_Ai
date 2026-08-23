@@ -1,0 +1,27 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# GGUF model weights — too large for git, download separately (see README)
+GGUF/*.gguf
+models/
+*.gguf
+
+# Android build output / IDE / native build caches
+android/.gradle/
+android/.idea/
+android/.kotlin/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+*.apk
+*.aab
+
+# Editor
+.vscode/
