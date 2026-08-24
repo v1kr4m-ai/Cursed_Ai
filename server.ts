@@ -5,6 +5,7 @@ import os from "os";
 import { createServer as createViteServer } from "vite";
 import { getLlama, LlamaChatSession } from "node-llama-cpp";
 import { pipeline } from "@xenova/transformers";
+import { GoogleGenAI } from "@google/genai";
 
 type PerformanceMode = "BATTERY_SAVER" | "BALANCED" | "PERFORMANCE";
 
@@ -26,9 +27,47 @@ function getLocalNetworkAddress(): string {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
+
+  // --- Console log capture: real ring buffer + SSE, backs the Console tab.
+  // Every console.log/info/warn/error call in this process (including the
+  // ones already scattered through this file) gets mirrored here.
+  const MAX_LOG_LINES = 500;
+  const logBuffer: { id: number; level: string; message: string; timestamp: number }[] = [];
+  let logIdCounter = 0;
+  const logSubscribers = new Set<express.Response>();
+
+  function formatLogArg(a: any): string {
+    if (typeof a === "string") return a;
+    // Error objects need special handling: their message/stack aren't
+    // enumerable own properties, so JSON.stringify(error) is always "{}".
+    if (a instanceof Error) return a.stack || `${a.name}: ${a.message}`;
+    try {
+      return JSON.stringify(a);
+    } catch {
+      return String(a);
+    }
+  }
+
+  function pushLog(level: "log" | "info" | "warn" | "error", args: any[]) {
+    const message = args.map(formatLogArg).join(" ");
+    const entry = { id: ++logIdCounter, level, message, timestamp: Date.now() };
+    logBuffer.push(entry);
+    if (logBuffer.length > MAX_LOG_LINES) logBuffer.shift();
+    for (const res of logSubscribers) {
+      res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    }
+  }
+
+  const originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
+  (["log", "info", "warn", "error"] as const).forEach(level => {
+    console[level] = (...args: any[]) => {
+      originalConsole[level](...args);
+      pushLog(level, args);
+    };
+  });
 
   let llama: any = null;
   let modelInstance: any = null;
@@ -64,12 +103,44 @@ async function startServer() {
     fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryStore, null, 2));
   }
 
+  // Single-flight guards: two requests arriving before the first model
+  // finishes loading must await the SAME promise, not each start their own
+  // pipeline() call — transformers.js writes the downloaded model files to
+  // a shared on-disk cache, and two concurrent first-loads racing to write
+  // the same cache files corrupts them (this was a real, reproduced bug —
+  // "Unsupported model type: whisper" from a torn config.json/onnx file).
+  let embedderPromise: Promise<any> | null = null;
   async function ensureEmbedder() {
-    if (!embedder) {
+    if (!embedderPromise) {
       console.log("[Memory] Loading embedding model (MiniLM-L6-v2)...");
-      embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+      embedderPromise = pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
     }
-    return embedder;
+    return embedderPromise;
+  }
+
+  // Local offline speech-to-text (Whisper via transformers.js — runs
+  // on-device in this Node process, no audio ever leaves the machine).
+  let transcriberPromise: Promise<any> | null = null;
+  async function ensureTranscriber() {
+    if (!transcriberPromise) {
+      console.log("[Voice] Loading local Whisper model (whisper-tiny.en)...");
+      transcriberPromise = pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en");
+    }
+    return transcriberPromise;
+  }
+
+  // Cloud image/video generation (Gemini) — the one feature in this app that
+  // genuinely needs internet + an API key. Chat/memory/voice stay local.
+  let genAI: GoogleGenAI | null = null;
+  function getGenAI(): GoogleGenAI {
+    if (!genAI) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY not set — add it to .env.local to use image/video generation.");
+      }
+      genAI = new GoogleGenAI({ apiKey });
+    }
+    return genAI;
   }
 
   function cosineSimilarity(v1: number[], v2: number[]) {
@@ -100,7 +171,25 @@ async function startServer() {
       .filter(m => m.score > 0.5); // Minimum threshold
   }
 
-  const MODELS_DIR = path.join(process.cwd(), "models");
+  // Config persistence (currently just modelsDir) — a real, user-editable
+  // override for where GGUF files live, instead of a hardcoded "models/".
+  const CONFIG_FILE = path.join(process.cwd(), "config.json");
+  interface ServerConfig { modelsDir?: string }
+  let serverConfig: ServerConfig = {};
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      serverConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    } catch (e) {
+      console.error("[Config] Failed to load config.json", e);
+    }
+  }
+  function saveConfig() {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(serverConfig, null, 2));
+  }
+
+  let MODELS_DIR = serverConfig.modelsDir && fs.existsSync(serverConfig.modelsDir)
+    ? serverConfig.modelsDir
+    : path.join(process.cwd(), "models");
   fs.mkdirSync(MODELS_DIR, { recursive: true });
 
   async function ensureLlama() {
@@ -411,6 +500,169 @@ async function startServer() {
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // API Route: Server config (currently just the models directory override)
+  app.get("/api/config", (req, res) => {
+    res.json({ modelsDir: MODELS_DIR, isDefault: !serverConfig.modelsDir });
+  });
+
+  app.post("/api/config", (req, res) => {
+    const { modelsDir } = req.body;
+    if (typeof modelsDir !== "string" || !modelsDir.trim()) {
+      return res.status(400).json({ error: "modelsDir is required" });
+    }
+    try {
+      if (!fs.existsSync(modelsDir)) {
+        fs.mkdirSync(modelsDir, { recursive: true });
+      }
+      const stat = fs.statSync(modelsDir);
+      if (!stat.isDirectory()) {
+        return res.status(400).json({ error: "Path exists but is not a directory" });
+      }
+      MODELS_DIR = modelsDir;
+      serverConfig.modelsDir = modelsDir;
+      saveConfig();
+      console.log(`[Config] Models directory set to: ${MODELS_DIR}`);
+      res.json({ modelsDir: MODELS_DIR, isDefault: false });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // API Route: Console — real log history + live SSE stream, backs the Console tab.
+  app.get("/api/console/history", (req, res) => {
+    res.json(logBuffer);
+  });
+
+  app.get("/api/console/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    logSubscribers.add(res);
+    req.on("close", () => logSubscribers.delete(res));
+  });
+
+  // API Route: Local offline voice transcription (Whisper via transformers.js).
+  // transformers.js's ASR pipeline needs raw Float32 PCM samples at 16kHz
+  // mono when running in Node (it has no AudioContext to decode compressed
+  // audio itself, unlike in a browser) - the client decodes/resamples the
+  // recording before sending, and posts the raw Float32Array bytes here.
+  app.post("/api/voice/transcribe", express.raw({ type: "application/octet-stream", limit: "25mb" }), async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: "No audio data received" });
+    }
+    if (req.body.length % 4 !== 0) {
+      return res.status(400).json({ error: "Audio payload must be raw 32-bit float PCM (length not a multiple of 4)" });
+    }
+    try {
+      const t = await ensureTranscriber();
+      const samples = new Float32Array(req.body.buffer, req.body.byteOffset, req.body.length / 4);
+      const result = await t(samples);
+      const text = Array.isArray(result) ? result.map((r: any) => r.text).join(" ") : result.text;
+      console.log(`[Voice] Transcribed ${samples.length} samples (~${(samples.length / 16000).toFixed(1)}s) -> "${(text || "").slice(0, 60)}..."`);
+      res.json({ text: text || "" });
+    } catch (error: any) {
+      console.error("[Voice] Transcription failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // API Route: Image generation (Gemini/Imagen — real, needs GEMINI_API_KEY + internet)
+  app.post("/api/image/generate", async (req, res) => {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "prompt is required" });
+    try {
+      console.log(`[Image] Generating: "${prompt.slice(0, 60)}..."`);
+      const ai = getGenAI();
+      const response = await ai.models.generateImages({
+        model: "imagen-4.0-generate-001",
+        prompt,
+        config: { numberOfImages: 1 },
+      });
+      const img = response.generatedImages?.[0]?.image;
+      if (!img?.imageBytes) throw new Error("No image returned by the API");
+      res.json({ src: `data:${img.mimeType || "image/png"};base64,${img.imageBytes}` });
+    } catch (error: any) {
+      console.error("[Image] Generation failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // API Route: Video generation (Gemini/Veo — real, async job since it takes minutes)
+  interface VideoJobInternal {
+    id: string;
+    prompt: string;
+    status: "pending" | "done" | "error";
+    videoPath?: string;
+    error?: string;
+    createdAt: number;
+  }
+  const videoJobs = new Map<string, VideoJobInternal>();
+  const VIDEO_TMP_DIR = path.join(os.tmpdir(), "sunayna-videos");
+  fs.mkdirSync(VIDEO_TMP_DIR, { recursive: true });
+
+  app.post("/api/video/generate", (req, res) => {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "prompt is required" });
+
+    const id = Date.now().toString();
+    const job: VideoJobInternal = { id, prompt, status: "pending", createdAt: Date.now() };
+    videoJobs.set(id, job);
+    res.json({ id, status: "pending" });
+
+    (async () => {
+      try {
+        console.log(`[Video] Generating: "${prompt.slice(0, 60)}..." (job ${id})`);
+        const ai = getGenAI();
+        let operation = await ai.models.generateVideos({
+          model: "veo-2.0-generate-001",
+          prompt,
+          config: { numberOfVideos: 1 },
+        });
+        while (!operation.done) {
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          operation = await ai.operations.getVideosOperation({ operation });
+        }
+        const generated = operation.response?.generatedVideos?.[0];
+        if (!generated?.video) throw new Error("No video returned by the API");
+
+        const videoPath = path.join(VIDEO_TMP_DIR, `${id}.mp4`);
+        if (generated.video.videoBytes) {
+          fs.writeFileSync(videoPath, Buffer.from(generated.video.videoBytes, "base64"));
+        } else {
+          await ai.files.download({ file: generated.video, downloadPath: videoPath });
+        }
+        job.videoPath = videoPath;
+        job.status = "done";
+        console.log(`[Video] Job ${id} done -> ${videoPath}`);
+      } catch (error: any) {
+        console.error(`[Video] Job ${id} failed:`, error);
+        job.status = "error";
+        job.error = error.message;
+      }
+    })();
+  });
+
+  app.get("/api/video/status/:id", (req, res) => {
+    const job = videoJobs.get(req.params.id);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    res.json({
+      id: job.id,
+      status: job.status,
+      error: job.error,
+      resultUrl: job.status === "done" ? `/api/video/result/${job.id}` : undefined,
+    });
+  });
+
+  app.get("/api/video/result/:id", (req, res) => {
+    const job = videoJobs.get(req.params.id);
+    if (!job || job.status !== "done" || !job.videoPath || !fs.existsSync(job.videoPath)) {
+      return res.status(404).end();
+    }
+    res.setHeader("Content-Type", "video/mp4");
+    fs.createReadStream(job.videoPath).pipe(res);
   });
 
   // Vite middleware for development

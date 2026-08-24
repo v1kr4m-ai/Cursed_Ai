@@ -23,7 +23,8 @@ import {
   Eye,
   Mic,
   MessageSquare,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -404,6 +405,76 @@ export function EngineView() {
   );
 }
 
+function ModelsDirectorySection() {
+  const [modelsDir, setModelsDir] = React.useState<string | null>(null);
+  const [isDefault, setIsDefault] = React.useState(true);
+  const [input, setInput] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchConfig = React.useCallback(async () => {
+    try {
+      const resp = await fetch("/api/config");
+      const data = await resp.json();
+      setModelsDir(data.modelsDir);
+      setIsDefault(data.isDefault);
+      setInput(data.modelsDir);
+    } catch (e) {
+      console.error("Failed to fetch config", e);
+    }
+  }, []);
+
+  React.useEffect(() => { fetchConfig(); }, [fetchConfig]);
+
+  const save = async () => {
+    if (!input.trim()) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const resp = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelsDir: input.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Failed to save");
+      setModelsDir(data.modelsDir);
+      setIsDefault(data.isDefault);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] border-b border-white/5 pb-3">Storage</h3>
+      <div className="glass p-6 rounded-[2rem] border-white/5 space-y-4">
+        <div className="space-y-1">
+          <Label className="text-zinc-100 font-bold tracking-tight">GGUF Models Directory</Label>
+          <p className="text-xs text-zinc-500">
+            Where the server reads/writes .gguf files. {isDefault ? "Currently the default." : "Currently a custom path."} Type an absolute path on this machine and Save — the directory is created if it doesn't exist yet.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="D:\Models or /home/user/models"
+            className="flex-1 bg-white/5 border-white/5 text-zinc-100 font-mono text-xs"
+          />
+          <Button onClick={save} disabled={isSaving || !input.trim() || input === modelsDir} className="bg-violet-600 hover:bg-violet-500 text-white font-bold shrink-0">
+            {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Save"}
+          </Button>
+        </div>
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        {modelsDir && <p className="text-[10px] text-zinc-600 font-mono truncate">Active: {modelsDir}</p>}
+      </div>
+    </section>
+  );
+}
+
 export function SettingsView({ settings, setSettings }: { settings: AppSettings, setSettings: (s: AppSettings) => void }) {
   const [stats, setStats] = React.useState<any>(null);
 
@@ -616,12 +687,40 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                   <div className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-all">
                      <div className="space-y-1">
                         <Label className="text-zinc-100 font-bold tracking-tight">Offline Voice Assistant</Label>
-                        <p className="text-xs text-zinc-500">Enable Whisper/TTS local pipeline for hands-free mode.</p>
+                        <p className="text-xs text-zinc-500">Enable the Voice tab and mic dictation.</p>
                      </div>
                      <Switch checked={settings.voiceEnabled} onCheckedChange={(val) => setSettings({ ...settings, voiceEnabled: val })} />
                   </div>
+                  {settings.voiceEnabled && (
+                    <div className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-all">
+                       <div className="space-y-1">
+                          <Label className="text-zinc-100 font-bold tracking-tight">Voice Engine</Label>
+                          <p className="text-xs text-zinc-500">
+                            {settings.voiceEngine === "whisper"
+                              ? "Real local Whisper model, fully offline (first use downloads ~40MB, then runs on-device)."
+                              : "Browser's built-in speech recognition — fast, but not fully offline."}
+                          </p>
+                       </div>
+                       <div className="flex gap-2 shrink-0 ml-4">
+                          <button
+                            onClick={() => setSettings({ ...settings, voiceEngine: "browser" })}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${settings.voiceEngine === "browser" ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
+                          >
+                            Browser
+                          </button>
+                          <button
+                            onClick={() => setSettings({ ...settings, voiceEngine: "whisper" })}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${settings.voiceEngine === "whisper" ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
+                          >
+                            Local Whisper
+                          </button>
+                       </div>
+                    </div>
+                  )}
                </div>
             </section>
+
+            <ModelsDirectorySection />
 
             <div className="pt-10 flex flex-col items-center gap-6">
                <div className="flex items-center gap-6 grayscale opacity-20">

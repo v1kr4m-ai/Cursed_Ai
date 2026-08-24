@@ -9,6 +9,7 @@ coverage/
 
 # Runtime data written by server.ts, not source
 memory.json
+config.json
 
 # GGUF model weights — too large for git, download separately (see README)
 GGUF/*.gguf

@@ -47,6 +47,9 @@ export interface AppSettings {
   apiEnabled: boolean;
   memoryEnabled: boolean;
   voiceEnabled: boolean;
+  /** 'browser' = Web Speech API (fast, needs Chrome + isn't fully offline).
+   *  'whisper' = real local Whisper model via /api/voice/transcribe (offline, slower). */
+  voiceEngine: 'browser' | 'whisper';
   temperature: number;
   topP: number;
   maxTokens: number;
@@ -54,4 +57,31 @@ export interface AppSettings {
   threads: number;
   /** Context window size (tokens) requested when the model is loaded. */
   kvCacheSize: number;
+}
+
+export interface LogLine {
+  id: number;
+  level: 'log' | 'info' | 'warn' | 'error';
+  message: string;
+  timestamp: number;
+}
+
+export interface GeneratedImage {
+  id: string;
+  prompt: string;
+  /** data: URL (base64) */
+  src: string;
+  createdAt: number;
+}
+
+export type VideoJobStatus = 'pending' | 'done' | 'error';
+
+export interface VideoJob {
+  id: string;
+  prompt: string;
+  status: VideoJobStatus;
+  /** Set once status is 'done' - relative URL to stream the result from. */
+  resultUrl?: string;
+  error?: string;
+  createdAt: number;
 }

@@ -17,7 +17,8 @@ import {
   MicOff,
   Archive,
   ChevronDown,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "motion/react";
 import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
 import { AIService } from "@/src/services/aiService";
+import { LocalVoiceRecorder } from "@/src/services/localVoice";
 import { cn } from "@/lib/utils";
 
 interface ChatWindowProps {
@@ -46,14 +48,18 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isDictating, setIsDictating] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [liveTps, setLiveTps] = useState<number | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const dictationRef = useRef<any>(null);
+  const localRecorderRef = useRef<LocalVoiceRecorder | null>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const speechSupported = typeof window !== "undefined" &&
     !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const whisperSupported = LocalVoiceRecorder.isSupported;
+  const dictationSupported = settings.voiceEngine === "whisper" ? whisperSupported : speechSupported;
 
   useEffect(() => {
     if (!showModelPicker) return;
@@ -66,8 +72,32 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [showModelPicker]);
 
-  const toggleDictation = () => {
-    if (!speechSupported) return;
+  const toggleDictation = async () => {
+    if (!dictationSupported) return;
+
+    if (settings.voiceEngine === "whisper") {
+      if (isDictating) {
+        setIsDictating(false);
+        setIsTranscribing(true);
+        try {
+          const text = await localRecorderRef.current?.stopAndTranscribe();
+          if (text) setInput(text);
+        } catch (e) {
+          console.error("Local transcription failed:", e);
+        } finally {
+          setIsTranscribing(false);
+        }
+        return;
+      }
+      localRecorderRef.current = new LocalVoiceRecorder();
+      try {
+        await localRecorderRef.current.start();
+        setIsDictating(true);
+      } catch (e) {
+        console.error("Failed to start recording:", e);
+      }
+      return;
+    }
 
     if (isDictating) {
       dictationRef.current?.stop();
@@ -265,16 +295,18 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     <div className="bg-white/5 border border-white/10 rounded-2xl p-2 flex items-end gap-2 focus-within:border-white/20 transition-all shadow-2xl shadow-black/40">
       <div className="flex gap-1 mb-1 ml-1">
         {modelPicker}
-        {speechSupported && (
+        {dictationSupported && (
           <button
             onClick={toggleDictation}
-            title={isDictating ? "Stop dictation" : "Dictate message"}
+            disabled={isTranscribing}
+            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : "Dictate message"}
             className={cn(
               "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
-              isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500"
+              isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500",
+              isTranscribing && "opacity-60 cursor-wait"
             )}
           >
-            {isDictating ? <MicOff size={18} /> : <Mic size={18} />}
+            {isTranscribing ? <Loader2 size={18} className="animate-spin" /> : isDictating ? <MicOff size={18} /> : <Mic size={18} />}
           </button>
         )}
       </div>

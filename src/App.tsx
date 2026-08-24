@@ -10,6 +10,9 @@ import { ChatWindow } from "./components/chat/ChatWindow";
 import { ModelManager } from "./components/models/ModelManager";
 import { VoiceAssistant } from "./components/voice/VoiceAssistant";
 import { MemoryView, SettingsView, EngineView } from "./components/tools/ExtraViews";
+import { ConsoleView } from "./components/tools/ConsoleView";
+import { ImageGeneratorView } from "./components/tools/ImageGenerator";
+import { VideoGeneratorView } from "./components/tools/VideoGenerator";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -96,6 +99,7 @@ export default function App() {
     apiEnabled: false,
     memoryEnabled: true,
     voiceEnabled: true,
+    voiceEngine: "browser",
     temperature: 0.7,
     topP: 0.9,
     maxTokens: 1024,
@@ -268,6 +272,9 @@ export default function App() {
             )}
             {activeTab === "memory" && <MemoryView />}
             {activeTab === "engine" && <EngineView />}
+            {activeTab === "console" && <ConsoleView />}
+            {activeTab === "image" && <ImageGeneratorView />}
+            {activeTab === "video" && <VideoGeneratorView />}
             {activeTab === "settings" && (
               <SettingsView 
                 settings={settings} 

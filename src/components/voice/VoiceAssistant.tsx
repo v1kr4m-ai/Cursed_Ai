@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
+import { LocalVoiceRecorder } from "../../services/localVoice";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
@@ -18,10 +19,14 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
   const recognitionRef = useRef<any>(null);
+  const localRecorderRef = useRef<LocalVoiceRecorder | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const usingWhisper = settings.voiceEngine === "whisper";
 
   useEffect(() => {
+    if (usingWhisper) return; // local Whisper path doesn't use the Web Speech API at all
+
     // Initialize Web Speech API
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -51,9 +56,44 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
       if (recognitionRef.current) recognitionRef.current.stop();
       if (synthRef.current) synthRef.current.cancel();
     };
-  }, [state]);
+  }, [state, usingWhisper]);
 
-  const toggleListening = () => {
+  useEffect(() => {
+    // speechSynthesis is used by both engines for the spoken reply
+    synthRef.current = window.speechSynthesis;
+    return () => synthRef.current?.cancel();
+  }, []);
+
+  const toggleListening = async () => {
+    if (usingWhisper) {
+      if (state === "listening") {
+        setState("processing");
+        try {
+          const text = await localRecorderRef.current?.stopAndTranscribe();
+          setTranscript(text || "");
+          if (text) {
+            await handleProcessVoice(text);
+          } else {
+            setState("idle");
+          }
+        } catch (e) {
+          console.error("Local transcription failed:", e);
+          setState("idle");
+        }
+        return;
+      }
+      setTranscript("");
+      setResponse("");
+      localRecorderRef.current = new LocalVoiceRecorder();
+      try {
+        await localRecorderRef.current.start();
+        setState("listening");
+      } catch (e) {
+        console.error("Failed to start recording:", e);
+      }
+      return;
+    }
+
     if (state === "listening") {
       recognitionRef.current?.stop();
       setState("idle");
@@ -73,19 +113,23 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     setState("idle");
   };
 
-  const handleProcessVoice = async () => {
-    if (!transcript) {
+  // Accepts an explicit transcript override for the Whisper path, where the
+  // text arrives async (from the server) after setTranscript() is called -
+  // reading the `transcript` state var here would be a stale closure.
+  const handleProcessVoice = async (transcriptOverride?: string) => {
+    const finalTranscript = transcriptOverride ?? transcript;
+    if (!finalTranscript) {
       setState("idle");
       return;
     }
 
     setState("processing");
-    
+
     // Create actual message for history tracking
     const userMsg: Message = {
       id: Date.now().toString(),
       role: MessageRole.USER,
-      content: transcript,
+      content: finalTranscript,
       timestamp: Date.now()
     };
     onNewMessage(userMsg);
@@ -173,7 +217,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center justify-center gap-3 mb-2"
           >
-            <div className="vulkan-tag">Vulkan Powered Voice</div>
+            <div className="vulkan-tag">{usingWhisper ? "Local Whisper (Offline)" : "Browser Speech"}</div>
             <div className="model-tag">{selectedModel.name}</div>
           </motion.div>
           <h1 className="text-5xl font-black text-white tracking-tighter">Sunayna Assistant</h1>

@@ -14,7 +14,9 @@ import {
   Download,
   Info,
   Cpu,
-  ArchiveRestore
+  ArchiveRestore,
+  ImagePlus,
+  Clapperboard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -60,6 +62,9 @@ export function Sidebar({
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
+    { id: "console", label: "Console", icon: Terminal },
+    { id: "image", label: "Image", icon: ImagePlus },
+    { id: "video", label: "Video", icon: Clapperboard },
     { id: "vision", label: "Vision", icon: Eye },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -226,7 +231,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Sunayna</h2>
              </div>
              <div className="space-y-2">
-               {["chat", ...(voiceEnabled ? ["voice"] : []), "models", "memory", "vision", "settings"].map((tab) => (
+               {["chat", ...(voiceEnabled ? ["voice"] : []), "models", "memory", "engine", "console", "image", "video", "vision", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"
