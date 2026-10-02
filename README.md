@@ -35,11 +35,10 @@ Voice has two engines: the browser's Web Speech API (fast, not fully offline) or
 
 **Verified working**
 - Web chat, memory/RAG, model download/delete, engine controls, console, local Whisper transcription.
-- Local ComfyUI **image** generation — both workflows tested end-to-end against a real ComfyUI instance.
+- Local ComfyUI **image** (txt2img + img2img) and **video** (LTX-Video text-to-video, mp4) — all tested end-to-end against a real ComfyUI. A "Start ComfyUI" button launches it from a folder you choose (checks first; does nothing if already running).
 - Android: real llama.cpp loading a real GGUF and generating tokens on-device (emulator-tested).
 
 **Written but not yet run end-to-end**
-- Local ComfyUI **video** (LTX-Video). Node schemas were read from a live ComfyUI, but ComfyUI was offline when the workflow was written.
 - Cloud image/video (Gemini/Imagen/Veo): error handling verified, real generation needs your `GEMINI_API_KEY`.
 
 **Known gaps**
@@ -73,7 +72,7 @@ The server reads `.gguf` files from `models/` (or any folder you pick in **Setti
 | Feature | Needs |
 |---|---|
 | Cloud image/video | `GEMINI_API_KEY` in `.env.local` + internet |
-| Local image/video | ComfyUI running at `http://127.0.0.1:8188` (override with `COMFYUI_URL`); video also needs the **ComfyUI-VideoHelperSuite** node pack and an LTX-Video checkpoint + T5-XXL text encoder |
+| Local image/video | ComfyUI running at `http://127.0.0.1:8188` (override with `COMFYUI_URL`); video needs an LTX-Video checkpoint + a T5-XXL text encoder (core nodes only, no custom packs). Set your ComfyUI folder (portable build) with the button in the Image/Video tabs |
 | Gemini chat fallback | `GEMINI_API_KEY` |
 
 ---

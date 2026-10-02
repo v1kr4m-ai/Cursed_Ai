@@ -1,6 +1,7 @@
 import React from "react";
 import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ComfyStatus } from "./ComfyStatus";
 import { GeneratedImage } from "../../types";
 
 type Source = "cloud" | "local";
@@ -28,8 +29,7 @@ export function ImageGeneratorView() {
   const [referenceImage, setReferenceImage] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    if (source !== "local") return;
+  const loadCheckpoints = React.useCallback(() => {
     setCheckpointsError(null);
     fetch("/api/comfyui/checkpoints?kind=image")
       .then(r => r.json())
@@ -39,6 +39,10 @@ export function ImageGeneratorView() {
         if (data.checkpoints?.length && !checkpoint) setCheckpoint(data.checkpoints[0]);
       })
       .catch(e => setCheckpointsError(e.message));
+  }, []);
+
+  React.useEffect(() => {
+    if (source === "local") loadCheckpoints();
   }, [source]);
 
   const onReferenceFile = (file: File | undefined) => {
@@ -114,6 +118,7 @@ export function ImageGeneratorView() {
         </header>
 
         <div className="glass p-6 rounded-[2rem] border-white/5 mb-8 shrink-0 space-y-4">
+          {source === "local" && <ComfyStatus onReady={loadCheckpoints} />}
           {source === "local" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

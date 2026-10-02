@@ -13,6 +13,7 @@ interface FolderPickerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialPath?: string;
+  title?: string;
   onSelect: (path: string) => void;
 }
 
@@ -22,7 +23,7 @@ interface FolderPickerDialogProps {
  * absolute path, so this is the actual way to click through disk instead of
  * typing a path by hand.
  */
-export function FolderPickerDialog({ open, onOpenChange, initialPath, onSelect }: FolderPickerDialogProps) {
+export function FolderPickerDialog({ open, onOpenChange, initialPath, onSelect, title = "Choose Models Folder" }: FolderPickerDialogProps) {
   const [currentPath, setCurrentPath] = React.useState("");
   const [parentPath, setParentPath] = React.useState<string | null>(null);
   const [entries, setEntries] = React.useState<Entry[]>([]);
@@ -54,7 +55,7 @@ export function FolderPickerDialog({ open, onOpenChange, initialPath, onSelect }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Choose Models Folder</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Browsing this machine's real filesystem.</DialogDescription>
         </DialogHeader>
 

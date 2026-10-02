@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import crypto from "crypto";
+import { spawn } from "child_process";
 import { createServer as createViteServer } from "vite";
 import { getLlama, LlamaChatSession } from "node-llama-cpp";
 import { pipeline } from "@xenova/transformers";
@@ -180,7 +181,7 @@ async function startServer() {
   // Config persistence (currently just modelsDir) — a real, user-editable
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
-  interface ServerConfig { modelsDir?: string }
+  interface ServerConfig { modelsDir?: string; comfyuiPath?: string }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -809,6 +810,96 @@ async function startServer() {
     return Buffer.from(await resp.arrayBuffer());
   }
 
+  // --- Start/stop awareness for ComfyUI: the UI's "Start ComfyUI" button hits
+  // these. Status is a real ping of ComfyUI's /system_stats; start launches the
+  // configured executable (ComfyUI Desktop's default install path, an env var
+  // COMFYUI_PATH, or config.json "comfyuiPath") detached, then waits for it
+  // to answer.
+  async function isComfyRunning(): Promise<boolean> {
+    try {
+      const r = await fetch(`${COMFYUI_URL}/system_stats`, { signal: AbortSignal.timeout(2000) });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // Resolve how to launch ComfyUI from the user's chosen install folder:
+  // a portable build's run_*.bat, else python main.py (embedded python first).
+  // A direct path to a .exe/.bat is accepted too. Deliberately NOT guessing at
+  // ComfyUI Desktop's exe: launching that for someone without a finished
+  // setup starts its installer.
+  function resolveComfyLaunch(): { cmd: string; args: string[]; cwd: string; shell: boolean } | null {
+    const target = process.env.COMFYUI_PATH || serverConfig.comfyuiPath;
+    if (!target || !fs.existsSync(target)) return null;
+    if (fs.statSync(target).isFile()) {
+      return { cmd: target, args: [], cwd: path.dirname(target), shell: /.(bat|cmd)$/i.test(target) };
+    }
+    for (const bat of ["run_nvidia_gpu.bat", "run_amd_gpu.bat", "run.bat", "run_cpu.bat"]) {
+      const p = path.join(target, bat);
+      if (fs.existsSync(p)) return { cmd: p, args: [], cwd: target, shell: true };
+    }
+    const main = [path.join(target, "main.py"), path.join(target, "ComfyUI", "main.py")].find(fs.existsSync);
+    if (main) {
+      const root = path.dirname(main);
+      const py = [path.join(target, "python_embeded", "python.exe"), path.join(root, "venv", "Scripts", "python.exe"), path.join(root, ".venv", "Scripts", "python.exe")].find(fs.existsSync) || "python";
+      return { cmd: py, args: [main], cwd: root, shell: false };
+    }
+    return null;
+  }
+
+  let comfyStarting: Promise<void> | null = null;
+
+  app.get("/api/comfyui/status", async (req, res) => {
+    res.json({
+      running: await isComfyRunning(),
+      starting: !!comfyStarting,
+      folder: process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
+      canLaunch: !!resolveComfyLaunch(),
+    });
+  });
+
+  app.post("/api/comfyui/config", (req, res) => {
+    const { path: p } = req.body;
+    if (typeof p !== "string" || !fs.existsSync(p)) return res.status(400).json({ error: "Path doesn't exist" });
+    serverConfig.comfyuiPath = p;
+    saveConfig();
+    const ok = !!resolveComfyLaunch();
+    console.log(`[Config] ComfyUI folder set to: ${p} (launchable=${ok})`);
+    if (!ok) return res.status(400).json({ error: "No run_*.bat or main.py found in that folder" });
+    res.json({ folder: p, canLaunch: true });
+  });
+
+  app.post("/api/comfyui/start", async (req, res) => {
+    if (await isComfyRunning()) return res.json({ running: true, alreadyRunning: true });
+    const launch = resolveComfyLaunch();
+    if (!launch) {
+      return res.status(404).json({
+        error: "Set your ComfyUI folder first (button next to the status). It needs a run_*.bat or main.py in it.",
+      });
+    }
+    try {
+      if (!comfyStarting) {
+        console.log(`[ComfyUI] Not running - launching ${launch.cmd} ${launch.args.join(" ")} (cwd ${launch.cwd})`);
+        comfyStarting = (async () => {
+          const child = spawn(launch.cmd, launch.args, { detached: true, stdio: "ignore", cwd: launch.cwd, shell: launch.shell, windowsHide: false });
+          child.unref();
+          for (let i = 0; i < 90; i++) { // up to ~3 minutes: first launch loads models/nodes
+            await new Promise(r => setTimeout(r, 2000));
+            if (await isComfyRunning()) return;
+          }
+          throw new Error("ComfyUI was launched but didn't answer within 3 minutes");
+        })().finally(() => { comfyStarting = null; });
+      }
+      await comfyStarting;
+      console.log("[ComfyUI] Now running");
+      res.json({ running: true, alreadyRunning: false });
+    } catch (error: any) {
+      console.error("[ComfyUI] Start failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // API Route: List installed checkpoints, straight from ComfyUI's own
   // node-info introspection - real, live, reflects whatever's actually in
   // your models/checkpoints folder right now.
@@ -949,18 +1040,14 @@ async function startServer() {
           },
         };
         workflow["12"] = { class_type: "VAEDecode", inputs: { samples: ["11", 0], vae: ["1", 2] } };
-        workflow["13"] = {
-          class_type: "VHS_VideoCombine",
-          inputs: {
-            images: ["12", 0], frame_rate: frameRate, loop_count: 0,
-            filename_prefix: "sunayna_video", format: "video/h264-mp4",
-            pix_fmt: "yuv420p", crf: 19, save_metadata: false, pingpong: false, save_output: true,
-          },
-        };
+        // Core nodes only (no VideoHelperSuite needed): CreateVideo -> SaveVideo mp4.
+        workflow["13"] = { class_type: "CreateVideo", inputs: { images: ["12", 0], fps: frameRate } };
+        workflow["14"] = { class_type: "SaveVideo", inputs: { video: ["13", 0], filename_prefix: "video/sunayna", format: "mp4", codec: "h264" } };
 
-        const output = await runComfyWorkflow(workflow, "13");
-        // VHS_VideoCombine reports its file under "gifs" regardless of format.
-        const videoInfo = output?.gifs?.[0] || output?.videos?.[0];
+        const output = await runComfyWorkflow(workflow, "14");
+        // SaveVideo reports its file under "images" (with animated:true); older
+        // video savers used "gifs"/"videos" - accept any.
+        const videoInfo = output?.images?.[0] || output?.videos?.[0] || output?.gifs?.[0];
         if (!videoInfo) throw new Error("ComfyUI returned no video output");
         const buffer = await fetchComfyFile(videoInfo.filename, videoInfo.subfolder, videoInfo.type);
 

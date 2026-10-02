@@ -1,6 +1,7 @@
 import React from "react";
 import { Clapperboard, Loader2, AlertTriangle, Globe, Clock, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ComfyStatus } from "./ComfyStatus";
 import { VideoJob } from "../../types";
 
 type Source = "cloud" | "local";
@@ -26,8 +27,7 @@ export function VideoGeneratorView() {
   const [sourceImage, setSourceImage] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    if (source !== "local") return;
+  const loadCheckpoints = React.useCallback(() => {
     setCheckpointsError(null);
     fetch("/api/comfyui/checkpoints?kind=video")
       .then(r => r.json())
@@ -37,6 +37,10 @@ export function VideoGeneratorView() {
         if (data.checkpoints?.length && !checkpoint) setCheckpoint(data.checkpoints[0]);
       })
       .catch(e => setCheckpointsError(e.message));
+  }, []);
+
+  React.useEffect(() => {
+    if (source === "local") loadCheckpoints();
   }, [source]);
 
   const onSourceFile = (file: File | undefined) => {
@@ -128,6 +132,7 @@ export function VideoGeneratorView() {
         </header>
 
         <div className="glass p-6 rounded-[2rem] border-white/5 mb-8 shrink-0 space-y-4">
+          {source === "local" && <ComfyStatus onReady={loadCheckpoints} />}
           {source === "local" && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
