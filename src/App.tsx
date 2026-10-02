@@ -114,7 +114,8 @@ export default function App() {
   useEffect(() => {
     const cur = models.find(m => m.id === selectedModelId);
     if (cur?.isDownloaded) return;
-    const firstUsable = models.find(m => m.isDownloaded);
+    // Prefer models that run fully locally over Ollama ":cloud" ones.
+    const firstUsable = models.find(m => m.isDownloaded && !/:cloud$|-cloud$/.test(m.id)) || models.find(m => m.isDownloaded);
     if (firstUsable) setSelectedModelId(firstUsable.id);
   }, [models]);
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Volume2, Square, Bot, Loader2, Zap, Shield } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Mic, MicOff, Volume2, Square, Bot, Loader2, User, AlertTriangle, Power } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
@@ -12,380 +12,306 @@ interface VoiceAssistantProps {
   settings: AppSettings;
 }
 
-type VoiceState = "idle" | "listening" | "processing" | "speaking";
+type VoiceState = "off" | "listening" | "thinking" | "speaking";
 
+const ERROR_TEXT: Record<string, string> = {
+  "not-allowed": "Microphone blocked. Allow mic access for this site (lock icon in the address bar) and try again.",
+  "service-not-allowed": "Speech recognition isn't allowed in this browser.",
+  "audio-capture": "No microphone found.",
+  "network": "Browser speech recognition needs internet (it uses your browser's cloud service). Switch Voice Engine to Local Whisper in Settings to work offline.",
+};
+
+/**
+ * Live voice conversation. Browser engine: continuous listening with interim
+ * results shown as you speak; a finished phrase is sent to the model, the
+ * reply streams on screen and is spoken aloud, then it listens again.
+ * Local Whisper engine can't stream partial text, so it's tap-to-talk.
+ */
 export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceAssistantProps) {
-  const [state, setState] = useState<VoiceState>("idle");
-  const [transcript, setTranscript] = useState("");
-  const [response, setResponse] = useState("");
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const recognitionRef = useRef<any>(null);
-  const localRecorderRef = useRef<LocalVoiceRecorder | null>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const usingWhisper = settings.voiceEngine === "whisper";
 
-  // A ref mirror of `state`, read inside the SpeechRecognition `onend`
-  // handler below. The handler is bound once (see the empty dep array on
-  // the effect that creates it) so it must never read `state` directly -
-  // that would be a stale closure frozen at creation time.
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
+  const [state, setState] = useState<VoiceState>("off");
+  const [live, setLive] = useState("");            // what you're saying right now
+  const [reply, setReply] = useState("");          // the model's reply, streaming
+  const [history, setHistory] = useState<Message[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  // Refs mirror state for event handlers bound once (avoids stale closures).
+  const stateRef = useRef<VoiceState>("off");
+  const activeRef = useRef(false);                 // conversation switched on
+  const historyRef = useRef<Message[]>([]);
+  const recognitionRef = useRef<any>(null);
+  const recorderRef = useRef<LocalVoiceRecorder | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const settingsRef = useRef(settings);
+  const modelRef = useRef(selectedModel);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const runTurnRef = useRef<(t: string) => void>(() => {});
+  const onNewMessageRef = useRef(onNewMessage);
+  onNewMessageRef.current = onNewMessage;
+  settingsRef.current = settings;
+  modelRef.current = selectedModel;
+
+  const setVoiceState = (s: VoiceState) => { stateRef.current = s; setState(s); };
 
   useEffect(() => {
-    if (usingWhisper) return; // local Whisper path doesn't use the Web Speech API at all
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [history, live, reply]);
 
-    // Initialize Web Speech API ONCE. This used to depend on `state`, which
-    // meant every state change (idle -> listening -> processing -> ...)
-    // tore down and recreated the recognition object - including stopping
-    // it via this effect's own cleanup literally the instant after
-    // toggleListening() had just started it. That's why voice input never
-    // actually worked: recognition.start() fired, then this effect re-ran
-    // on the resulting state change and immediately called
-    // recognition.stop() on it before it ever captured anything.
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
+  const speak = useCallback((text: string, done: () => void) => {
+    const synth = window.speechSynthesis;
+    if (!synth || !text.trim()) return done();
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ""));
+    u.onend = done;
+    u.onerror = done;
+    synth.speak(u);
+  }, []);
 
-      recognition.onresult = (event: any) => {
-        const currentTranscript = Array.from(event.results)
-          .map((result: any) => result[0])
-          .map((result: any) => result.transcript)
-          .join("");
-        setTranscript(currentTranscript);
-      };
-
-      recognition.onend = () => {
-        if (stateRef.current === "listening") {
-          handleProcessVoice();
-        }
-      };
-
-      recognitionRef.current = recognition;
+  const startListening = useCallback(() => {
+    if (!activeRef.current) return;
+    setLive("");
+    if (usingWhisper) { setVoiceState("off"); return; } // tap-to-talk, handled in the button
+    const rec = recognitionRef.current;
+    if (!rec) return;
+    try {
+      setVoiceState("listening");
+      rec.start();
+    } catch {
+      /* already started */
     }
+  }, [usingWhisper]);
 
+  // One full turn: send text to the model with history, stream + speak the reply.
+  const runTurn = useCallback(async (text: string) => {
+    const userMsg: Message = { id: Date.now().toString(), role: MessageRole.USER, content: text, timestamp: Date.now() };
+    historyRef.current = [...historyRef.current, userMsg];
+    setHistory(historyRef.current);
+    onNewMessageRef.current(userMsg);
+    setLive("");
+    setReply("");
+    setVoiceState("thinking");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let full = "";
+    try {
+      await AIService.generate(historyRef.current, modelRef.current.id, {
+        onToken: (t) => { full += t; setReply(full); },
+        onError: (e) => { setError(e?.message || String(e)); },
+        onComplete: () => {},
+      }, {
+        signal: controller.signal,
+        temperature: settingsRef.current.temperature,
+        topP: settingsRef.current.topP,
+        maxTokens: settingsRef.current.maxTokens,
+        memoryEnabled: settingsRef.current.memoryEnabled,
+      });
+    } catch (e: any) {
+      if (e?.name !== "AbortError") setError(e?.message || String(e));
+    }
+    abortRef.current = null;
+    if (!activeRef.current) return;
+
+    if (full.trim()) {
+      const aMsg: Message = { id: (Date.now() + 1).toString(), role: MessageRole.ASSISTANT, content: full, timestamp: Date.now() };
+      historyRef.current = [...historyRef.current, aMsg];
+      setHistory(historyRef.current);
+      onNewMessageRef.current(aMsg);
+      setReply("");
+      setVoiceState("speaking");
+      speak(full, () => { if (activeRef.current) startListening(); });
+    } else {
+      startListening();
+    }
+  }, [speak, startListening]);
+  runTurnRef.current = runTurn;
+
+  // Browser speech recognition, created once.
+  useEffect(() => {
+    if (usingWhisper) return;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      setError("This browser has no speech recognition. Use Chrome/Edge, or switch Voice Engine to Local Whisper in Settings.");
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+
+    let finalText = "";
+    rec.onresult = (event: any) => {
+      let interim = "";
+      finalText = "";
+      for (let i = 0; i < event.results.length; i++) {
+        const r = event.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setLive((finalText + interim).trim());
+    };
+    rec.onerror = (e: any) => {
+      if (e.error === "no-speech" || e.error === "aborted") return; // normal silence
+      setError(ERROR_TEXT[e.error] || `Speech recognition error: ${e.error}`);
+      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+        activeRef.current = false;
+        setVoiceState("off");
+      }
+    };
+    rec.onend = () => {
+      if (!activeRef.current || stateRef.current !== "listening") return;
+      const text = finalText.trim();
+      finalText = "";
+      if (text) runTurnRef.current(text);
+      else setTimeout(() => { if (activeRef.current && stateRef.current === "listening") { try { rec.start(); } catch {} } }, 200);
+    };
+    recognitionRef.current = rec;
     return () => {
-      recognitionRef.current?.stop();
+      activeRef.current = false;
+      try { rec.abort(); } catch {}
       recognitionRef.current = null;
     };
   }, [usingWhisper]);
 
-  useEffect(() => {
-    // speechSynthesis is used by both engines for the spoken reply
-    synthRef.current = window.speechSynthesis;
-    return () => synthRef.current?.cancel();
+  useEffect(() => () => {
+    activeRef.current = false;
+    abortRef.current?.abort();
+    window.speechSynthesis?.cancel();
+    recorderRef.current?.cancel();
   }, []);
 
-  // Local Whisper only produces a transcript after you stop (no live
-  // partial text is possible without real streaming inference), so a
-  // recording timer is the honest "this is actually working" signal while
-  // listening instead of a caption that can't update yet.
+  // Whisper recording timer
   useEffect(() => {
-    if (!usingWhisper || state !== "listening") {
-      setRecordingSeconds(0);
-      return;
-    }
+    if (!usingWhisper || state !== "listening") { setRecordingSeconds(0); return; }
     const start = Date.now();
-    const timer = setInterval(() => setRecordingSeconds(Math.floor((Date.now() - start) / 1000)), 250);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setRecordingSeconds(Math.floor((Date.now() - start) / 1000)), 250);
+    return () => clearInterval(t);
   }, [usingWhisper, state]);
 
-  const toggleListening = async () => {
+  const stopAll = () => {
+    activeRef.current = false;
+    abortRef.current?.abort();
+    window.speechSynthesis?.cancel();
+    try { recognitionRef.current?.abort(); } catch {}
+    recorderRef.current?.cancel();
+    setLive("");
+    setVoiceState("off");
+  };
+
+  const toggleConversation = async () => {
+    setError(null);
     if (usingWhisper) {
-      if (state === "listening") {
-        setState("processing");
+      // tap-to-talk
+      if (stateRef.current === "listening") {
+        setVoiceState("thinking");
         try {
-          const text = await localRecorderRef.current?.stopAndTranscribe();
-          setTranscript(text || "");
-          if (text) {
-            await handleProcessVoice(text);
-          } else {
-            setState("idle");
-          }
-        } catch (e) {
-          console.error("Local transcription failed:", e);
-          setState("idle");
-        }
+          const text = await recorderRef.current?.stopAndTranscribe();
+          setLive(text || "");
+          if (text) { activeRef.current = true; await runTurn(text); activeRef.current = false; setVoiceState("off"); return; }
+        } catch (e: any) { setError(e.message); }
+        setVoiceState("off");
         return;
       }
-      setTranscript("");
-      setResponse("");
-      localRecorderRef.current = new LocalVoiceRecorder();
-      try {
-        await localRecorderRef.current.start();
-        setState("listening");
-      } catch (e) {
-        console.error("Failed to start recording:", e);
-      }
+      recorderRef.current = new LocalVoiceRecorder();
+      try { await recorderRef.current.start(); setLive(""); setReply(""); setVoiceState("listening"); }
+      catch (e: any) { setError(ERROR_TEXT["not-allowed"]); }
       return;
     }
-
-    if (state === "listening") {
-      recognitionRef.current?.stop();
-      setState("idle");
-    } else {
-      setTranscript("");
-      setResponse("");
-      setState("listening");
-      recognitionRef.current?.start();
-    }
+    if (activeRef.current) return stopAll();
+    activeRef.current = true;
+    startListening();
   };
 
-  const handleStop = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    synthRef.current?.cancel();
-    setState("idle");
-  };
-
-  // Accepts an explicit transcript override for the Whisper path, where the
-  // text arrives async (from the server) after setTranscript() is called -
-  // reading the `transcript` state var here would be a stale closure.
-  const handleProcessVoice = async (transcriptOverride?: string) => {
-    const finalTranscript = transcriptOverride ?? transcript;
-    if (!finalTranscript) {
-      setState("idle");
-      return;
-    }
-
-    setState("processing");
-
-    // Create actual message for history tracking
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: MessageRole.USER,
-      content: finalTranscript,
-      timestamp: Date.now()
-    };
-    onNewMessage(userMsg);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    try {
-      let fullResponse = "";
-      await AIService.generate([userMsg], selectedModel.id, {
-        onToken: (token) => {
-          fullResponse += token;
-          setResponse(fullResponse);
-        },
-        onError: (error) => {
-          console.error("Voice processing failed:", error);
-          setState("idle");
-        },
-        onComplete: () => {
-          const assistantMsg: Message = {
-            id: (Date.now() + 1).toString(),
-            role: MessageRole.ASSISTANT,
-            content: fullResponse,
-            timestamp: Date.now() + 1
-          };
-          onNewMessage(assistantMsg);
-          speakResponse(fullResponse);
-        }
-      }, {
-        signal: controller.signal,
-        temperature: settings.temperature,
-        topP: settings.topP,
-        maxTokens: settings.maxTokens,
-        memoryEnabled: settings.memoryEnabled
-      });
-    } catch (error) {
-      console.error("Voice processing failed:", error);
-      setState("idle");
-    } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
-    }
-  };
-
-  const speakResponse = (text: string) => {
-    if (!synthRef.current) return;
-    
-    // Cancel any current speech
-    synthRef.current.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onstart = () => setState("speaking");
-    utterance.onend = () => setState("idle");
-    utterance.onerror = () => setState("idle");
-    
-    synthRef.current.speak(utterance);
-  };
-
-  const stopSpeaking = () => {
-    synthRef.current?.cancel();
-    setState("idle");
-  };
+  const on = state !== "off";
+  const label =
+    state === "listening" ? (usingWhisper ? `Recording... ${recordingSeconds}s — tap to transcribe` : "Listening — just speak")
+    : state === "thinking" ? "Thinking..."
+    : state === "speaking" ? "Speaking..."
+    : usingWhisper ? "Tap the mic, talk, tap again" : "Press Start to begin a live conversation";
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-transparent glass rounded-[2.5rem] h-full p-8 relative overflow-hidden">
-      {/* Background Decorative Rings */}
-      <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-10">
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], rotate: 360 }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="w-[500px] h-[500px] border border-violet-500 rounded-full"
-        />
-        <motion.div 
-          animate={{ scale: [1.2, 1, 1.2], rotate: -360 }}
-          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-          className="w-[400px] h-[400px] border border-emerald-500 rounded-full"
-        />
+    <div className="flex-1 flex flex-col bg-transparent glass rounded-[2.5rem] h-full p-6 relative overflow-hidden">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <div>
+          <h1 className="text-3xl font-black text-white tracking-tighter">Sunayna Assistant</h1>
+          <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
+            {usingWhisper ? "Local Whisper (offline)" : "Browser speech"} · {selectedModel.name}
+          </p>
+        </div>
+        {on && (
+          <Button onClick={stopAll} variant="ghost" className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold gap-2">
+            <Power size={16} /> End
+          </Button>
+        )}
       </div>
 
-      <div className="max-w-2xl w-full flex flex-col items-center gap-12 z-10">
-        <div className="text-center space-y-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-center gap-3 mb-2"
-          >
-            <div className="vulkan-tag">{usingWhisper ? "Local Whisper (Offline)" : "Browser Speech"}</div>
-            <div className="model-tag">{selectedModel.name}</div>
-          </motion.div>
-          <h1 className="text-5xl font-black text-white tracking-tighter">Sunayna Assistant</h1>
-          <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-sm">Offline Multimodal Pipeline Active</p>
+      {/* Conversation */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
+        {history.length === 0 && !live && !reply && (
+          <div className="h-full flex flex-col items-center justify-center text-center gap-4 opacity-70">
+            <Bot size={48} className="text-zinc-700" />
+            <p className="text-zinc-500 text-sm max-w-xs">{label}</p>
+          </div>
+        )}
+        {history.map((m) => (
+          <div key={m.id} className={`flex gap-3 ${m.role === MessageRole.USER ? "justify-end" : ""}`}>
+            {m.role !== MessageRole.USER && <Bot size={18} className="text-violet-400 mt-1 shrink-0" />}
+            <p className={`max-w-[80%] text-sm leading-relaxed rounded-2xl px-4 py-3 whitespace-pre-wrap ${m.role === MessageRole.USER ? "bg-violet-600/20 text-zinc-100" : "bg-white/5 text-zinc-200"}`}>{m.content}</p>
+            {m.role === MessageRole.USER && <User size={18} className="text-zinc-500 mt-1 shrink-0" />}
+          </div>
+        ))}
+        {live && (
+          <div className="flex gap-3 justify-end">
+            <p className="max-w-[80%] text-sm leading-relaxed rounded-2xl px-4 py-3 bg-violet-600/10 text-zinc-300 italic border border-violet-500/20">{live}<span className="animate-pulse">▋</span></p>
+            <User size={18} className="text-zinc-500 mt-1 shrink-0" />
+          </div>
+        )}
+        {reply && (
+          <div className="flex gap-3">
+            <Bot size={18} className="text-violet-400 mt-1 shrink-0" />
+            <p className="max-w-[80%] text-sm leading-relaxed rounded-2xl px-4 py-3 bg-white/5 text-zinc-200 whitespace-pre-wrap">{reply}<span className="animate-pulse">▋</span></p>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="mt-3 flex items-start gap-2 text-red-400 text-xs bg-red-500/10 rounded-xl px-4 py-3 shrink-0">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" /> <span>{error}</span>
         </div>
+      )}
 
-        {/* Visualizer Area */}
-        <div className="relative w-64 h-64 flex items-center justify-center">
-          <AnimatePresence>
-            {state === "listening" && (
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1.5, opacity: 0.2 }}
-                exit={{ scale: 2, opacity: 0 }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="absolute inset-0 bg-violet-600 rounded-full blur-3xl"
-              />
-            )}
-            {state === "speaking" && (
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1.2, opacity: 0.15 }}
-                exit={{ scale: 1.5, opacity: 0 }}
-                transition={{ duration: 1, repeat: Infinity }}
-                className="absolute inset-0 bg-emerald-500 rounded-full blur-3xl"
-              />
-            )}
-          </AnimatePresence>
-
-          <motion.div 
-            className={`w-48 h-48 rounded-[3rem] glass flex items-center justify-center border-2 transition-colors duration-500 shadow-2xl ${
-              state === "listening" ? "border-violet-500 shadow-violet-500/20" : 
-              state === "speaking" ? "border-emerald-500 shadow-emerald-500/20" : 
-              state === "processing" ? "border-white/20 animate-pulse" : "border-white/10"
-            }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {state === "processing" ? (
-              <Loader2 className="text-zinc-400 animate-spin" size={48} />
-            ) : state === "speaking" ? (
-              <Volume2 className="text-emerald-400" size={48} />
-            ) : state === "listening" ? (
-                <div className="flex gap-1.5">
-                   {[1,2,3,4,5].map(i => (
-                     <motion.div 
-                        key={i}
-                        animate={{ height: [12, 32, 12] }}
-                        transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
-                        className="w-1.5 bg-violet-400 rounded-full"
-                     />
-                   ))}
-                </div>
-            ) : (
-              <Bot className="text-zinc-600" size={48} />
-            )}
-          </motion.div>
-        </div>
-
-        {/* Text Display */}
-        <div className="w-full text-center min-h-[80px]">
-          <AnimatePresence mode="wait">
-            {state === "listening" && (
-              <motion.div 
-                key="listening"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-2"
-              >
-                <p className="text-violet-400 font-bold uppercase tracking-widest text-[10px]">
-                  {usingWhisper ? `Recording... ${recordingSeconds}s (transcribes on stop)` : "Listening..."}
-                </p>
-                {!usingWhisper && (
-                  <p className="text-xl text-zinc-300 font-medium italic">"{transcript || "Say something..."}"</p>
-                )}
-              </motion.div>
-            )}
-            {state === "processing" && (
-              <motion.div 
-                key="processing"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]"
-              >
-                Processing Core Inference...
-              </motion.div>
-            )}
-            {(state === "speaking" || (state === "idle" && response)) && (
-              <motion.div 
-                key="response"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-4"
-              >
-                {state === "speaking" && <p className="text-emerald-400 font-bold uppercase tracking-widest text-[10px] pulse-anim">AI Assistant is speaking</p>}
-                <p className="text-lg text-zinc-200 leading-relaxed font-medium line-clamp-3 overflow-hidden">{response}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center gap-6">
-          <Button 
-            size="lg"
-            className={`h-16 w-16 rounded-2xl transition-all shadow-xl ${
-              state === "listening" 
-                ? "bg-red-500 hover:bg-red-600 text-white" 
-                : "bg-violet-600 hover:bg-violet-500 text-white"
-            }`}
-            onClick={toggleListening}
-            disabled={state === "processing" || state === "speaking"}
-          >
-            {state === "listening" ? <MicOff size={24} /> : <Mic size={24} />}
-          </Button>
-
-          {state === "speaking" && (
-            <Button 
-              variant="outline"
-              size="lg"
-              className="h-16 w-16 rounded-2xl border-white/10 glass bg-white/5 text-zinc-400 hover:text-white"
-              onClick={stopSpeaking}
-            >
-              <Square size={20} className="fill-current" />
-            </Button>
+      {/* Controls */}
+      <div className="mt-4 shrink-0 flex flex-col items-center gap-3">
+        <AnimatePresence>
+          {state === "listening" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex gap-1.5 h-8 items-center">
+              {[1, 2, 3, 4, 5].map(i => (
+                <motion.div key={i} animate={{ height: [8, 28, 8] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }} className="w-1.5 bg-violet-400 rounded-full" />
+              ))}
+            </motion.div>
           )}
-        </div>
-
-        <div className="flex items-center gap-8 mt-4 pt-10 border-t border-white/5 w-full justify-center">
-            <div className="flex items-center gap-2 group cursor-pointer">
-              <Zap size={14} className="text-emerald-500" />
-              <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest group-hover:text-zinc-400 transition-colors">Low Latency Mode</span>
-            </div>
-            <div className="flex items-center gap-2 group cursor-pointer">
-              <Shield size={14} className="text-violet-500" />
-              <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest group-hover:text-zinc-400 transition-colors">Local Sandbox Encryption</span>
-            </div>
-        </div>
+        </AnimatePresence>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+          {state === "thinking" && <Loader2 size={12} className="animate-spin" />}
+          {state === "speaking" && <Volume2 size={12} className="text-emerald-400" />}
+          {label}
+        </p>
+        <Button
+          size="lg"
+          onClick={toggleConversation}
+          disabled={state === "thinking" || state === "speaking"}
+          className={`h-16 rounded-2xl px-8 font-bold gap-3 shadow-xl ${state === "listening" ? "bg-red-500 hover:bg-red-600" : "bg-violet-600 hover:bg-violet-500"} text-white`}
+        >
+          {state === "listening" ? <MicOff size={22} /> : <Mic size={22} />}
+          {usingWhisper ? (state === "listening" ? "Stop & transcribe" : "Talk") : on ? "Listening..." : "Start conversation"}
+        </Button>
+        {state === "speaking" && (
+          <Button variant="ghost" onClick={() => { window.speechSynthesis.cancel(); }} className="text-zinc-400 gap-2 text-xs">
+            <Square size={12} className="fill-current" /> Skip speaking
+          </Button>
+        )}
       </div>
     </div>
   );
