@@ -22,9 +22,14 @@ export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video"; 
 
   const load = React.useCallback(async () => {
     try {
-      const data = await (await fetch(`/api/gallery?kind=${kind}`)).json();
+      const resp = await fetch(`/api/gallery?kind=${kind}`);
+      const text = await resp.text();
+      let data: any = null;
+      try { data = JSON.parse(text); } catch { /* not JSON */ }
+      if (!resp.ok || !data) throw new Error("History unavailable - restart the Sunayna server (npm run dev) so it picks up the new version.");
       setItems(data.items || []);
       setDir(data.dir || "");
+      setError(null);
     } catch (e: any) {
       setError(e.message);
     }
@@ -42,7 +47,7 @@ export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video"; 
   const remove = async (item: Item) => {
     if (!window.confirm("Delete this file from disk? This can't be undone.")) return;
     const resp = await fetch(`/api/gallery/${kind}/${encodeURIComponent(item.file)}`, { method: "DELETE" });
-    if (!resp.ok) return setError((await resp.json()).error || "Delete failed");
+    if (!resp.ok) return setError("Delete failed");
     setItems(prev => prev.filter(i => i.file !== item.file));
     setOpen(cur => (cur?.file === item.file ? null : cur));
   };
@@ -53,7 +58,7 @@ export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video"; 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, file: item.file }),
     });
-    if (!resp.ok) setError((await resp.json()).error || "Couldn't open the folder");
+    if (!resp.ok) setError("Couldn't open the folder");
   };
 
   const actions = (item: Item) => (
@@ -122,5 +127,25 @@ export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video"; 
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** Small auto-dismissing popup, bottom-right. */
+export function Toast({ message, onDone }: { message: string | null; onDone: () => void }) {
+  React.useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(onDone, 4000);
+    return () => clearTimeout(t);
+  }, [message, onDone]);
+  return (
+    <AnimatePresence>
+      {message && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+          onClick={onDone}
+          className="fixed bottom-6 right-6 z-[60] bg-emerald-600 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-2xl cursor-pointer"
+        >{message}</motion.div>
+      )}
+    </AnimatePresence>
   );
 }

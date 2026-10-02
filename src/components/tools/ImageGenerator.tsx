@@ -2,7 +2,7 @@ import React from "react";
 import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
-import { GalleryHistory } from "./GalleryHistory";
+import { GalleryHistory, Toast } from "./GalleryHistory";
 
 type Source = "cloud" | "local";
 
@@ -18,6 +18,7 @@ export function ImageGeneratorView() {
   const [prompt, setPrompt] = React.useState("");
   const [negativePrompt, setNegativePrompt] = React.useState("");
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [toast, setToast] = React.useState<string | null>(null);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -79,6 +80,7 @@ export function ImageGeneratorView() {
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Generation failed");
+      setToast("Image generated and saved to history");
       setRefreshKey(k => k + 1); // result was saved to disk; reload history
       setPrompt("");
     } catch (e: any) {
@@ -209,6 +211,7 @@ export function ImageGeneratorView() {
 
         <div className="flex-1 overflow-y-auto pb-10">
           <GalleryHistory kind="image" refreshKey={refreshKey} />
+          <Toast message={toast} onDone={() => setToast(null)} />
         </div>
       </div>
     </div>

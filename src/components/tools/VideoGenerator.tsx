@@ -3,7 +3,7 @@ import { Clapperboard, Loader2, AlertTriangle, Globe, Clock, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { VideoJob } from "../../types";
-import { GalleryHistory } from "./GalleryHistory";
+import { GalleryHistory, Toast } from "./GalleryHistory";
 
 type Source = "cloud" | "local";
 
@@ -18,6 +18,7 @@ export function VideoGeneratorView() {
   const [prompt, setPrompt] = React.useState("");
   const [jobs, setJobs] = React.useState<VideoJob[]>([]);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [toast, setToast] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -61,7 +62,7 @@ export function VideoGeneratorView() {
         try {
           const resp = await fetch(`/api/video/status/${job.id}`);
           const data = await resp.json();
-          if (data.status === "done") setRefreshKey(k => k + 1);
+          if (data.status === "done") { setRefreshKey(k => k + 1); setToast("Video generated and saved to history"); }
           setJobs(prev => prev.map(j => j.id === job.id
             ? { ...j, status: data.status, resultUrl: data.resultUrl, error: data.error }
             : j
@@ -233,6 +234,7 @@ export function VideoGeneratorView() {
             </div>
           ))}
           <GalleryHistory kind="video" refreshKey={refreshKey} />
+          <Toast message={toast} onDone={() => setToast(null)} />
         </div>
       </div>
     </div>
