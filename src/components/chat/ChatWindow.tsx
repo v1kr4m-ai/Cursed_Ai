@@ -213,6 +213,13 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           },
           onError: (error) => {
             console.error("Failed to generate response:", error);
+            // Show the failure in the reply bubble instead of leaving it blank.
+            const msgs = [...updatedChat.messages];
+            msgs[msgs.length - 1] = {
+              ...assistantMessagePlaceholder,
+              content: finalContent || `⚠️ ${error?.message || error}`,
+            };
+            onUpdateChat({ ...updatedChat, messages: msgs });
             setIsGenerating(false);
           },
           onComplete: () => {
