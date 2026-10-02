@@ -19,7 +19,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 |---|---|
 | **Chat** | Streaming local LLM chat, model picker, mic dictation, archive/clear, live tokens/sec |
 | **Assistant** | Voice conversation: speak → transcribe → LLM reply → spoken back |
-| **Models** | Real streamed GGUF downloads from Hugging Face, delete, switch |
+| **Models** | Real streamed GGUF downloads from Hugging Face, delete, switch. Auto-lists any .gguf in your models folder plus models from a running **Ollama** / **LM Studio** (chat proxied to them) |
 | **Memory** | Vector RAG: MiniLM embeddings + cosine search, injected into prompts; searchable, wipeable |
 | **Engine** | Real telemetry (tokens/sec, RAM, active model), performance modes, unload |
 | **Console** | Live stream of the server's real log output |

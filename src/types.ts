@@ -38,6 +38,8 @@ export interface AIModel {
   type: 'General' | 'Vision' | 'Fast' | 'Reasoning';
   /** Direct HTTPS URL to the .gguf file. Omitted for models with no working download path yet. */
   downloadUrl?: string;
+  /** Where it runs: a GGUF file, or an external local server. */
+  source?: 'gguf' | 'ollama' | 'lmstudio';
 }
 
 export interface AppSettings {

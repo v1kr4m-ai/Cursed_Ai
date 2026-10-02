@@ -257,6 +257,88 @@ async function startServer() {
     });
   }
 
+  // --- External local servers: Ollama and LM Studio ------------------------
+  // Their models are discovered live from their own local APIs and chatted
+  // with by proxying - ids are "ollama:<name>" / "lmstudio:<id>".
+  const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+  const LMSTUDIO_URL = process.env.LMSTUDIO_URL || "http://127.0.0.1:1234";
+
+  async function listExternalModels() {
+    const out: { ollama: any; lmstudio: any } = {
+      ollama: { running: false, models: [] as string[] },
+      lmstudio: { running: false, models: [] as string[] },
+    };
+    try {
+      const r = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1500) });
+      if (r.ok) {
+        const d: any = await r.json();
+        out.ollama = { running: true, models: (d.models || []).filter((m: any) => !/embed/i.test(m.name)).map((m: any) => m.name) };
+      }
+    } catch {}
+    try {
+      const r = await fetch(`${LMSTUDIO_URL}/v1/models`, { signal: AbortSignal.timeout(1500) });
+      if (r.ok) {
+        const d: any = await r.json();
+        out.lmstudio = { running: true, models: (d.data || []).map((m: any) => m.id).filter((id: string) => !/embed/i.test(id)) };
+      }
+    } catch {}
+    return out;
+  }
+
+  app.get("/api/external-models", async (req, res) => {
+    res.json(await listExternalModels());
+  });
+
+  // Streams a chat through Ollama or LM Studio, emitting the same SSE
+  // {token} / [DONE] / {error} frames the local engine does.
+  async function proxyExternalChat(provider: "ollama" | "lmstudio", model: string, messages: any[], options: any, res: express.Response, signal: AbortSignal) {
+    const history = (messages || []).map((m: any) => ({ role: m.role, content: m.content }));
+    const send = (o: any) => res.write(`data: ${JSON.stringify(o)}\n\n`);
+    const label = provider === "ollama" ? "Ollama" : "LM Studio";
+    let resp: Response;
+    try {
+      resp = provider === "ollama"
+        ? await fetch(`${OLLAMA_URL}/api/chat`, {
+            method: "POST", signal, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, num_predict: options?.maxTokens } }),
+          })
+        : await fetch(`${LMSTUDIO_URL}/v1/chat/completions`, {
+            method: "POST", signal, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model, messages: history, stream: true, temperature: options?.temperature, top_p: options?.topP, max_tokens: options?.maxTokens }),
+          });
+    } catch (e: any) {
+      if (signal.aborted) return;
+      throw new Error(`Could not reach ${label} - is it running? (${e.message})`);
+    }
+    if (!resp.ok || !resp.body) {
+      throw new Error(`${label} returned HTTP ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200)}`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        let line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        if (provider === "lmstudio") {
+          if (!line.startsWith("data:")) continue;
+          line = line.slice(5).trim();
+          if (line === "[DONE]") continue;
+        }
+        let j: any;
+        try { j = JSON.parse(line); } catch { continue; }
+        if (j.error) throw new Error(typeof j.error === "string" ? j.error : JSON.stringify(j.error));
+        const token = provider === "ollama" ? j.message?.content : j.choices?.[0]?.delta?.content;
+        if (token) send({ token });
+      }
+    }
+  }
+
   // API Route: Real Local LLM Inference with Streaming
   app.post("/api/chat", async (req, res) => {
     const { messages, prompt, model: modelName, options } = req.body;
@@ -270,13 +352,24 @@ async function startServer() {
     res.setHeader('Connection', 'keep-alive');
 
     const abortController = new AbortController();
-    req.on('close', () => {
-      console.log("[LocalRuntime] Request closed by client. Aborting inference...");
+    // Listen on the RESPONSE: on current Node, req 'close' fires as soon as
+    // the request body has been read, which aborted every chat instantly.
+    res.on('close', () => {
+      if (res.writableFinished) return;
+      console.log("[LocalRuntime] Client disconnected. Aborting inference...");
       abortController.abort();
     });
 
     try {
       isInferenceRunning = true;
+      const ext = /^(ollama|lmstudio):(.+)$/.exec(modelName || "");
+      if (ext) {
+        console.log(`[External] Chat via ${ext[1]}: ${ext[2]}`);
+        await proxyExternalChat(ext[1] as "ollama" | "lmstudio", ext[2], messages, options, res, abortController.signal);
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+        return;
+      }
       await loadModel(modelName || "phi-3-mini");
 
       let finalPrompt = "";

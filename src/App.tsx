@@ -76,21 +76,47 @@ export default function App() {
   useEffect(() => {
     async function syncModels() {
       const data = await AIService.getModels();
-      if (data && data.available) {
-        setModels(prev => prev.map(m => ({
+      const ext = await fetch("/api/external-models").then(r => r.json()).catch(() => null);
+
+      setModels(prev => {
+        const available: string[] = data?.available || [];
+        const norm = (n: string) => n.toLowerCase().replace(" ", "-");
+        // Catalog entries: downloaded if a matching file is on disk.
+        const known = prev.filter(m => !m.source || m.source === "gguf").map(m => ({
           ...m,
-          // If the model filename (e.g. phi.gguf) is in available list, mark it as downloaded
-          // We check both id and a possible filename match
-          isDownloaded: data.available.some((f: string) => 
-            f.toLowerCase() === m.id.toLowerCase() || 
+          isDownloaded: available.some((f: string) =>
+            f.toLowerCase() === m.id.toLowerCase() ||
             f.toLowerCase() === `${m.id}.gguf`.toLowerCase() ||
-            f.toLowerCase().includes(m.name.toLowerCase().replace(" ", "-"))
-          )
-        })));
-      }
+            f.toLowerCase().includes(norm(m.name))
+          ),
+        }));
+        // Any other .gguf already in the user's models folder.
+        const extraFiles: AIModel[] = available
+          .map((f: string) => f.replace(/\.gguf$/i, ""))
+          .filter((id: string) => !known.some(m => m.isDownloaded && (id.toLowerCase() === m.id.toLowerCase() || id.toLowerCase().includes(norm(m.name)))))
+          .map((id: string): AIModel => ({
+            id, name: id, description: "GGUF file from your models folder.", size: "", format: "GGUF",
+            isDownloaded: true, parameters: "", type: "General", source: "gguf",
+          }));
+        const fromServer = (provider: "ollama" | "lmstudio", label: string): AIModel[] =>
+          (ext?.[provider]?.models || []).map((name: string): AIModel => ({
+            id: `${provider}:${name}`, name, description: `Served by ${label} on this machine.`, size: "",
+            format: "GGUF", isDownloaded: true, parameters: label, type: "General", source: provider,
+          }));
+        return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio")];
+      });
     }
     syncModels();
   }, []);
+
+  // If the selected model isn't actually available (e.g. the default isn't
+  // downloaded) but others are, switch to the first usable one.
+  useEffect(() => {
+    const cur = models.find(m => m.id === selectedModelId);
+    if (cur?.isDownloaded) return;
+    const firstUsable = models.find(m => m.isDownloaded);
+    if (firstUsable) setSelectedModelId(firstUsable.id);
+  }, [models]);
 
   const [settings, setSettings] = useState<AppSettings>({
     vulkanEnabled: true,

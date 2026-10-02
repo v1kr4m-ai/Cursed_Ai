@@ -137,6 +137,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                       size="icon" 
                       className="w-12 h-12 rounded-[1.25rem] bg-white/5 border border-white/5 hover:bg-red-500/10 hover:text-red-400 text-zinc-600"
                       onClick={() => onDeleteModel(model.id)}
+                      hidden={model.source === "ollama" || model.source === "lmstudio"}
                     >
                       <Trash2 size={18} />
                     </Button>
