@@ -24,7 +24,8 @@ import {
   Mic,
   MessageSquare,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  Folder
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppSettings } from "../../types";
 
 import { AIService } from "../../services/aiService";
+import { FolderPickerDialog } from "./FolderPickerDialog";
 
 export function MemoryView() {
   const [memories, setMemories] = React.useState<{ text: string, timestamp: number }[]>([]);
@@ -411,6 +413,7 @@ function ModelsDirectorySection() {
   const [input, setInput] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const fetchConfig = React.useCallback(async () => {
     try {
@@ -426,19 +429,21 @@ function ModelsDirectorySection() {
 
   React.useEffect(() => { fetchConfig(); }, [fetchConfig]);
 
-  const save = async () => {
-    if (!input.trim()) return;
+  const save = async (pathOverride?: string) => {
+    const target = pathOverride ?? input;
+    if (!target.trim()) return;
     setIsSaving(true);
     setError(null);
     try {
       const resp = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelsDir: input.trim() }),
+        body: JSON.stringify({ modelsDir: target.trim() }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Failed to save");
       setModelsDir(data.modelsDir);
+      setInput(data.modelsDir);
       setIsDefault(data.isDefault);
     } catch (e: any) {
       setError(e.message);
@@ -454,7 +459,7 @@ function ModelsDirectorySection() {
         <div className="space-y-1">
           <Label className="text-zinc-100 font-bold tracking-tight">GGUF Models Directory</Label>
           <p className="text-xs text-zinc-500">
-            Where the server reads/writes .gguf files. {isDefault ? "Currently the default." : "Currently a custom path."} Type an absolute path on this machine and Save — the directory is created if it doesn't exist yet.
+            Where the server reads/writes .gguf files. {isDefault ? "Currently the default." : "Currently a custom path."} Point this at a folder that already has your downloaded GGUF models, or type a path directly.
           </p>
         </div>
         <div className="flex gap-3">
@@ -464,13 +469,23 @@ function ModelsDirectorySection() {
             placeholder="D:\Models or /home/user/models"
             className="flex-1 bg-white/5 border-white/5 text-zinc-100 font-mono text-xs"
           />
-          <Button onClick={save} disabled={isSaving || !input.trim() || input === modelsDir} className="bg-violet-600 hover:bg-violet-500 text-white font-bold shrink-0">
+          <Button onClick={() => setPickerOpen(true)} variant="ghost" className="bg-white/5 hover:bg-white/10 text-zinc-300 font-bold shrink-0">
+            <Folder size={16} className="mr-2" /> Browse
+          </Button>
+          <Button onClick={() => save()} disabled={isSaving || !input.trim() || input === modelsDir} className="bg-violet-600 hover:bg-violet-500 text-white font-bold shrink-0">
             {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Save"}
           </Button>
         </div>
         {error && <p className="text-xs text-red-400">{error}</p>}
         {modelsDir && <p className="text-[10px] text-zinc-600 font-mono truncate">Active: {modelsDir}</p>}
       </div>
+
+      <FolderPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        initialPath={modelsDir || ""}
+        onSelect={(path) => save(path)}
+      />
     </section>
   );
 }

@@ -1,15 +1,52 @@
 import React from "react";
-import { Clapperboard, Loader2, AlertTriangle, Globe, Clock } from "lucide-react";
+import { Clapperboard, Loader2, AlertTriangle, Globe, Clock, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoJob } from "../../types";
 
+type Source = "cloud" | "local";
+
+const SIZE_PRESETS = [
+  { label: "768×512 (wide)", width: 768, height: 512 },
+  { label: "512×768 (tall)", width: 512, height: 768 },
+  { label: "640×640 (square)", width: 640, height: 640 },
+];
+
 export function VideoGeneratorView() {
+  const [source, setSource] = React.useState<Source>("cloud");
   const [prompt, setPrompt] = React.useState("");
   const [jobs, setJobs] = React.useState<VideoJob[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Poll any pending jobs every 8s (Veo generation typically takes 1-6 minutes).
+  // Local (ComfyUI/LTX-Video) only
+  const [checkpoints, setCheckpoints] = React.useState<string[]>([]);
+  const [checkpoint, setCheckpoint] = React.useState("");
+  const [checkpointsError, setCheckpointsError] = React.useState<string | null>(null);
+  const [sizeIdx, setSizeIdx] = React.useState(0);
+  const [sourceImage, setSourceImage] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (source !== "local") return;
+    setCheckpointsError(null);
+    fetch("/api/comfyui/checkpoints?kind=video")
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setCheckpoints(data.checkpoints || []);
+        if (data.checkpoints?.length && !checkpoint) setCheckpoint(data.checkpoints[0]);
+      })
+      .catch(e => setCheckpointsError(e.message));
+  }, [source]);
+
+  const onSourceFile = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setSourceImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // Poll any pending jobs every 8s (both Veo and SVD can take minutes).
   React.useEffect(() => {
     const pending = jobs.filter(j => j.status === "pending");
     if (pending.length === 0) return;
@@ -31,18 +68,28 @@ export function VideoGeneratorView() {
   }, [jobs]);
 
   const generate = async () => {
-    if (!prompt.trim() || isSubmitting) return;
+    if (isSubmitting) return;
+    if (!prompt.trim()) return;
+    if (source === "local" && !checkpoint) {
+      setError("No checkpoint selected");
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
-      const resp = await fetch("/api/video/generate", {
+      const endpoint = source === "cloud" ? "/api/video/generate" : "/api/comfyui/video/generate";
+      const body = source === "cloud"
+        ? { prompt }
+        : { prompt, image: sourceImage, checkpoint, width: SIZE_PRESETS[sizeIdx].width, height: SIZE_PRESETS[sizeIdx].height };
+      const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Failed to start generation");
-      setJobs(prev => [{ id: data.id, prompt, status: "pending", createdAt: Date.now() }, ...prev]);
+      const label = prompt;
+      setJobs(prev => [{ id: data.id, prompt: label, status: "pending", createdAt: Date.now() }, ...prev]);
       setPrompt("");
     } catch (e: any) {
       setError(e.message);
@@ -59,28 +106,103 @@ export function VideoGeneratorView() {
             <Clapperboard className="text-orange-500" size={32} />
             Video Studio
           </h1>
-          <p className="text-zinc-500 text-sm font-medium uppercase tracking-[0.2em] flex items-center gap-2">
-            <Globe size={12} className="text-yellow-500" /> Cloud (Gemini/Veo) — needs internet + GEMINI_API_KEY. Generation takes several minutes.
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => setSource("cloud")}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${source === "cloud" ? "bg-orange-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
+            >
+              <Globe size={12} /> Cloud (Veo)
+            </button>
+            <button
+              onClick={() => setSource("local")}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${source === "local" ? "bg-orange-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
+            >
+              <HardDrive size={12} /> Local (ComfyUI/SVD)
+            </button>
+          </div>
+          <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-3">
+            {source === "cloud"
+              ? "Needs internet + GEMINI_API_KEY. Generation takes several minutes."
+              : "Needs ComfyUI + VideoHelperSuite at http://127.0.0.1:8188 — fully offline. Text-to-video, optionally starting from an image."}
           </p>
         </header>
 
         <div className="glass p-6 rounded-[2rem] border-white/5 mb-8 shrink-0 space-y-4">
-          <div className="flex gap-3">
-            <input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && generate()}
-              placeholder="A neon hologram of a cat driving at top speed..."
-              className="flex-1 bg-white/5 border-none rounded-2xl px-6 py-3 text-white focus:outline-none focus:ring-1 focus:ring-orange-500 transition-all font-medium placeholder:text-zinc-700"
-            />
-            <Button
-              onClick={generate}
-              disabled={isSubmitting || !prompt.trim()}
-              className="bg-orange-600 hover:bg-orange-500 text-white rounded-2xl px-8 font-black uppercase text-[10px] tracking-widest h-auto"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : "Generate"}
-            </Button>
-          </div>
+          {source === "local" && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block">LTX-Video Checkpoint</label>
+                  {checkpointsError ? (
+                    <p className="text-xs text-red-400 flex items-center gap-2"><AlertTriangle size={12} /> {checkpointsError}</p>
+                  ) : (
+                    <select
+                      value={checkpoint}
+                      onChange={(e) => setCheckpoint(e.target.value)}
+                      className="w-full bg-white/5 border-none rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    >
+                      {checkpoints.length === 0 && <option value="">No checkpoints found</option>}
+                      {checkpoints.map(c => <option key={c} value={c} className="bg-zinc-900">{c}</option>)}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block">Size</label>
+                  <select
+                    value={sizeIdx}
+                    onChange={(e) => setSizeIdx(Number(e.target.value))}
+                    className="w-full bg-white/5 border-none rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  >
+                    {SIZE_PRESETS.map((s, i) => <option key={s.label} value={i} className="bg-zinc-900">{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block">Starting Image (optional)</label>
+                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => onSourceFile(e.target.files?.[0])} />
+                {sourceImage ? (
+                  <div className="relative inline-block">
+                    <img src={sourceImage} alt="source" className="h-24 w-24 object-cover rounded-xl border border-white/10" />
+                    <button
+                      onClick={() => setSourceImage(null)}
+                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold uppercase tracking-widest px-4 py-3 rounded-2xl"
+                  >
+                    <Upload size={14} /> Upload starting image
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {(
+            <div className="flex gap-3">
+              <input
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && generate()}
+                placeholder="A neon hologram of a cat driving at top speed..."
+                className="flex-1 bg-white/5 border-none rounded-2xl px-6 py-3 text-white focus:outline-none focus:ring-1 focus:ring-orange-500 transition-all font-medium placeholder:text-zinc-700"
+              />
+            </div>
+          )}
+
+          <Button
+            onClick={generate}
+            disabled={isSubmitting || !prompt.trim()}
+            className="bg-orange-600 hover:bg-orange-500 text-white rounded-2xl px-8 font-black uppercase text-[10px] tracking-widest h-auto w-full md:w-auto"
+          >
+            {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : "Generate"}
+          </Button>
+
           {error && (
             <div className="flex items-center gap-2 text-red-400 text-xs font-medium">
               <AlertTriangle size={14} /> {error}

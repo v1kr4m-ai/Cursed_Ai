@@ -18,24 +18,39 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const [state, setState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recognitionRef = useRef<any>(null);
   const localRecorderRef = useRef<LocalVoiceRecorder | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const usingWhisper = settings.voiceEngine === "whisper";
 
+  // A ref mirror of `state`, read inside the SpeechRecognition `onend`
+  // handler below. The handler is bound once (see the empty dep array on
+  // the effect that creates it) so it must never read `state` directly -
+  // that would be a stale closure frozen at creation time.
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   useEffect(() => {
     if (usingWhisper) return; // local Whisper path doesn't use the Web Speech API at all
 
-    // Initialize Web Speech API
+    // Initialize Web Speech API ONCE. This used to depend on `state`, which
+    // meant every state change (idle -> listening -> processing -> ...)
+    // tore down and recreated the recognition object - including stopping
+    // it via this effect's own cleanup literally the instant after
+    // toggleListening() had just started it. That's why voice input never
+    // actually worked: recognition.start() fired, then this effect re-ran
+    // on the resulting state change and immediately called
+    // recognition.stop() on it before it ever captured anything.
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = "en-US";
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognition.onresult = (event: any) => {
         const currentTranscript = Array.from(event.results)
           .map((result: any) => result[0])
           .map((result: any) => result.transcript)
@@ -43,26 +58,40 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         setTranscript(currentTranscript);
       };
 
-      recognitionRef.current.onend = () => {
-        if (state === "listening") {
+      recognition.onend = () => {
+        if (stateRef.current === "listening") {
           handleProcessVoice();
         }
       };
+
+      recognitionRef.current = recognition;
     }
 
-    synthRef.current = window.speechSynthesis;
-
     return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
-      if (synthRef.current) synthRef.current.cancel();
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
     };
-  }, [state, usingWhisper]);
+  }, [usingWhisper]);
 
   useEffect(() => {
     // speechSynthesis is used by both engines for the spoken reply
     synthRef.current = window.speechSynthesis;
     return () => synthRef.current?.cancel();
   }, []);
+
+  // Local Whisper only produces a transcript after you stop (no live
+  // partial text is possible without real streaming inference), so a
+  // recording timer is the honest "this is actually working" signal while
+  // listening instead of a caption that can't update yet.
+  useEffect(() => {
+    if (!usingWhisper || state !== "listening") {
+      setRecordingSeconds(0);
+      return;
+    }
+    const start = Date.now();
+    const timer = setInterval(() => setRecordingSeconds(Math.floor((Date.now() - start) / 1000)), 250);
+    return () => clearInterval(timer);
+  }, [usingWhisper, state]);
 
   const toggleListening = async () => {
     if (usingWhisper) {
@@ -288,8 +317,12 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-2"
               >
-                <p className="text-violet-400 font-bold uppercase tracking-widest text-[10px]">Listening...</p>
-                <p className="text-xl text-zinc-300 font-medium italic">"{transcript || "Say something..."}"</p>
+                <p className="text-violet-400 font-bold uppercase tracking-widest text-[10px]">
+                  {usingWhisper ? `Recording... ${recordingSeconds}s (transcribes on stop)` : "Listening..."}
+                </p>
+                {!usingWhisper && (
+                  <p className="text-xl text-zinc-300 font-medium italic">"{transcript || "Say something..."}"</p>
+                )}
               </motion.div>
             )}
             {state === "processing" && (
