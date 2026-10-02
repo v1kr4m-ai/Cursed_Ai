@@ -717,6 +717,64 @@ async function startServer() {
     }
   });
 
+  // --- Gallery: generated images/videos are saved to disk (outputs/), so the
+  // Image/Video tabs can show history, delete, and reveal in the file manager.
+  const OUTPUTS_DIR = path.join(process.cwd(), "outputs");
+  const galleryDir = (kind: string) => path.join(OUTPUTS_DIR, kind === "video" ? "videos" : "images");
+  fs.mkdirSync(galleryDir("image"), { recursive: true });
+  fs.mkdirSync(galleryDir("video"), { recursive: true });
+
+  function saveToGallery(kind: "image" | "video", buffer: Buffer, ext: string): string {
+    const name = `${new Date().toISOString().replace(/[:.]/g, "-")}${ext}`;
+    fs.writeFileSync(path.join(galleryDir(kind), name), buffer);
+    return name;
+  }
+
+  // Only plain file names inside the gallery folder - blocks path traversal.
+  function galleryPath(kind: string, file: string): string | null {
+    if (!file || file !== path.basename(file)) return null;
+    const p = path.join(galleryDir(kind), file);
+    return fs.existsSync(p) ? p : null;
+  }
+
+  app.get("/api/gallery", (req, res) => {
+    const kind = req.query.kind === "video" ? "video" : "image";
+    const dir = galleryDir(kind);
+    const items = fs.readdirSync(dir)
+      .filter(f => /\.(png|jpg|jpeg|webp|mp4)$/i.test(f))
+      .map(f => ({ file: f, url: `/api/gallery/file/${kind}/${encodeURIComponent(f)}`, createdAt: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+    res.json({ dir, items });
+  });
+
+  app.get("/api/gallery/file/:kind/:file", (req, res) => {
+    const p = galleryPath(req.params.kind, req.params.file);
+    if (!p) return res.status(404).end();
+    res.sendFile(p);
+  });
+
+  app.delete("/api/gallery/:kind/:file", (req, res) => {
+    const p = galleryPath(req.params.kind, req.params.file);
+    if (!p) return res.status(404).json({ error: "File not found" });
+    fs.unlinkSync(p);
+    res.json({ status: "success" });
+  });
+
+  // Opens the OS file manager with the file selected (Windows/macOS/Linux).
+  app.post("/api/gallery/reveal", (req, res) => {
+    const { kind, file } = req.body;
+    const p = galleryPath(kind, file);
+    if (!p) return res.status(404).json({ error: "File not found" });
+    try {
+      if (process.platform === "win32") spawn("explorer.exe", [`/select,${p}`], { detached: true, stdio: "ignore" }).unref();
+      else if (process.platform === "darwin") spawn("open", ["-R", p], { detached: true, stdio: "ignore" }).unref();
+      else spawn("xdg-open", [path.dirname(p)], { detached: true, stdio: "ignore" }).unref();
+      res.json({ status: "success" });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // API Route: Image generation (Gemini/Imagen — real, needs GEMINI_API_KEY + internet)
   app.post("/api/image/generate", async (req, res) => {
     const { prompt } = req.body;
@@ -731,7 +789,9 @@ async function startServer() {
       });
       const img = response.generatedImages?.[0]?.image;
       if (!img?.imageBytes) throw new Error("No image returned by the API");
-      res.json({ src: `data:${img.mimeType || "image/png"};base64,${img.imageBytes}` });
+      const mime = img.mimeType || "image/png";
+      const file = saveToGallery("image", Buffer.from(img.imageBytes, "base64"), mime.includes("jpeg") ? ".jpg" : ".png");
+      res.json({ src: `data:${mime};base64,${img.imageBytes}`, file });
     } catch (error: any) {
       console.error("[Image] Generation failed:", error);
       res.status(500).json({ error: error.message });
@@ -744,6 +804,7 @@ async function startServer() {
     prompt: string;
     status: "pending" | "done" | "error";
     videoPath?: string;
+    galleryFile?: string;
     error?: string;
     createdAt: number;
   }
@@ -783,6 +844,7 @@ async function startServer() {
           await ai.files.download({ file: generated.video, downloadPath: videoPath });
         }
         job.videoPath = videoPath;
+        job.galleryFile = saveToGallery("video", fs.readFileSync(videoPath), ".mp4");
         job.status = "done";
         console.log(`[Video] Job ${id} done -> ${videoPath}`);
       } catch (error: any) {
@@ -801,6 +863,7 @@ async function startServer() {
       status: job.status,
       error: job.error,
       resultUrl: job.status === "done" ? `/api/video/result/${job.id}` : undefined,
+      file: job.galleryFile,
     });
   });
 
@@ -1054,7 +1117,8 @@ async function startServer() {
       const img = output?.images?.[0];
       if (!img) throw new Error("ComfyUI returned no image output");
       const buffer = await fetchComfyFile(img.filename, img.subfolder, img.type);
-      res.json({ src: `data:image/png;base64,${buffer.toString("base64")}` });
+      const file = saveToGallery("image", buffer, ".png");
+      res.json({ src: `data:image/png;base64,${buffer.toString("base64")}`, file });
     } catch (error: any) {
       console.error("[ComfyUI Image] Generation failed:", error);
       res.status(500).json({ error: error.message });
@@ -1147,6 +1211,7 @@ async function startServer() {
         const videoPath = path.join(VIDEO_TMP_DIR, `${id}.mp4`);
         fs.writeFileSync(videoPath, buffer);
         job.videoPath = videoPath;
+        job.galleryFile = saveToGallery("video", fs.readFileSync(videoPath), ".mp4");
         job.status = "done";
         console.log(`[ComfyUI Video] Job ${id} done -> ${videoPath}`);
       } catch (error: any) {

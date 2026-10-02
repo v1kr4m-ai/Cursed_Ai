@@ -23,8 +23,8 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Memory** | Vector RAG: MiniLM embeddings + cosine search, injected into prompts; searchable, wipeable |
 | **Engine** | Real telemetry (tokens/sec, RAM, active model), performance modes, unload |
 | **Console** | Live stream of the server's real log output |
-| **Image** | Cloud (Gemini/Imagen) **or** local ComfyUI: txt2img and img2img with a reference image, checkpoint dropdown, size presets |
-| **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image) |
+| **Image** | Cloud (Gemini/Imagen) **or** local ComfyUI: txt2img and img2img with a reference image, checkpoint dropdown, size presets. Results are saved to `outputs/` and shown as a history: click to enlarge, click away to collapse, delete or open file location |
+| **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image); saved to `outputs/` with the same history (delete, open file location) |
 | **Settings** | Sampling params, voice engine (browser vs. local Whisper), GGUF folder with a folder browser, threads/context size |
 
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).

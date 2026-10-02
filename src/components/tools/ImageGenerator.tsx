@@ -2,7 +2,7 @@ import React from "react";
 import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
-import { GeneratedImage } from "../../types";
+import { GalleryHistory } from "./GalleryHistory";
 
 type Source = "cloud" | "local";
 
@@ -17,7 +17,7 @@ export function ImageGeneratorView() {
   const [source, setSource] = React.useState<Source>("cloud");
   const [prompt, setPrompt] = React.useState("");
   const [negativePrompt, setNegativePrompt] = React.useState("");
-  const [images, setImages] = React.useState<GeneratedImage[]>([]);
+  const [refreshKey, setRefreshKey] = React.useState(0);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -79,7 +79,7 @@ export function ImageGeneratorView() {
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Generation failed");
-      setImages(prev => [{ id: Date.now().toString(), prompt, src: data.src, createdAt: Date.now() }, ...prev]);
+      setRefreshKey(k => k + 1); // result was saved to disk; reload history
       setPrompt("");
     } catch (e: any) {
       setError(e.message);
@@ -208,30 +208,7 @@ export function ImageGeneratorView() {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-10">
-          {images.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4 opacity-60">
-              <ImagePlus size={48} className="text-zinc-800" />
-              <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">No images generated yet</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              {images.map((img) => (
-                <div key={img.id} className="glass rounded-[2rem] border-white/5 overflow-hidden group relative">
-                  <img src={img.src} alt={img.prompt} className="w-full aspect-square object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                    <p className="text-xs text-zinc-200 line-clamp-2 mb-3">{img.prompt}</p>
-                    <a
-                      href={img.src}
-                      download={`sunayna-image-${img.id}.png`}
-                      className="self-start bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-xl flex items-center gap-2"
-                    >
-                      <Download size={12} /> Save
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <GalleryHistory kind="image" refreshKey={refreshKey} />
         </div>
       </div>
     </div>

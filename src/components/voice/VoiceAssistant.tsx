@@ -142,6 +142,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     rec.lang = "en-US";
 
     let finalText = "";
+    let lastHeard = ""; // fallback when the engine ends without marking a result final
+    let silentCycles = 0;
     rec.onresult = (event: any) => {
       let interim = "";
       finalText = "";
@@ -150,7 +152,10 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         if (r.isFinal) finalText += r[0].transcript;
         else interim += r[0].transcript;
       }
-      setLive((finalText + interim).trim());
+      lastHeard = (finalText + interim).trim();
+      silentCycles = 0;
+      setError(null);
+      setLive(lastHeard);
     };
     rec.onerror = (e: any) => {
       if (e.error === "no-speech" || e.error === "aborted") return; // normal silence
@@ -162,10 +167,14 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     };
     rec.onend = () => {
       if (!activeRef.current || stateRef.current !== "listening") return;
-      const text = finalText.trim();
+      const text = (finalText.trim() || lastHeard);
       finalText = "";
+      lastHeard = "";
       if (text) runTurnRef.current(text);
-      else setTimeout(() => { if (activeRef.current && stateRef.current === "listening") { try { rec.start(); } catch {} } }, 200);
+      else {
+        if (++silentCycles === 3) setError("Listening, but no speech is reaching the browser. Check the right microphone is selected in the site permissions and not muted - or switch Voice Engine to Local Whisper in Settings.");
+        setTimeout(() => { if (activeRef.current && stateRef.current === "listening") { try { rec.start(); } catch {} } }, 200);
+      }
     };
     recognitionRef.current = rec;
     return () => {
