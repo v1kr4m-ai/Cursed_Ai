@@ -17,8 +17,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 | Tab | What it does |
 |---|---|
-| **Chat** | Streaming local LLM chat, model picker, mic dictation, archive/clear, live tokens/sec |
-| **Assistant** | Voice conversation: speak → transcribe → LLM reply → spoken back |
+| **Chat** | Streaming local LLM chat, model picker, mic dictation, a **read-aloud** button on every reply, archive/clear, live tokens/sec. Chat history is saved in the browser and survives reloads. A **floating bot button** (bottom-right) opens the live voice assistant |
 | **Models** | Real streamed GGUF downloads from Hugging Face, delete, switch. Auto-lists any .gguf in your models folder plus models from a running **Ollama** / **LM Studio** (chat proxied to them) |
 | **Memory** | Vector RAG: MiniLM embeddings + cosine search, injected into prompts; searchable, wipeable |
 | **Engine** | Real telemetry (tokens/sec, RAM, active model), performance modes, unload |
@@ -27,6 +26,8 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image); saved to `outputs/` with the same history (delete, open file location) |
 | **Settings** | Sampling params, voice engine (browser vs. local Whisper), GGUF folder with a folder browser, threads/context size |
 
+**Live voice assistant** (the floating bot button): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and is spoken aloud, then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
+
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).
 
 ---
@@ -34,8 +35,8 @@ Voice has two engines: the browser's Web Speech API (fast, not fully offline) or
 ## Current status
 
 **Verified working**
-- Web chat, memory/RAG, model download/delete, engine controls, console, local Whisper transcription.
-- Local ComfyUI **image** (txt2img + img2img) and **video** (LTX-Video text-to-video, mp4) — all tested end-to-end against a real ComfyUI. A "Start ComfyUI" button launches it from a folder you choose (checks first; does nothing if already running).
+- Web chat (with saved history and scrolling), live voice assistant (browser engine, tested with the real microphone), memory/RAG, model download/delete, engine controls, console, local Whisper transcription.
+- Local ComfyUI **image** (txt2img + img2img) and **video** (LTX-Video text-to-video, mp4) — all tested end-to-end against a real ComfyUI, including the saved-history gallery and a "generated" popup. A "Start ComfyUI" button launches it from a folder you choose (checks first; does nothing if already running).
 - Android: real llama.cpp loading a real GGUF and generating tokens on-device (emulator-tested).
 
 **Written but not yet run end-to-end**
@@ -58,7 +59,9 @@ npm install
 npm run dev          # http://localhost:3000   (set PORT=3100 to change)
 ```
 
-Production build:
+On Windows you can just double-click **`start.bat`** (installs dependencies on first run, opens the browser, starts the server). It runs the current source, so you never serve a stale build.
+
+Production build (rebuild after every code change, or `npm run start` serves old code):
 
 ```bash
 npm run build        # vite build + esbuild bundle of server.ts → dist/
@@ -74,6 +77,8 @@ The server reads `.gguf` files from `models/` (or any folder you pick in **Setti
 | Cloud image/video | `GEMINI_API_KEY` in `.env.local` + internet |
 | Local image/video | ComfyUI running at `http://127.0.0.1:8188` (override with `COMFYUI_URL`); video needs an LTX-Video checkpoint + a T5-XXL text encoder (core nodes only, no custom packs). Set your ComfyUI folder (portable build) with the button in the Image/Video tabs |
 | Gemini chat fallback | `GEMINI_API_KEY` |
+| Ollama models | Ollama running on `localhost:11434`; chats use a 4096-token context so large models fit in RAM |
+| Live voice (browser engine) | Chrome or Edge, microphone permission, internet (the browser's speech service). Use Local Whisper in Settings for fully offline |
 
 ---
 
