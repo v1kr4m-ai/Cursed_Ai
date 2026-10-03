@@ -125,13 +125,13 @@ export function VideoGeneratorView() {
               onClick={() => setSource("local")}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${source === "local" ? "bg-orange-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
             >
-              <HardDrive size={12} /> Local (ComfyUI/SVD)
+              <HardDrive size={12} /> Local (ComfyUI/LTX-Video)
             </button>
           </div>
           <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-3">
             {source === "cloud"
               ? "Needs internet + GEMINI_API_KEY. Generation takes several minutes."
-              : "Needs ComfyUI + VideoHelperSuite at http://127.0.0.1:8188 — fully offline. Text-to-video, optionally starting from an image."}
+              : "Needs ComfyUI (with an LTX-Video checkpoint) at http://127.0.0.1:8188 — fully offline. Text-to-video, optionally starting from an image."}
           </p>
         </header>
 
