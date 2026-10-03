@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Volume2, Square, Bot, Loader2, User, AlertTriangle, Power } from "lucide-react";
+import { Mic, MicOff, Volume2, Square, Bot, Loader2, User, AlertTriangle, Power, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
@@ -35,6 +35,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const [reply, setReply] = useState("");          // the model's reply, streaming
   const [history, setHistory] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   // Refs mirror state for event handlers bound once (avoids stale closures).
@@ -96,10 +97,11 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     const controller = new AbortController();
     abortRef.current = controller;
     let full = "";
+    let failed = false;
     try {
       await AIService.generate(historyRef.current, modelRef.current.id, {
         onToken: (t) => { full += t; setReply(full); },
-        onError: (e) => { setError(e?.message || String(e)); },
+        onError: (e) => { failed = true; setError(e?.message || String(e)); },
         onComplete: () => {},
       }, {
         signal: controller.signal,
@@ -109,7 +111,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         memoryEnabled: settingsRef.current.memoryEnabled,
       });
     } catch (e: any) {
-      if (e?.name !== "AbortError") setError(e?.message || String(e));
+      if (e?.name !== "AbortError") { failed = true; setError(e?.message || String(e)); }
     }
     abortRef.current = null;
     if (!activeRef.current) return;
@@ -122,6 +124,10 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
       setReply("");
       setVoiceState("speaking");
       speak(full, () => { if (activeRef.current) startListening(); });
+    } else if (failed) {
+      // Don't loop listen -> fail -> listen; stop and show the error.
+      activeRef.current = false;
+      setVoiceState("off");
     } else {
       startListening();
     }
@@ -234,26 +240,42 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   };
 
   const on = state !== "off";
+  const closePanel = () => { stopAll(); setOpen(false); };
   const label =
     state === "listening" ? (usingWhisper ? `Recording... ${recordingSeconds}s — tap to transcribe` : "Listening — just speak")
     : state === "thinking" ? "Thinking..."
     : state === "speaking" ? "Speaking..."
     : usingWhisper ? "Tap the mic, talk, tap again" : "Press Start to begin a live conversation";
 
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        title="Sunayna voice assistant"
+        className="fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform"
+      >
+        <Bot size={26} />
+      </button>
+    );
+  }
+
   return (
-    <div className="flex-1 flex flex-col bg-transparent glass rounded-[2.5rem] h-full p-6 relative overflow-hidden">
+    <div className="fixed bottom-24 right-6 z-40 w-[400px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-8rem)] flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter">Sunayna Assistant</h1>
+          <h1 className="text-xl font-black text-white tracking-tighter">Sunayna Assistant</h1>
           <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
             {usingWhisper ? "Local Whisper (offline)" : "Browser speech"} · {selectedModel.name}
           </p>
         </div>
-        {on && (
-          <Button onClick={stopAll} variant="ghost" className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold gap-2">
-            <Power size={16} /> End
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {on && (
+            <Button onClick={stopAll} variant="ghost" className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold gap-2">
+              <Power size={16} /> End
+            </Button>
+          )}
+          <Button onClick={closePanel} variant="ghost" title="Close" className="text-zinc-400"><X size={16} /></Button>
+        </div>
       </div>
 
       {/* Conversation */}

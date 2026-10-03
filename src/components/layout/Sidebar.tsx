@@ -58,7 +58,6 @@ export function Sidebar({
 
   const navItems = [
     { id: "chat", label: "Chat", icon: MessageSquare },
-    ...(voiceEnabled ? [{ id: "voice", label: "Assistant", icon: Mic }] : []),
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
@@ -231,7 +230,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Sunayna</h2>
              </div>
              <div className="space-y-2">
-               {["chat", ...(voiceEnabled ? ["voice"] : []), "models", "memory", "engine", "console", "image", "video", "vision", "settings"].map((tab) => (
+               {["chat", "models", "memory", "engine", "console", "image", "video", "vision", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

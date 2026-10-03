@@ -261,33 +261,6 @@ export default function App() {
                 settings={settings}
               />
             )}
-            {activeTab === "voice" && settings.voiceEnabled && (
-              <VoiceAssistant 
-                selectedModel={selectedModel}
-                settings={settings}
-                onNewMessage={(msg) => {
-                  if (activeChat) {
-                    updateChat({
-                      ...activeChat,
-                      messages: [...activeChat.messages, msg],
-                      updatedAt: Date.now()
-                    });
-                  } else {
-                    // Create a new chat if none is active
-                    const newChat: Chat = {
-                      id: Date.now().toString(),
-                      title: "Voice Conversation",
-                      messages: [msg],
-                      createdAt: Date.now(),
-                      updatedAt: Date.now(),
-                      modelId: selectedModelId,
-                    };
-                    setChats(prev => [newChat, ...prev]);
-                    setActiveChatId(newChat.id);
-                  }
-                }}
-              />
-            )}
             {activeTab === "models" && (
               <ModelManager 
                 models={models} 
@@ -324,6 +297,34 @@ export default function App() {
               </div>
             )}
           </main>
+          {activeTab === "chat" && settings.voiceEnabled && (
+            <VoiceAssistant 
+              selectedModel={selectedModel}
+              settings={settings}
+              onNewMessage={(msg) => {
+                if (activeChat) {
+                  updateChat({
+                    ...activeChat,
+                    messages: [...activeChat.messages, msg],
+                    updatedAt: Date.now()
+                  });
+                } else {
+                  // Create a new chat if none is active
+                  const newChat: Chat = {
+                    id: Date.now().toString(),
+                    title: "Voice Conversation",
+                    messages: [msg],
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    modelId: selectedModelId,
+                  };
+                  setChats(prev => [newChat, ...prev]);
+                  setActiveChatId(newChat.id);
+                }
+              }}
+            />
+          )}
+
         </div>
       </div>
     </TooltipProvider>

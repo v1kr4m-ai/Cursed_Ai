@@ -51,6 +51,19 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [liveTps, setLiveTps] = useState<number | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const toggleSpeak = (id: string, text: string) => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const wasThis = speakingId === id;
+    synth.cancel();
+    if (wasThis) return setSpeakingId(null);
+    const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ""));
+    u.onend = u.onerror = () => setSpeakingId(cur => (cur === id ? null : cur));
+    setSpeakingId(id);
+    synth.speak(u);
+  };
+  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const dictationRef = useRef<any>(null);
@@ -430,6 +443,15 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {m.content || (isGenerating && idx === chat.messages.length - 1 ? "▋" : "")}
                   </ReactMarkdown>
+                  {m.content && !(isGenerating && idx === chat.messages.length - 1) && (
+                    <button
+                      onClick={() => toggleSpeak(m.id, m.content)}
+                      title={speakingId === m.id ? "Stop reading" : "Read aloud"}
+                      className={cn("mt-3 p-1.5 rounded-lg transition-colors", speakingId === m.id ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-500 hover:text-white hover:bg-white/10")}
+                    >
+                      {speakingId === m.id ? <Square size={14} className="fill-current" /> : <Volume2 size={14} />}
+                    </button>
+                  )}
                   {isGenerating && idx === chat.messages.length - 1 && (
                     <div className="flex items-center gap-2 mt-4 text-[10px] font-mono opacity-40 uppercase tracking-widest italic group">
                       <span className="pulse-anim">Streaming tokens...</span>

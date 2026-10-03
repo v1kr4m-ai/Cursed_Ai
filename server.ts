@@ -300,7 +300,7 @@ async function startServer() {
       resp = provider === "ollama"
         ? await fetch(`${OLLAMA_URL}/api/chat`, {
             method: "POST", signal, headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, num_predict: options?.maxTokens } }),
+            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, num_predict: options?.maxTokens, num_ctx: 4096 } }),
           })
         : await fetch(`${LMSTUDIO_URL}/v1/chat/completions`, {
             method: "POST", signal, headers: { "Content-Type": "application/json" },
