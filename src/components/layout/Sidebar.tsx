@@ -19,7 +19,6 @@ import {
   Clapperboard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Sheet, 
   SheetContent, 
@@ -111,7 +110,7 @@ export function Sidebar({
         )}
       </div>
 
-      <ScrollArea className="flex-1 px-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3">
         <div className="space-y-1">
           {navItems.map((item) => (
             <Button
@@ -187,7 +186,7 @@ export function Sidebar({
             )}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       <div className="p-4 border-t border-white/5">
         {!isCollapsed ? (

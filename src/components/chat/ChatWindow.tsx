@@ -24,7 +24,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "motion/react";
 import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
@@ -426,7 +425,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-8 py-8" ref={scrollRef}>
+      <div className="flex-1 min-h-0 overflow-y-auto px-8 py-8" ref={scrollRef}>
         <div className="max-w-4xl mx-auto flex flex-col pb-12">
           {chat.messages.map((m, idx) => (
             <motion.div 
@@ -465,7 +464,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
             </motion.div>
           ))}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input area */}
       <div className="p-6 bg-transparent border-t border-white/5">
