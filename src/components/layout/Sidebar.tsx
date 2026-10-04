@@ -96,7 +96,7 @@ export function Sidebar({
             onClick={createNewChat}
           >
             <Plus size={18} />
-            New Studio Session
+            New Chat
           </Button>
         )}
         {isCollapsed && (
@@ -147,7 +147,7 @@ export function Sidebar({
                       ? "bg-violet-900/20 text-violet-400 border-l-2 border-l-violet-500 rounded-l-none" 
                       : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
                   }`}
-                  onClick={() => setActiveChatId(chat.id)}
+                  onClick={() => { setActiveChatId(chat.id); }}
                 >
                   <MessageSquare size={14} className="mr-3 flex-shrink-0 opacity-50" />
                   <span className="truncate">{chat.title || "Untitled History"}</span>

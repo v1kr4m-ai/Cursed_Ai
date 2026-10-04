@@ -70,11 +70,10 @@ const INITIAL_MODELS: AIModel[] = [
 export default function App() {
   const [activeTab, setActiveTab] = useState("chat");
   const [chats, setChats] = useState<Chat[]>(() => {
-    try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]")); } catch { return []; }
+    try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]")).filter((c: Chat) => c.messages?.length); } catch { return []; }
   });
-  const [activeChatId, setActiveChatId] = useState<string | undefined>(() => {
-    try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]"))[0]?.id; } catch { return undefined; }
-  });
+  // Every launch starts on a fresh chat (the welcome screen); past chats are opened from History.
+  const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
   // Chat history survives reloads (browser storage).
   useEffect(() => {
     try { localStorage.setItem("cursed.chats", JSON.stringify(chats)); } catch { /* storage full/blocked */ }
@@ -253,7 +252,7 @@ export default function App() {
             archivedChats={chats.filter(c => c.archived)}
             activeChatId={activeChatId}
             setActiveChatId={setActiveChatId}
-            createNewChat={createNewChat}
+            createNewChat={() => { setActiveChatId(undefined); setActiveTab("chat"); }}
             onUnarchiveChat={unarchiveChat}
             voiceEnabled={settings.voiceEnabled}
           />
