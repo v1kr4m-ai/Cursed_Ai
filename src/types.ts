@@ -48,6 +48,8 @@ export interface AIModel {
   downloadUrl?: string;
   /** Where it runs: a GGUF file, or an external local server. */
   source?: 'gguf' | 'ollama' | 'lmstudio';
+  /** Capability flags: Reasoning, Coding, Multilingual, Vision, Tools, Embedding. */
+  tags?: string[];
 }
 
 export interface AppSettings {

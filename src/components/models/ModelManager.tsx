@@ -19,6 +19,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { AIModel } from "../../types";
+import { MODEL_FLAGS } from "../../lib/modelTags";
+import { FlagChip } from "./flags";
+import { ModelHub } from "./ModelHub";
 
 interface ModelManagerProps {
   models: AIModel[];
@@ -26,6 +29,7 @@ interface ModelManagerProps {
   onSelectModel: (id: string) => void;
   onDownloadModel: (id: string) => void;
   onDeleteModel: (id: string) => void;
+  onRefresh: () => void;
 }
 
 // Each model gets a colour: by where it runs (Ollama / LM Studio), otherwise from a palette by name.
@@ -50,13 +54,15 @@ function sourceLabel(m: AIModel) {
   return m.format || "GGUF";
 }
 
-export function ModelManager({ models, selectedModelId, onSelectModel, onDownloadModel, onDeleteModel }: ModelManagerProps) {
+export function ModelManager({ models, selectedModelId, onSelectModel, onDownloadModel, onDeleteModel, onRefresh }: ModelManagerProps) {
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"installed" | "hf" | "ollama">("installed");
+  const [flag, setFlag] = useState<string | null>(null);
 
   const filteredModels = models.filter(m => 
     m.name.toLowerCase().includes(search.toLowerCase()) || 
     m.description.toLowerCase().includes(search.toLowerCase())
-  );
+  ).filter(m => !flag || m.tags?.includes(flag));
 
   return (
     <div className="flex-1 flex flex-col bg-transparent overflow-hidden h-full">
@@ -69,7 +75,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
             </h1>
             <p className="text-zinc-500 text-sm font-medium uppercase tracking-[0.2em]">Local GGUF Vault • Adreno Optimized</p>
           </div>
-          <div className="relative w-full md:w-80">
+          {view === "installed" && <div className="relative w-full md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
             <Input 
               placeholder="Search local directory..." 
@@ -77,10 +83,28 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
+          </div>}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-20 pr-2 content-start">
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+          {([["installed", "Installed"], ["hf", "Hugging Face"], ["ollama", "Ollama Library"]] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setView(id)}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors ${view === id ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>{label}</button>
+          ))}
+          <span className="w-px h-6 bg-white/10 mx-2" />
+          <button onClick={() => setFlag(null)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${flag === null ? "bg-white text-black" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>All</button>
+          {MODEL_FLAGS.map(fl => (
+            <button key={fl} onClick={() => setFlag(flag === fl ? null : fl)} className={`rounded-lg transition-all ${flag === fl ? "ring-2 ring-white/60" : "opacity-80 hover:opacity-100"}`}><FlagChip flag={fl} /></button>
+          ))}
+        </div>
+
+        {view !== "installed" && (
+          <div className="overflow-y-auto pb-20 pr-2">
+            <ModelHub key={view} source={view} flag={flag} onInstalled={onRefresh} />
+          </div>
+        )}
+
+        {view === "installed" && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-20 pr-2 content-start">
           {filteredModels.map((model) => {
             const c = accentFor(model);
             const active = selectedModelId === model.id;
@@ -102,9 +126,10 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                   <p className="text-[11px] text-zinc-400 mt-1 line-clamp-2 leading-snug">{model.description}</p>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 text-[10px] font-mono">
-                  {[model.type, model.parameters, model.size].filter(Boolean).map((t, i) => (
-                    <span key={i} className="px-2 py-0.5 rounded-md bg-black/25 text-zinc-300">{t}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(model.tags || []).map(t => <FlagChip key={t} flag={t} />)}
+                  {[model.parameters, model.size].filter(Boolean).map((t, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded-md bg-black/25 text-zinc-300 text-[10px] font-mono">{t}</span>
                   ))}
                 </div>
 
@@ -153,7 +178,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
               </div>
             );
           })}
-        </div>
+        </div>}
       </div>
     </div>
   );

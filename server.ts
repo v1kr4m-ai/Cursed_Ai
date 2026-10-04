@@ -1,3 +1,4 @@
+import { registerHub, modelDirs } from "./hub";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -207,12 +208,31 @@ async function startServer() {
     return llama;
   }
 
+  // .gguf files under the models folder, as posix-style relative paths. Goes a few
+  // levels deep so LM Studio's "publisher/repo/file.gguf" layout is found too.
+  function listGguf(dir = MODELS_DIR, rel = "", depth = 0): string[] {
+    if (depth > 4) return [];
+    let out: string[] = [];
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) out = out.concat(listGguf(path.join(dir, e.name), r, depth + 1));
+      else if (e.name.toLowerCase().endsWith(".gguf")) out.push(r);
+    }
+    return out;
+  }
+
+  // Keeps a model id inside the models folder (no ../ escapes).
+  function inModelsDir(rel: string): string | null {
+    const p = path.resolve(MODELS_DIR, rel);
+    return p.startsWith(path.resolve(MODELS_DIR) + path.sep) ? p : null;
+  }
+
   function resolveModelPath(modelName: string): string {
     const candidates = [
-      path.join(MODELS_DIR, `${modelName}.gguf`),
-      path.join(MODELS_DIR, modelName),
-    ];
-    const found = candidates.find(p => fs.existsSync(p));
+      inModelsDir(`${modelName}.gguf`),
+      inModelsDir(modelName),
+    ].filter((p): p is string => !!p);
+    const found = candidates.find(p => fs.existsSync(p) && fs.statSync(p).isFile());
     if (!found) {
       throw new Error(`Model ${modelName} not found in ${MODELS_DIR}. Download it from the Models tab first.`);
     }
@@ -262,6 +282,7 @@ async function startServer() {
   // with by proxying - ids are "ollama:<name>" / "lmstudio:<id>".
   const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
   const LMSTUDIO_URL = process.env.LMSTUDIO_URL || "http://127.0.0.1:1234";
+  registerHub(app, { getModelsDir: () => MODELS_DIR, ollamaUrl: OLLAMA_URL });
 
   async function listExternalModels() {
     const out: { ollama: any; lmstudio: any } = {
@@ -564,7 +585,7 @@ async function startServer() {
 
   // API Route: Model Management
   app.get("/api/models", (req, res) => {
-    const localModels = fs.readdirSync(MODELS_DIR).filter(f => f.endsWith(".gguf"));
+    const localModels = listGguf();
     res.json({
       storage: MODELS_DIR,
       active: activeModelName,
@@ -619,7 +640,8 @@ async function startServer() {
 
   // API Route: Delete a downloaded model — actually removes the file this time.
   app.delete("/api/models/:id", (req, res) => {
-    const modelPath = path.join(MODELS_DIR, `${req.params.id}.gguf`);
+    const modelPath = inModelsDir(`${req.params.id}.gguf`);
+    if (!modelPath) return res.status(400).json({ error: "Bad model id" });
     try {
       if (fs.existsSync(modelPath)) fs.unlinkSync(modelPath);
       if (activeModelName === req.params.id) {
@@ -636,7 +658,7 @@ async function startServer() {
 
   // API Route: Server config (currently just the models directory override)
   app.get("/api/config", (req, res) => {
-    res.json({ modelsDir: MODELS_DIR, isDefault: !serverConfig.modelsDir });
+    res.json({ modelsDir: MODELS_DIR, isDefault: !serverConfig.modelsDir, ...modelDirs() });
   });
 
   app.post("/api/config", (req, res) => {

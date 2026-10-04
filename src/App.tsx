@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Eye } from "lucide-react";
 import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { ModelManager } from "./components/models/ModelManager";
+import { inferFlags } from "./lib/modelTags";
 import { VoiceAssistant } from "./components/voice/VoiceAssistant";
 import { MemoryView, SettingsView, EngineView } from "./components/tools/ExtraViews";
 import { ConsoleView } from "./components/tools/ConsoleView";
@@ -81,8 +82,8 @@ export default function App() {
   const [models, setModels] = useState<AIModel[]>(INITIAL_MODELS);
   const [selectedModelId, setSelectedModelId] = useState("phi-3-mini");
   
-  useEffect(() => {
-    async function syncModels() {
+  const refreshModels = useCallback(async () => {
+    {
       const data = await AIService.getModels();
       const ext = await fetch("/api/external-models").then(r => r.json()).catch(() => null);
 
@@ -103,7 +104,7 @@ export default function App() {
           .map((f: string) => f.replace(/\.gguf$/i, ""))
           .filter((id: string) => !known.some(m => m.isDownloaded && (id.toLowerCase() === m.id.toLowerCase() || id.toLowerCase().includes(norm(m.name)))))
           .map((id: string): AIModel => ({
-            id, name: id, description: "GGUF file from your models folder.", size: "", format: "GGUF",
+            id, name: id.split("/").pop() || id, description: id.includes("/") ? `GGUF in ${id.split("/").slice(0, -1).join("/")}` : "GGUF file from your models folder.", size: "", format: "GGUF",
             isDownloaded: true, parameters: "", type: "General", source: "gguf",
           }));
         const fromServer = (provider: "ollama" | "lmstudio", label: string): AIModel[] =>
@@ -111,11 +112,16 @@ export default function App() {
             id: `${provider}:${name}`, name, description: `Served by ${label} on this machine.`, size: "",
             format: "GGUF", isDownloaded: true, parameters: label, type: "General", source: provider,
           }));
-        return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio")];
+        return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio")]
+          .map(m => ({ ...m, tags: m.tags ?? inferFlags(m.name) }));
       });
     }
-    syncModels();
   }, []);
+  useEffect(() => {
+    refreshModels();
+    window.addEventListener("cursed:models-changed", refreshModels);
+    return () => window.removeEventListener("cursed:models-changed", refreshModels);
+  }, [refreshModels]);
 
   // If the selected model isn't actually available (e.g. the default isn't
   // downloaded) but others are, switch to the first usable one.
@@ -222,12 +228,13 @@ export default function App() {
 
   const handleDeleteModel = async (id: string) => {
     try {
-      await fetch(`/api/models/${id}`, { method: "DELETE" });
+      await fetch(`/api/models/${encodeURIComponent(id)}`, { method: "DELETE" });
     } catch (e) {
       console.error(`Failed to delete ${id}:`, e);
       return;
     }
     updateModel(id, { isDownloaded: false });
+    refreshModels();
     if (selectedModelId === id) {
        setSelectedModelId("phi-3-mini");
     }
@@ -276,6 +283,7 @@ export default function App() {
                 onSelectModel={setSelectedModelId}
                 onDownloadModel={handleDownloadModel}
                 onDeleteModel={handleDeleteModel}
+                onRefresh={refreshModels}
               />
             )}
             {activeTab === "memory" && <MemoryView />}

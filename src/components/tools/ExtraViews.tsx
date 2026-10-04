@@ -414,6 +414,8 @@ function ModelsDirectorySection() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [lmstudioDir, setLmstudioDir] = React.useState<string | null>(null);
+  const [ollamaDir, setOllamaDir] = React.useState<string | null>(null);
 
   const fetchConfig = React.useCallback(async () => {
     try {
@@ -422,6 +424,8 @@ function ModelsDirectorySection() {
       setModelsDir(data.modelsDir);
       setIsDefault(data.isDefault);
       setInput(data.modelsDir);
+      setLmstudioDir(data.lmstudioDir);
+      setOllamaDir(data.ollamaDir);
     } catch (e) {
       console.error("Failed to fetch config", e);
     }
@@ -445,6 +449,7 @@ function ModelsDirectorySection() {
       setModelsDir(data.modelsDir);
       setInput(data.modelsDir);
       setIsDefault(data.isDefault);
+      window.dispatchEvent(new Event("cursed:models-changed")); // re-scan the new folder
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -477,7 +482,16 @@ function ModelsDirectorySection() {
           </Button>
         </div>
         {error && <p className="text-xs text-red-400">{error}</p>}
+        {lmstudioDir && lmstudioDir !== modelsDir && (
+          <Button onClick={() => save(lmstudioDir)} variant="ghost" className="bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold h-9">
+            Use LM Studio's models folder ({lmstudioDir})
+          </Button>
+        )}
         {modelsDir && <p className="text-[10px] text-zinc-600 font-mono truncate">Active: {modelsDir}</p>}
+        <p className="text-xs text-zinc-500 leading-relaxed">
+          Models downloaded from <b>Hugging Face</b> are saved here (in LM Studio's publisher/repo layout). Models pulled from the <b>Ollama library</b> are stored by the Ollama app itself
+          {ollamaDir ? <> in <span className="font-mono text-zinc-400">{ollamaDir}</span></> : null}. To move that folder, set the <span className="font-mono">OLLAMA_MODELS</span> environment variable and restart Ollama.
+        </p>
       </div>
 
       <FolderPickerDialog
