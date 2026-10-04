@@ -284,6 +284,7 @@ async function startServer() {
   const LMSTUDIO_URL = process.env.LMSTUDIO_URL || "http://127.0.0.1:1234";
   registerHub(app, { getModelsDir: () => MODELS_DIR, ollamaUrl: OLLAMA_URL });
 
+  const ollamaCaps = new Map<string, string[]>();
   async function listExternalModels() {
     const out: { ollama: any; lmstudio: any } = {
       ollama: { running: false, models: [] as string[] },
@@ -293,7 +294,19 @@ async function startServer() {
       const r = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1500) });
       if (r.ok) {
         const d: any = await r.json();
-        out.ollama = { running: true, models: (d.models || []).filter((m: any) => !/embed/i.test(m.name)).map((m: any) => m.name) };
+        const names: string[] = (d.models || []).filter((m: any) => !/embed/i.test(m.name)).map((m: any) => m.name);
+        // Ollama reports each model's real capabilities (vision, tools, thinking...); cached per name.
+        const caps: Record<string, string[]> = {};
+        await Promise.all(names.map(async (n) => {
+          if (!ollamaCaps.has(n)) {
+            try {
+              const sr = await fetch(`${OLLAMA_URL}/api/show`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: n }), signal: AbortSignal.timeout(3000) });
+              if (sr.ok) ollamaCaps.set(n, ((await sr.json()) as any).capabilities || []);
+            } catch { /* leave unknown; name-based flags still apply */ }
+          }
+          if (ollamaCaps.has(n)) caps[n] = ollamaCaps.get(n)!;
+        }));
+        out.ollama = { running: true, models: names, caps };
       }
     } catch {}
     try {

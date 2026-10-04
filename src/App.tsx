@@ -9,6 +9,7 @@ import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { ModelManager } from "./components/models/ModelManager";
 import { inferFlags } from "./lib/modelTags";
+import { VisionView } from "./components/tools/VisionView";
 import { VoiceAssistant } from "./components/voice/VoiceAssistant";
 import { MemoryView, SettingsView, EngineView } from "./components/tools/ExtraViews";
 import { ConsoleView } from "./components/tools/ConsoleView";
@@ -56,7 +57,7 @@ const INITIAL_MODELS: AIModel[] = [
   {
     id: "moondream",
     name: "Moondream 2",
-    description: "Vision-capable model. Image understanding isn't wired up in this build yet â€” downloading it won't enable vision chat.",
+    description: "Vision-capable model. Image understanding isn't wired up in this build yet — downloading it won't enable vision chat.",
     size: "1.6 GB",
     format: "GGUF",
     isDownloaded: false,
@@ -110,6 +111,7 @@ export default function App() {
           (ext?.[provider]?.models || []).map((name: string): AIModel => ({
             id: `${provider}:${name}`, name, description: `Served by ${label} on this machine.`, size: "",
             format: "GGUF", isDownloaded: true, parameters: label, type: "General", source: provider,
+            tags: inferFlags(name, [], ext?.[provider]?.caps?.[name] || []),
           }));
         return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio")]
           .map(m => ({ ...m, tags: m.tags ?? inferFlags(m.name) }));
@@ -297,19 +299,7 @@ export default function App() {
               />
             )}
             {activeTab === "vision" && (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent glass rounded-3xl h-full">
-                 <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-xl shadow-violet-500/10">
-                    <Eye size={32} className="text-violet-400" />
-                 </div>
-                 <h1 className="text-xl font-bold text-white tracking-tight">Vision System Offline</h1>
-                 <p className="text-zinc-500 mt-2 max-w-xs text-sm">Download Moondream 2 weights to enable image understanding capabilities.</p>
-                 <Button 
-                   className="mt-6 bg-violet-600 hover:bg-violet-500 text-white font-bold px-6 rounded-xl"
-                   onClick={() => setActiveTab("models")}
-                 >
-                   Explore Models
-                 </Button>
-              </div>
+              <VisionView models={models} selectedModelId={selectedModelId} onOpenModels={() => setActiveTab("models")} />
             )}
           </main>
           {settings.voiceEnabled && (
