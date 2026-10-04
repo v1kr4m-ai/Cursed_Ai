@@ -17,16 +17,16 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 | Tab | What it does |
 |---|---|
-| **Chat** | Streaming local LLM chat, model picker, mic dictation, a **read-aloud** button on every reply, **attachments** (paperclip: images, PDFs, DOCX, text/code files), archive/clear, live tokens/sec. Chat history is saved in the browser and survives reloads. A **floating bot button** (bottom-right) opens the live voice assistant |
+| **Chat** | Streaming local LLM chat, model picker, mic dictation, a **read-aloud** button on every reply, **attachments** (paperclip: images, PDFs, DOCX, text/code files), archive/clear, live tokens/sec. Chat history is saved in the browser and survives reloads. The sidebar lists past chats under **History** |
 | **Models** | Three views: **Installed** (your .gguf files, including LM Studio's publisher/repo folders, plus live **Ollama** / **LM Studio** models), **Hugging Face** (search GGUF repos, pick a quantization, download into your models folder) and **Ollama Library** (search ollama.com, pull by size). Every model carries capability flags - Reasoning, Coding, Multilingual, Vision, Tools, Embedding - and you can filter by them. Progress bars and cancel for downloads |
-| **Memory** | Vector RAG: MiniLM embeddings + cosine search, injected into prompts; searchable, wipeable |
+| **Memory** | Your own notes ("I prefer short answers", "my project uses React"), stored as MiniLM embeddings. On each message the most relevant notes are found by cosine search and added to the prompt, for any model. Notes are added by hand; searchable, wipeable, switchable in Settings |
 | **Engine** | Real telemetry (tokens/sec, RAM, active model), performance modes, unload |
-| **Console** | Live stream of the server's real log output |
 | **Image** | Cloud (Gemini/Imagen) **or** local ComfyUI: txt2img and img2img with a reference image, checkpoint dropdown, size presets. Results are saved to `outputs/` and shown as a history: click to enlarge, click away to collapse, delete or open file location |
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image); saved to `outputs/` with the same history (delete, open file location) |
+| **Console** | Live stream of the server's real log output (sits just above Settings in the sidebar) |
 | **Settings** | Sampling params, voice engine (browser vs. local Whisper), models folder with a folder browser (plus a one-click "use LM Studio's folder"), threads/context size |
 
-**Cursed_Pirate, the live voice assistant** (the floating bot button): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and **is spoken sentence by sentence as it is written** (no waiting for the full answer), then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
+**Cursed_Pirate, the live voice assistant** (the floating bot button, shown on every page; drag it - or the open panel by its header - anywhere, and its position is remembered): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and **is spoken sentence by sentence as it is written** (no waiting for the full answer), then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
 
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).
 
