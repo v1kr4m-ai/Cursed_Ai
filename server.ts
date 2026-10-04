@@ -306,7 +306,9 @@ async function startServer() {
           }
           if (ollamaCaps.has(n)) caps[n] = ollamaCaps.get(n)!;
         }));
-        out.ollama = { running: true, models: names, caps };
+        const sizes: Record<string, number> = {};
+        for (const m of d.models || []) if (!/cloud/i.test(m.name)) sizes[m.name] = m.size || 0; // cloud models run elsewhere
+        out.ollama = { running: true, models: names, caps, sizes };
       }
     } catch {}
     try {
@@ -574,6 +576,9 @@ async function startServer() {
   });
 
   // API Route: Memory and Resource Stats — all real, nothing fabricated.
+  // This PC's memory, for the "will this model fit?" hints in the Models tab.
+  app.get("/api/system", (req, res) => res.json({ totalBytes: os.totalmem(), freeBytes: os.freemem() }));
+
   app.get("/api/stats", (req, res) => {
     const memory = process.memoryUsage();
     res.json({
@@ -605,6 +610,7 @@ async function startServer() {
       storage: MODELS_DIR,
       active: activeModelName,
       available: localModels,
+      sizes: Object.fromEntries(localModels.map(f => [f, fs.statSync(path.join(MODELS_DIR, f)).size])),
     });
   });
 

@@ -9,6 +9,7 @@ import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { ModelManager } from "./components/models/ModelManager";
 import { inferFlags } from "./lib/modelTags";
+import { parseSize } from "./lib/ramFit";
 import { VisionView } from "./components/tools/VisionView";
 import { VoiceAssistant } from "./components/voice/VoiceAssistant";
 import { MemoryView, SettingsView, EngineView } from "./components/tools/ExtraViews";
@@ -120,15 +121,19 @@ export default function App() {
           .map((id: string): AIModel => ({
             id, name: id.split("/").pop() || id, description: id.includes("/") ? `GGUF in ${id.split("/").slice(0, -1).join("/")}` : "GGUF file from your models folder.", size: "", format: "GGUF",
             isDownloaded: true, parameters: "", type: "General", source: "gguf",
+            sizeBytes: data?.sizes?.[`${id}.gguf`],
+            ...(data?.sizes?.[`${id}.gguf`] ? { size: `${(data.sizes[`${id}.gguf`] / 1024 ** 3).toFixed(1)} GB` } : {}),
           }));
         const fromServer = (provider: "ollama" | "lmstudio", label: string): AIModel[] =>
           (ext?.[provider]?.models || []).map((name: string): AIModel => ({
             id: `${provider}:${name}`, name, description: `Served by ${label} on this machine.`, size: "",
             format: "GGUF", isDownloaded: true, parameters: label, type: "General", source: provider,
             tags: inferFlags(name, [], ext?.[provider]?.caps?.[name] || []),
+            sizeBytes: ext?.[provider]?.sizes?.[name] || undefined,
+            ...(ext?.[provider]?.sizes?.[name] ? { size: `${(ext[provider].sizes[name] / 1024 ** 3).toFixed(1)} GB` } : {}),
           }));
         return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio")]
-          .map(m => ({ ...m, tags: m.tags ?? inferFlags(m.name) }));
+          .map(m => ({ ...m, tags: m.tags ?? inferFlags(m.name), sizeBytes: m.sizeBytes ?? parseSize(m.size) }));
       });
     }
   }, []);

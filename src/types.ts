@@ -50,6 +50,8 @@ export interface AIModel {
   source?: 'gguf' | 'ollama' | 'lmstudio';
   /** Capability flags: Reasoning, Coding, Multilingual, Vision, Tools, Embedding. */
   tags?: string[];
+  /** File size in bytes when known, for the RAM-fit hint. */
+  sizeBytes?: number;
 }
 
 export interface AppSettings {

@@ -20,7 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { AIModel } from "../../types";
 import { MODEL_FLAGS } from "../../lib/modelTags";
-import { FlagChip } from "./flags";
+import { FlagChip, FitBadge } from "./flags";
+import { fitFor, useSystemInfo } from "../../lib/ramFit";
 import { ModelHub } from "./ModelHub";
 
 interface ModelManagerProps {
@@ -62,6 +63,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
     fetch("/api/external-models").then(r => r.json()).then(d => setHosts({ ollama: !!d.ollama?.running, lmstudio: !!d.lmstudio?.running })).catch(() => setHosts(null));
   }, [models.length]);
   const [search, setSearch] = useState("");
+  const sys = useSystemInfo();
   const [view, setView] = useState<"installed" | "hf" | "ollama">("installed");
   const [flag, setFlag] = useState<string | null>(null);
 
@@ -140,6 +142,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
+                  <FitBadge fit={fitFor(model.sizeBytes, sys)} />
                   {(model.tags || []).map(t => <FlagChip key={t} flag={t} />)}
                   {[model.parameters, model.size].filter(Boolean).map((t, i) => (
                     <span key={i} className="px-2 py-0.5 rounded-md bg-black/25 text-zinc-300 text-[10px] font-mono">{t}</span>

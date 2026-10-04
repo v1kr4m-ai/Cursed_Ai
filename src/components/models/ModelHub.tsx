@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { FlagChip, formatBytes } from "./flags";
+import { FlagChip, FitBadge, formatBytes } from "./flags";
+import { fitFor, paramsToBytes, useSystemInfo } from "../../lib/ramFit";
 
 interface HubModel {
   source: "hf" | "ollama";
@@ -26,6 +27,7 @@ interface Job {
  * models folder) or the Ollama library (pulled by the Ollama app itself).
  */
 export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama"; flag: string | null; onInstalled: () => void }) {
+  const sys = useSystemInfo();
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<HubModel[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -155,14 +157,14 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
               </Button>
             ) : (
               <div className="mt-auto space-y-1.5">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Download size</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Download size <span className="normal-case tracking-normal text-zinc-600">(green fits your RAM, red is too big)</span></p>
                 <div className="flex flex-wrap gap-1.5">
                   {[...(m.sizes?.length ? m.sizes : ["latest"])].map(sz => (
                     <button
                       key={sz}
                       onClick={() => start({ source: "ollama", name: sz === "latest" ? m.name : `${m.name}:${sz}` })}
-                      title={`ollama pull ${m.name}:${sz}`}
-                      className="px-2.5 py-1 rounded-lg bg-orange-500/20 hover:bg-orange-500 hover:text-white text-orange-200 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                      title={fitFor(paramsToBytes(sz), sys)?.detail ?? `ollama pull ${m.name}:${sz}`}
+                      className={`px-2.5 py-1 rounded-lg hover:text-white text-[11px] font-bold flex items-center gap-1 transition-colors ${({ ok: "bg-emerald-500/20 hover:bg-emerald-500 text-emerald-200", tight: "bg-amber-500/20 hover:bg-amber-500 text-amber-200", no: "bg-red-500/15 hover:bg-red-500 text-red-300 opacity-70" } as const)[fitFor(paramsToBytes(sz), sys)?.level ?? "ok"] ?? "bg-orange-500/20 hover:bg-orange-500 text-orange-200"}`}
                     ><Download size={11} />{sz}</button>
                   ))}
                 </div>
@@ -182,11 +184,15 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
             {!files && !filesError && <div className="py-8 flex justify-center"><Loader2 className="animate-spin text-zinc-500" /></div>}
             {filesError && <p className="text-red-400 text-xs">{filesError}</p>}
             {files?.length === 0 && <p className="text-zinc-500 text-sm py-4 text-center">No .gguf files in this repository.</p>}
-            {files?.map(f => (
+            {files?.map(f => {
+              const fit = fitFor(f.size, sys);
+              const bestSize = Math.max(0, ...files.filter(x => !x.split && !x.vision && !/^(F16|BF16|F32)$/.test(x.quant) && fitFor(x.size, sys)?.level === "ok").map(x => x.size));
+              const isBest = !!bestSize && f.size === bestSize;
+              return (
               <div key={f.file} className="flex items-center justify-between gap-3 bg-white/5 rounded-xl px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-xs text-zinc-200 truncate" title={f.file}>{f.file}</p>
-                  <p className="text-[10px] text-zinc-500">{[f.quant, formatBytes(f.size), f.vision && "vision projector", f.split && "split file (not supported)"].filter(Boolean).join(" · ")}</p>
+                  <p className="text-[10px] text-zinc-500 flex flex-wrap items-center gap-1.5">{[f.quant, formatBytes(f.size), f.vision && "vision projector", f.split && "split file (not supported)"].filter(Boolean).join(" · ")}<FitBadge fit={f.vision ? null : fit} />{isBest && <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/25 text-sky-200">Best fit</span>}</p>
                 </div>
                 <Button
                   size="sm" disabled={f.split}
@@ -194,7 +200,8 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
                   onClick={() => { start({ source: "hf", repo: picker!.id, file: f.file }); setPicker(null); }}
                 ><Download size={13} /> Download</Button>
               </div>
-            ))}
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>

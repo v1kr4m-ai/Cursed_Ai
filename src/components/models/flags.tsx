@@ -24,3 +24,19 @@ export function formatBytes(n: number) {
   const gb = n / 1024 ** 3;
   return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(n / 1024 ** 2)} MB`;
 }
+
+const FIT_STYLE = {
+  ok: "bg-emerald-500/20 text-emerald-300",
+  tight: "bg-amber-500/20 text-amber-300",
+  no: "bg-red-500/20 text-red-300",
+} as const;
+
+/** Small "Fits your RAM / Tight fit / Too big" pill with the numbers in its tooltip. */
+export function FitBadge({ fit }: { fit: { level: "ok" | "tight" | "no"; label: string; detail: string } | null }) {
+  if (!fit) return null;
+  return (
+    <span title={fit.detail} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold cursor-help ${FIT_STYLE[fit.level]}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current" />{fit.label}
+    </span>
+  );
+}
