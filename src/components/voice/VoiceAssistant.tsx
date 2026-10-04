@@ -60,13 +60,20 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [history, live, reply]);
 
-  const speak = useCallback((text: string, done: () => void) => {
+  // Streaming speech: sentences are queued to the synthesizer as the reply
+  // arrives, so it starts talking while the model is still writing.
+  const speechRef = useRef({ pending: 0, ended: false, skipped: false, done: () => {} });
+  const enqueueSpeech = useCallback((text: string) => {
     const synth = window.speechSynthesis;
-    if (!synth || !text.trim()) return done();
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ""));
-    u.onend = done;
-    u.onerror = done;
+    const clean = text.replace(/[*_`#>]/g, "").trim();
+    const sp = speechRef.current;
+    if (!synth || !clean || sp.skipped) return;
+    sp.pending++;
+    const u = new SpeechSynthesisUtterance(clean);
+    const finish = () => { sp.pending--; if (sp.ended && sp.pending <= 0) sp.done(); };
+    u.onend = finish;
+    u.onerror = finish;
+    if (stateRef.current !== "speaking") setVoiceState("speaking");
     synth.speak(u);
   }, []);
 
@@ -98,9 +105,23 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     abortRef.current = controller;
     let full = "";
     let failed = false;
+    let spoken = 0; // chars of `full` already handed to the speech queue
+    const sp = speechRef.current;
+    sp.pending = 0; sp.ended = false; sp.skipped = false; sp.done = () => {};
+    // Speak up to the last sentence end (or, for long run-ons, the last comma/space).
+    const flushSpeech = (final: boolean) => {
+      const rest = full.slice(spoken);
+      let cut = -1;
+      const re = /[.!?\n]+(\s|$)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(rest))) cut = m.index + m[0].length;
+      if (cut < 0 && rest.length > 90) cut = Math.max(rest.lastIndexOf(", "), rest.lastIndexOf(" ")) + 1;
+      if (final) cut = rest.length;
+      if (cut > 0) { enqueueSpeech(rest.slice(0, cut)); spoken += cut; }
+    };
     try {
       await AIService.generate(historyRef.current, modelRef.current.id, {
-        onToken: (t) => { full += t; setReply(full); },
+        onToken: (t) => { full += t; setReply(full); flushSpeech(false); },
         onError: (e) => { failed = true; setError(e?.message || String(e)); },
         onComplete: () => {},
       }, {
@@ -117,13 +138,16 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     if (!activeRef.current) return;
 
     if (full.trim()) {
+      flushSpeech(true);
       const aMsg: Message = { id: (Date.now() + 1).toString(), role: MessageRole.ASSISTANT, content: full, timestamp: Date.now() };
       historyRef.current = [...historyRef.current, aMsg];
       setHistory(historyRef.current);
       onNewMessageRef.current(aMsg);
       setReply("");
-      setVoiceState("speaking");
-      speak(full, () => { if (activeRef.current) startListening(); });
+      // Listen again once everything queued has been spoken.
+      sp.done = () => { if (activeRef.current) startListening(); };
+      sp.ended = true;
+      if (sp.pending <= 0) sp.done();
     } else if (failed) {
       // Don't loop listen -> fail -> listen; stop and show the error.
       activeRef.current = false;
@@ -131,7 +155,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     } else {
       startListening();
     }
-  }, [speak, startListening]);
+  }, [enqueueSpeech, startListening]);
   runTurnRef.current = runTurn;
 
   // Browser speech recognition, created once.
@@ -339,7 +363,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
           {usingWhisper ? (state === "listening" ? "Stop & transcribe" : "Talk") : on ? "Listening..." : "Start conversation"}
         </Button>
         {state === "speaking" && (
-          <Button variant="ghost" onClick={() => { window.speechSynthesis.cancel(); }} className="text-zinc-400 gap-2 text-xs">
+          <Button variant="ghost" onClick={() => { speechRef.current.skipped = true; window.speechSynthesis.cancel(); }} className="text-zinc-400 gap-2 text-xs">
             <Square size={12} className="fill-current" /> Skip speaking
           </Button>
         )}

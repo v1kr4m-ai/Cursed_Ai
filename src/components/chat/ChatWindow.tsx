@@ -18,7 +18,10 @@ import {
   Archive,
   ChevronDown,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Paperclip,
+  X,
+  FileText
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -27,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "motion/react";
 import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
+import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
 import { cn } from "@/lib/utils";
@@ -50,6 +54,30 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [liveTps, setLiveTps] = useState<number | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  // Files attached to the message being written
+  const [pending, setPending] = useState<Picked[]>([]);
+  const [attachMsg, setAttachMsg] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const onFilesChosen = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setReading(true);
+    setAttachMsg(null);
+    const notes: string[] = [];
+    for (const file of Array.from(files)) {
+      try {
+        const p = await pickFile(file);
+        if (p.note) notes.push(p.note);
+        setPending(prev => [...prev, p]);
+      } catch (e: any) {
+        notes.push(e.message);
+      }
+    }
+    setReading(false);
+    if (notes.length) setAttachMsg(notes.join(" "));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+  const canSend = (!!input.trim() || pending.length > 0) && !reading;
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const toggleSpeak = (id: string, text: string) => {
     const synth = window.speechSynthesis;
@@ -149,7 +177,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   // Sending from the empty-state screen: no chat exists yet, so create one
   // first, then send into it directly (see the targetChat param above).
   const handleWelcomeSend = () => {
-    if (!input.trim() || isGenerating) return;
+    if (!canSend || isGenerating) return;
     handleSendMessage(onCreateChat());
   };
 
@@ -172,12 +200,14 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   // `chat` prop yet (App.tsx's setState is async).
   const handleSendMessage = async (targetChat?: Chat) => {
     const activeChat = targetChat ?? chat;
-    if (!input.trim() || isGenerating || !activeChat) return;
+    if (!canSend || isGenerating || !activeChat) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: MessageRole.USER,
       content: input,
+      images: pending.filter(p => p.image).map(p => p.image!),
+      attachments: pending.map(p => p.attachment),
       timestamp: Date.now(),
     };
 
@@ -192,11 +222,13 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     const updatedChat = {
       ...activeChat,
       messages: updatedMessages,
-      title: activeChat.messages.length === 0 ? (input.slice(0, 30) + (input.length > 30 ? "..." : "")) : activeChat.title
+      title: activeChat.messages.length === 0 ? ((input || pending[0]?.attachment.name || "Attachment").slice(0, 30) + (input.length > 30 ? "..." : "")) : activeChat.title
     };
 
     onUpdateChat(updatedChat);
     setInput("");
+    setPending([]);
+    setAttachMsg(null);
     setIsGenerating(true);
     setLiveTps(null);
 
@@ -311,9 +343,30 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   );
 
   const inputBar = (onSend: () => void, placeholder: string) => (
+    <div>
+    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => onFilesChosen(e.target.files)}
+      accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cs,.go,.rs,.sh,.sql,.yaml,.yml,.log,.ini,.toml" />
+    {(pending.length > 0 || reading || attachMsg) && (
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        {pending.map((p, i) => (
+          <div key={i} className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-xl pl-1.5 pr-2 py-1.5 text-xs text-zinc-200 max-w-[220px]">
+            {p.image ? <img src={p.image} className="w-7 h-7 rounded-md object-cover" /> : <FileText size={16} className="text-violet-400 ml-1" />}
+            <span className="truncate">{p.attachment.name}</span>
+            <button onClick={() => setPending(prev => prev.filter((_, j) => j !== i))} className="text-zinc-500 hover:text-red-400"><X size={14} /></button>
+          </div>
+        ))}
+        {reading && <span className="text-xs text-zinc-500 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Reading file...</span>}
+        {attachMsg && <span className="text-xs text-amber-400">{attachMsg}</span>}
+      </div>
+    )}
     <div className="bg-white/5 border border-white/10 rounded-2xl p-2 flex items-end gap-2 focus-within:border-white/20 transition-all shadow-2xl shadow-black/40">
       <div className="flex gap-1 mb-1 ml-1">
         {modelPicker}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach images, documents, PDFs..."
+          className="w-10 h-10 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-colors flex items-center justify-center"
+        ><Paperclip size={18} /></button>
         {dictationSupported && (
           <button
             onClick={toggleDictation}
@@ -352,16 +405,17 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       </div>
       <button
         onClick={onSend}
-        disabled={!input.trim() || isGenerating}
+        disabled={!canSend || isGenerating}
         className={cn(
           "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
-          input.trim() && !isGenerating
+          canSend && !isGenerating
            ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
            : "bg-white/5 text-zinc-600 cursor-not-allowed"
         )}
       >
         <Send size={20} />
       </button>
+    </div>
     </div>
   );
 
@@ -459,7 +513,17 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
                   )}
                 </div>
               ) : (
-                <div className="font-medium">{m.content}</div>
+                <div className="font-medium">
+                  {(m.images?.length || m.attachments?.some(a => a.kind === "doc")) && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {m.images?.map((src, k) => <img key={k} src={src} className="max-h-40 rounded-xl border border-white/10" />)}
+                      {m.attachments?.filter(a => a.kind === "doc").map((a, k) => (
+                        <span key={k} className="flex items-center gap-1.5 bg-black/20 rounded-lg px-2 py-1 text-xs"><FileText size={13} /> {a.name}</span>
+                      ))}
+                    </div>
+                  )}
+                  {m.content}
+                </div>
               )}
             </motion.div>
           ))}

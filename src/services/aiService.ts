@@ -99,7 +99,13 @@ export class AIService {
         body: JSON.stringify({
           messages: messages.map(m => ({
             role: m.role === MessageRole.USER ? "user" : "assistant",
-            content: m.content
+            // Attached documents are sent to the model as text after the user's own words.
+            content: [m.content, ...(m.attachments || []).filter(a => a.kind === "doc").map(a => `
+
+--- Attached file: ${a.name} ---
+${a.text}
+--- End of ${a.name} ---`)].join(""),
+            images: m.images
           })),
           model: modelId,
           options: {

@@ -17,7 +17,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 | Tab | What it does |
 |---|---|
-| **Chat** | Streaming local LLM chat, model picker, mic dictation, a **read-aloud** button on every reply, archive/clear, live tokens/sec. Chat history is saved in the browser and survives reloads. A **floating bot button** (bottom-right) opens the live voice assistant |
+| **Chat** | Streaming local LLM chat, model picker, mic dictation, a **read-aloud** button on every reply, **attachments** (paperclip: images, PDFs, DOCX, text/code files), archive/clear, live tokens/sec. Chat history is saved in the browser and survives reloads. A **floating bot button** (bottom-right) opens the live voice assistant |
 | **Models** | Real streamed GGUF downloads from Hugging Face, delete, switch. Auto-lists any .gguf in your models folder plus models from a running **Ollama** / **LM Studio** (chat proxied to them) |
 | **Memory** | Vector RAG: MiniLM embeddings + cosine search, injected into prompts; searchable, wipeable |
 | **Engine** | Real telemetry (tokens/sec, RAM, active model), performance modes, unload |
@@ -26,7 +26,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image); saved to `outputs/` with the same history (delete, open file location) |
 | **Settings** | Sampling params, voice engine (browser vs. local Whisper), GGUF folder with a folder browser, threads/context size |
 
-**Cursed_Pirate, the live voice assistant** (the floating bot button): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and is spoken aloud, then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
+**Cursed_Pirate, the live voice assistant** (the floating bot button): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and **is spoken sentence by sentence as it is written** (no waiting for the full answer), then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
 
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).
 
@@ -67,6 +67,9 @@ Production build (rebuild after every code change, or `npm run start` serves old
 npm run build        # vite build + esbuild bundle of server.ts → dist/
 npm run start
 ```
+
+### Attachments
+Click the paperclip next to the chat box. Text, code, PDF and DOCX files are read on the server and sent to the model as text (first ~10,000 characters, to fit the context window). Images are downscaled and sent to **vision models served by Ollama or LM Studio** (e.g. `llava`, `llama3.2-vision`); local `.gguf` models ignore images. Scanned PDFs have no text layer and are not OCR'd.
 
 ### Get a model
 The server reads `.gguf` files from `models/` (or any folder you pick in **Settings → Storage → Browse**). Either click Download in the **Models** tab, or point Settings at a folder you already have.

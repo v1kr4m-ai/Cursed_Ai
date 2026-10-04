@@ -13,7 +13,15 @@ export interface Message {
   role: MessageRole;
   content: string;
   images?: string[];
+  attachments?: Attachment[];
   timestamp: number;
+}
+
+/** A file attached to a message. Documents carry their extracted text; images live in Message.images. */
+export interface Attachment {
+  name: string;
+  kind: "image" | "doc";
+  text?: string;
 }
 
 export interface Chat {

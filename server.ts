@@ -292,7 +292,13 @@ async function startServer() {
   // Streams a chat through Ollama or LM Studio, emitting the same SSE
   // {token} / [DONE] / {error} frames the local engine does.
   async function proxyExternalChat(provider: "ollama" | "lmstudio", model: string, messages: any[], options: any, res: express.Response, signal: AbortSignal) {
-    const history = (messages || []).map((m: any) => ({ role: m.role, content: m.content }));
+    // Images ride along as base64 (Ollama) or image_url parts (LM Studio); only vision models use them.
+    const history = (messages || []).map((m: any) => {
+      const imgs: string[] = Array.isArray(m.images) ? m.images : [];
+      if (!imgs.length) return { role: m.role, content: m.content };
+      if (provider === "ollama") return { role: m.role, content: m.content, images: imgs.map(i => i.replace(/^data:[^,]*,/, "")) };
+      return { role: m.role, content: [{ type: "text", text: m.content }, ...imgs.map(url => ({ type: "image_url", image_url: { url } }))] };
+    });
     const send = (o: any) => res.write(`data: ${JSON.stringify(o)}\n\n`);
     const label = provider === "ollama" ? "Ollama" : "LM Studio";
     let resp: Response;
@@ -338,6 +344,32 @@ async function startServer() {
       }
     }
   }
+
+  // API Route: pull plain text out of an attached document (PDF, DOCX, anything text-like).
+  app.post("/api/attachments/extract", express.raw({ type: "*/*", limit: "50mb" }), async (req, res) => {
+    const name = String(req.query.name || "file");
+    const buf = req.body as Buffer;
+    if (!Buffer.isBuffer(buf) || buf.length === 0) return res.status(400).json({ error: "Empty file" });
+    try {
+      let text = "";
+      if (/.pdf$/i.test(name)) {
+        const { extractText, getDocumentProxy } = await import("unpdf");
+        const pdf = await getDocumentProxy(new Uint8Array(buf));
+        text = (await extractText(pdf, { mergePages: true })).text as string;
+      } else if (/.docx$/i.test(name)) {
+        const mammoth = (await import("mammoth")).default;
+        text = (await mammoth.extractRawText({ buffer: buf })).value;
+      } else {
+        text = buf.toString("utf8");
+        if (text.includes(" ")) return res.status(415).json({ error: `"${name}" looks like a binary file - attach text, code, PDF, DOCX or images.` });
+      }
+      text = text.trim();
+      if (!text) return res.status(422).json({ error: `No readable text found in "${name}" (scanned PDFs need OCR).` });
+      res.json({ text });
+    } catch (e: any) {
+      res.status(500).json({ error: `Couldn't read "${name}": ${e.message}` });
+    }
+  });
 
   // API Route: Real Local LLM Inference with Streaming
   app.post("/api/chat", async (req, res) => {

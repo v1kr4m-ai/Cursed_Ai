@@ -74,7 +74,7 @@ export function Sidebar({
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg">S</div>
             <div>
-              <h1 className="font-bold tracking-tight text-xl text-white leading-none">Cursed</h1>
+              <h1 className="font-bold tracking-tight text-xl text-white leading-none">Cursed_Ai</h1>
               <p className="text-[10px] opacity-50 uppercase tracking-widest mt-1">Offline AI Studio</p>
             </div>
           </div>
@@ -215,7 +215,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
     <div className="h-16 glass rounded-2xl flex items-center px-6 justify-between md:hidden mb-4 border-white/5 shadow-lg">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 flex items-center justify-center font-bold text-white text-sm shadow-lg">S</div>
-        <span className="font-bold text-white tracking-tight">Cursed</span>
+        <span className="font-bold text-white tracking-tight">Cursed_Ai</span>
       </div>
       
       <Sheet>
@@ -226,7 +226,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
            <div className="p-8">
              <div className="flex items-center gap-3 mb-10">
                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg">S</div>
-               <h2 className="text-xl font-bold text-white tracking-tight">Cursed</h2>
+               <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
                {["chat", "models", "memory", "engine", "console", "image", "video", "vision", "settings"].map((tab) => (
