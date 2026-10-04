@@ -57,12 +57,12 @@ export function Sidebar({
 
   const navItems = [
     { id: "chat", label: "Chat", icon: MessageSquare },
+    { id: "vision", label: "Vision", icon: Eye },
+    { id: "image", label: "Image", icon: ImagePlus },
+    { id: "video", label: "Video", icon: Clapperboard },
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
-    { id: "image", label: "Image", icon: ImagePlus },
-    { id: "video", label: "Video", icon: Clapperboard },
-    { id: "vision", label: "Vision", icon: Eye },
     { id: "console", label: "Console", icon: Terminal },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -229,7 +229,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "models", "memory", "engine", "image", "video", "vision", "console", "settings"].map((tab) => (
+               {["chat", "vision", "image", "video", "models", "memory", "engine", "console", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"
