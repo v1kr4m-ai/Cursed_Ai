@@ -457,8 +457,8 @@ async function startServer() {
         topP: options?.topP ?? 0.9,
         maxTokens: options?.maxTokens ?? 1024,
         signal: abortController.signal,
-        onToken(chunk: any) {
-          const token = llama.decode(chunk);
+        // Streams decoded text (llama.decode doesn't exist; onToken only gives raw token ids).
+        onTextChunk(token: string) {
           tokenCount++;
           res.write(`data: ${JSON.stringify({ token })}\n\n`);
         }
