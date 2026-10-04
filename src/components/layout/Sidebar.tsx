@@ -16,7 +16,9 @@ import {
   Cpu,
   ArchiveRestore,
   ImagePlus,
-  Clapperboard
+  Clapperboard,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -38,6 +40,8 @@ interface SidebarProps {
   setActiveChatId: (id: string) => void;
   createNewChat: () => void;
   onUnarchiveChat?: (id: string) => void;
+  onRenameChat?: (id: string, title: string) => void;
+  onDeleteChat?: (id: string) => void;
   voiceEnabled?: boolean;
 }
 
@@ -50,8 +54,21 @@ export function Sidebar({
   setActiveChatId,
   createNewChat,
   onUnarchiveChat,
+  onRenameChat,
+  onDeleteChat,
   voiceEnabled = true
 }: SidebarProps) {
+  const [historySearch, setHistorySearch] = React.useState("");
+  const [renamingId, setRenamingId] = React.useState<string | null>(null);
+  const [renameValue, setRenameValue] = React.useState("");
+  const q = historySearch.trim().toLowerCase();
+  const shownChats = q
+    ? chats.filter(c => c.title.toLowerCase().includes(q) || c.messages.some(m => m.content.toLowerCase().includes(q)))
+    : chats;
+  const commitRename = () => {
+    if (renamingId && renameValue.trim()) onRenameChat?.(renamingId, renameValue.trim());
+    setRenamingId(null);
+  };
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [showArchived, setShowArchived] = React.useState(false);
 
@@ -137,21 +154,54 @@ export function Sidebar({
         {!isCollapsed && activeTab === "chat" && (
           <div className="mt-8">
             <h3 className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-3">History</h3>
+            {chats.length > 0 && (
+              <div className="px-1 mb-2">
+                <input
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Search chats..."
+                  className="w-full h-8 rounded-lg bg-white/5 border border-white/5 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-white/20"
+                />
+              </div>
+            )}
             <div className="space-y-1 px-1">
-              {chats.map((chat) => (
-                <Button
-                  key={chat.id}
-                  variant="ghost"
-                  className={`w-full justify-start h-10 text-[13px] truncate p-3 rounded-xl transition-all ${
-                    activeChatId === chat.id 
-                      ? "bg-violet-900/20 text-violet-400 border-l-2 border-l-violet-500 rounded-l-none" 
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-                  }`}
-                  onClick={() => { setActiveChatId(chat.id); }}
-                >
-                  <MessageSquare size={14} className="mr-3 flex-shrink-0 opacity-50" />
-                  <span className="truncate">{chat.title || "Untitled History"}</span>
-                </Button>
+              {chats.length > 0 && shownChats.length === 0 && <p className="px-3 py-2 text-xs text-zinc-600">No chats match.</p>}
+              {shownChats.map((chat) => (
+                <div key={chat.id} className="group relative">
+                  {renamingId === chat.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
+                      className="w-full h-10 rounded-xl bg-white/10 border border-violet-500/40 px-3 text-[13px] text-white focus:outline-none"
+                    />
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        className={`w-full justify-start h-10 text-[13px] truncate p-3 pr-16 rounded-xl transition-all ${
+                          activeChatId === chat.id
+                            ? "bg-violet-900/20 text-violet-400 border-l-2 border-l-violet-500 rounded-l-none"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                        }`}
+                        onClick={() => { setActiveChatId(chat.id); }}
+                      >
+                        <MessageSquare size={14} className="mr-3 flex-shrink-0 opacity-50" />
+                        <span className="truncate">{chat.title || "Untitled History"}</span>
+                      </Button>
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
+                        <button title="Rename" onClick={() => { setRenamingId(chat.id); setRenameValue(chat.title); }} className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10"><Pencil size={13} /></button>
+                        <button
+                          title="Delete chat"
+                          onClick={() => { if (window.confirm(`Delete "${chat.title}"? This can't be undone.`)) onDeleteChat?.(chat.id); }}
+                          className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-white/10"
+                        ><Trash2 size={13} /></button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
           </div>

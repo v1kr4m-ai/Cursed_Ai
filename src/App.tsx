@@ -195,6 +195,15 @@ export default function App() {
     if (activeChatId === id) setActiveChatId(undefined);
   };
 
+  const renameChat = (id: string, title: string) => {
+    setChats(prev => prev.map(c => c.id === id ? { ...c, title } : c));
+  };
+
+  const deleteChat = (id: string) => {
+    setChats(prev => prev.filter(c => c.id !== id));
+    if (activeChatId === id) setActiveChatId(undefined);
+  };
+
   const unarchiveChat = (id: string) => {
     setChats(prev => prev.map(c => c.id === id ? { ...c, archived: false } : c));
   };
@@ -279,6 +288,8 @@ export default function App() {
             setActiveChatId={setActiveChatId}
             createNewChat={() => { setActiveChatId(undefined); setActiveTab("chat"); }}
             onUnarchiveChat={unarchiveChat}
+            onRenameChat={renameChat}
+            onDeleteChat={deleteChat}
             voiceEnabled={settings.voiceEnabled}
           />
         </div>
