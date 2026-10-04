@@ -30,6 +30,7 @@ interface ModelManagerProps {
   onDownloadModel: (id: string) => void;
   onDeleteModel: (id: string) => void;
   onRefresh: () => void;
+  onCancelDownload: (id: string) => void;
 }
 
 // Each model gets a colour: by where it runs (Ollama / LM Studio), otherwise from a palette by name.
@@ -54,7 +55,12 @@ function sourceLabel(m: AIModel) {
   return m.format || "GGUF";
 }
 
-export function ModelManager({ models, selectedModelId, onSelectModel, onDownloadModel, onDeleteModel, onRefresh }: ModelManagerProps) {
+export function ModelManager({ models, selectedModelId, onSelectModel, onDownloadModel, onDeleteModel, onRefresh, onCancelDownload }: ModelManagerProps) {
+  // Tell the user when Ollama / LM Studio are off, instead of silently showing no models from them.
+  const [hosts, setHosts] = useState<{ ollama: boolean; lmstudio: boolean } | null>(null);
+  React.useEffect(() => {
+    fetch("/api/external-models").then(r => r.json()).then(d => setHosts({ ollama: !!d.ollama?.running, lmstudio: !!d.lmstudio?.running })).catch(() => setHosts(null));
+  }, [models.length]);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"installed" | "hf" | "ollama">("installed");
   const [flag, setFlag] = useState<string | null>(null);
@@ -98,6 +104,13 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
           ))}
         </div>
 
+        {view === "installed" && hosts && (!hosts.ollama || !hosts.lmstudio) && (
+          <div className="mb-4 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5">
+            {!hosts.ollama && <>Ollama isn't running, so its models aren't listed - start the Ollama app. </>}
+            {!hosts.lmstudio && <>LM Studio's local server isn't running (optional) - start its server to list its models.</>}
+          </div>
+        )}
+
         {view !== "installed" && (
           <div className="overflow-y-auto pb-20 pr-2">
             <ModelHub key={view} source={view} flag={flag} onInstalled={onRefresh} />
@@ -136,7 +149,10 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                 {downloading && (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] text-zinc-400 uppercase font-bold tracking-widest">
-                      <span className="animate-pulse">Downloading...</span><span>{model.downloadProgress}%</span>
+                      <span className="animate-pulse">Downloading...</span>
+                      <span className="flex items-center gap-2">{model.downloadProgress}%
+                        <button onClick={() => onCancelDownload(model.id)} title="Cancel download" className="text-zinc-400 hover:text-red-400">✕</button>
+                      </span>
                     </div>
                     <Progress value={model.downloadProgress} className="h-1 bg-black/30" />
                   </div>

@@ -7,6 +7,8 @@ export interface AIResponseHandlers {
   onComplete: () => void;
 }
 
+import { friendlyError } from "./errors";
+
 export interface AIGenerationOptions {
   temperature?: number;
   topP?: number;
@@ -160,7 +162,7 @@ ${a.text}
       if (error.name === 'AbortError') {
         console.log("[AIService] Generation aborted by client");
       } else {
-        handlers.onError(error);
+        handlers.onError(new Error(friendlyError(error)));
       }
     }
   }

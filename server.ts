@@ -319,6 +319,8 @@ async function startServer() {
     return out;
   }
 
+  app.get("/api/health", (req, res) => res.json({ ok: true }));
+
   app.get("/api/external-models", async (req, res) => {
     res.json(await listExternalModels());
   });
@@ -617,9 +619,12 @@ async function startServer() {
 
     const destPath = path.join(MODELS_DIR, `${id}.gguf`);
     const tmpPath = `${destPath}.part`;
+    // Cancel button = the browser closes the stream; stop downloading and clean up.
+    const ctl = new AbortController();
+    res.on("close", () => { if (!res.writableFinished) ctl.abort(); });
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: ctl.signal });
       if (!response.ok || !response.body) {
         throw new Error(`Download failed: HTTP ${response.status}`);
       }
@@ -869,7 +874,8 @@ async function startServer() {
   interface VideoJobInternal {
     id: string;
     prompt: string;
-    status: "pending" | "done" | "error";
+    status: "pending" | "done" | "error" | "cancelled";
+    abort?: AbortController;
     videoPath?: string;
     galleryFile?: string;
     error?: string;
@@ -884,7 +890,7 @@ async function startServer() {
     if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
     const id = Date.now().toString();
-    const job: VideoJobInternal = { id, prompt, status: "pending", createdAt: Date.now() };
+    const job: VideoJobInternal = { id, prompt, status: "pending", createdAt: Date.now(), abort: new AbortController() };
     videoJobs.set(id, job);
     res.json({ id, status: "pending" });
 
@@ -898,7 +904,8 @@ async function startServer() {
           config: { numberOfVideos: 1 },
         });
         while (!operation.done) {
-          await new Promise(resolve => setTimeout(resolve, 10000));
+          if (job.abort!.signal.aborted) throw new Error("Cancelled");
+          await new Promise(resolve => setTimeout(resolve, 3000));
           operation = await ai.operations.getVideosOperation({ operation });
         }
         const generated = operation.response?.generatedVideos?.[0];
@@ -915,11 +922,19 @@ async function startServer() {
         job.status = "done";
         console.log(`[Video] Job ${id} done -> ${videoPath}`);
       } catch (error: any) {
+        if (job.abort?.signal.aborted) { job.status = "cancelled"; return; }
         console.error(`[Video] Job ${id} failed:`, error);
         job.status = "error";
         job.error = error.message;
       }
     })();
+  });
+
+  app.post("/api/video/cancel/:id", (req, res) => {
+    const job = videoJobs.get(req.params.id);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (job.status === "pending") { job.abort?.abort(); job.status = "cancelled"; }
+    res.json({ id: job.id, status: job.status });
   });
 
   app.get("/api/video/status/:id", (req, res) => {
@@ -996,7 +1011,18 @@ async function startServer() {
   // node's result). ComfyUI has no simple "wait for it" endpoint - polling
   // is the standard integration pattern (same as everyone's ComfyUI API
   // client scripts do).
-  async function runComfyWorkflow(workflow: Record<string, any>, outputNodeId: string): Promise<any> {
+  // Stop a ComfyUI job: drop it from the queue, and interrupt it if it's the one running.
+  async function cancelComfyPrompt(promptId: string) {
+    try {
+      await fetch(`${COMFYUI_URL}/queue`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ delete: [promptId] }) });
+      const q: any = await (await fetch(`${COMFYUI_URL}/queue`)).json();
+      if ((q.queue_running || []).some((e: any) => e[1] === promptId)) {
+        await fetch(`${COMFYUI_URL}/interrupt`, { method: "POST" });
+      }
+    } catch { /* ComfyUI gone - nothing left to cancel */ }
+  }
+
+  async function runComfyWorkflow(workflow: Record<string, any>, outputNodeId: string, signal?: AbortSignal): Promise<any> {
     const clientId = crypto.randomUUID();
     const queueResp = await comfyFetch("/prompt", {
       method: "POST",
@@ -1010,9 +1036,10 @@ async function startServer() {
     const promptId = queued.prompt_id;
     if (!promptId) throw new Error("ComfyUI did not return a prompt_id");
 
-    const maxAttempts = 300; // 300 * 2s = up to 10 minutes
+    const maxAttempts = 600; // 600 * 1s = up to 10 minutes
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (signal?.aborted) { await cancelComfyPrompt(promptId); throw new Error("Cancelled"); }
+      await new Promise(resolve => setTimeout(resolve, 1000));
       const histResp = await comfyFetch(`/history/${promptId}`);
       const history: any = await histResp.json();
       const entry = history[promptId];
@@ -1146,6 +1173,9 @@ async function startServer() {
   app.post("/api/comfyui/image/generate", async (req, res) => {
     const { prompt, negativePrompt, checkpoint, width, height, referenceImage } = req.body;
     if (!prompt || !checkpoint) return res.status(400).json({ error: "prompt and checkpoint are required" });
+    // Stop button = the browser aborts the request; then we cancel the ComfyUI job too.
+    const ctl = new AbortController();
+    res.on("close", () => { if (!res.writableFinished) ctl.abort(); });
 
     try {
       console.log(`[ComfyUI Image] Generating: "${String(prompt).slice(0, 60)}..." (checkpoint=${checkpoint}, hasReference=${!!referenceImage})`);
@@ -1180,13 +1210,14 @@ async function startServer() {
       workflow["8"] = { class_type: "VAEDecode", inputs: { samples: ["3", 0], vae: ["4", 2] } };
       workflow["9"] = { class_type: "SaveImage", inputs: { filename_prefix: "cursed", images: ["8", 0] } };
 
-      const output = await runComfyWorkflow(workflow, "9");
+      const output = await runComfyWorkflow(workflow, "9", ctl.signal);
       const img = output?.images?.[0];
       if (!img) throw new Error("ComfyUI returned no image output");
       const buffer = await fetchComfyFile(img.filename, img.subfolder, img.type);
       const file = saveToGallery("image", buffer, ".png");
       res.json({ src: `data:image/png;base64,${buffer.toString("base64")}`, file });
     } catch (error: any) {
+      if (ctl.signal.aborted) { console.log("[ComfyUI Image] Cancelled by user."); return; }
       console.error("[ComfyUI Image] Generation failed:", error);
       res.status(500).json({ error: error.message });
     }
@@ -1204,7 +1235,7 @@ async function startServer() {
     if (!prompt || !checkpoint) return res.status(400).json({ error: "prompt and checkpoint are required" });
 
     const id = Date.now().toString();
-    const job: VideoJobInternal = { id, prompt, status: "pending", createdAt: Date.now() };
+    const job: VideoJobInternal = { id, prompt, status: "pending", createdAt: Date.now(), abort: new AbortController() };
     videoJobs.set(id, job);
     res.json({ id, status: "pending" });
 
@@ -1268,7 +1299,7 @@ async function startServer() {
         workflow["13"] = { class_type: "CreateVideo", inputs: { images: ["12", 0], fps: frameRate } };
         workflow["14"] = { class_type: "SaveVideo", inputs: { video: ["13", 0], filename_prefix: "video/cursed", format: "mp4", codec: "h264" } };
 
-        const output = await runComfyWorkflow(workflow, "14");
+        const output = await runComfyWorkflow(workflow, "14", job.abort!.signal);
         // SaveVideo reports its file under "images" (with animated:true); older
         // video savers used "gifs"/"videos" - accept any.
         const videoInfo = output?.images?.[0] || output?.videos?.[0] || output?.gifs?.[0];
@@ -1282,6 +1313,7 @@ async function startServer() {
         job.status = "done";
         console.log(`[ComfyUI Video] Job ${id} done -> ${videoPath}`);
       } catch (error: any) {
+        if (job.abort?.signal.aborted) { console.log(`[ComfyUI Video] Job ${id} cancelled.`); job.status = "cancelled"; return; }
         console.error(`[ComfyUI Video] Job ${id} failed:`, error);
         job.status = "error";
         job.error = error.message;

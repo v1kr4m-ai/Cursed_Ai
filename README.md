@@ -29,6 +29,8 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 **Cursed_Pirate, the live voice assistant** (the floating bot button, shown on every page; drag it - or the open panel by its header - anywhere, and its position is remembered): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and **is spoken sentence by sentence as it is written** (no waiting for the full answer), then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
 
+**Stop buttons and errors:** every long job can be stopped - chat (Stop button or Esc), image generation (also cancels the job inside ComfyUI), video generation, model downloads, Vision. A red banner appears if the local server stops answering, Models explains when Ollama / LM Studio are off, and failures show plain-language messages with the next step.
+
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).
 
 ---

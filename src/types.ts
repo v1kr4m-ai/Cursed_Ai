@@ -86,7 +86,7 @@ export interface GeneratedImage {
   createdAt: number;
 }
 
-export type VideoJobStatus = 'pending' | 'done' | 'error';
+export type VideoJobStatus = 'pending' | 'done' | 'error' | 'cancelled';
 
 export interface VideoJob {
   id: string;

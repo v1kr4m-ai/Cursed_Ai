@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Eye } from "lucide-react";
 import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -57,7 +57,7 @@ const INITIAL_MODELS: AIModel[] = [
   {
     id: "moondream",
     name: "Moondream 2",
-    description: "Vision-capable model. Image understanding isn't wired up in this build yet — downloading it won't enable vision chat.",
+    description: "Vision-capable model. Image understanding isn't wired up in this build yet ï¿½ downloading it won't enable vision chat.",
     size: "1.6 GB",
     format: "GGUF",
     isDownloaded: false,
@@ -79,6 +79,20 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("cursed.chats", JSON.stringify(chats)); } catch { /* storage full/blocked */ }
   }, [chats]);
+  const [serverUp, setServerUp] = useState(true);
+  // Heartbeat: shows a banner the moment the local server stops answering.
+  useEffect(() => {
+    let alive = true;
+    const ping = async () => {
+      try {
+        const r = await fetch("/api/health", { signal: AbortSignal.timeout(3000) });
+        if (alive) setServerUp(r.ok);
+      } catch { if (alive) setServerUp(false); }
+    };
+    const t = setInterval(ping, 4000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  const downloadControllers = useRef(new Map<string, AbortController>());
   const [models, setModels] = useState<AIModel[]>(INITIAL_MODELS);
   const [selectedModelId, setSelectedModelId] = useState("phi-3-mini");
   
@@ -194,12 +208,15 @@ export default function App() {
     if (!model?.downloadUrl) return;
 
     updateModel(id, { downloadProgress: 0 });
+    const controller = new AbortController();
+    downloadControllers.current.set(id, controller);
 
     try {
       const response = await fetch("/api/models/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, url: model.downloadUrl }),
+        signal: controller.signal,
       });
       if (!response.ok || !response.body) throw new Error("Failed to start download");
 
@@ -225,6 +242,12 @@ export default function App() {
       console.error(`Failed to download ${id}:`, e);
       updateModel(id, { downloadProgress: undefined });
     }
+  };
+
+  const handleCancelDownload = (id: string) => {
+    downloadControllers.current.get(id)?.abort();
+    downloadControllers.current.delete(id);
+    updateModel(id, { downloadProgress: undefined });
   };
 
   const handleDeleteModel = async (id: string) => {
@@ -262,6 +285,12 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
+          {!serverUp && (
+            <div className="mx-2 mb-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+              Can't reach the Cursed_Ai server - it may have stopped. Start it with start.bat; this banner clears by itself when it's back.
+            </div>
+          )}
           <MobileHeader activeTab={activeTab} setActiveTab={setActiveTab} voiceEnabled={settings.voiceEnabled} />
 
           <main className="flex-1 overflow-hidden h-full">
@@ -285,6 +314,7 @@ export default function App() {
                 onDownloadModel={handleDownloadModel}
                 onDeleteModel={handleDeleteModel}
                 onRefresh={refreshModels}
+                onCancelDownload={handleCancelDownload}
               />
             )}
             {activeTab === "memory" && <MemoryView />}

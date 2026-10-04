@@ -188,6 +188,14 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     }
   }, [chat?.messages, isGenerating]);
 
+  // Esc stops a reply that is being generated.
+  useEffect(() => {
+    if (!isGenerating) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleStopGeneration(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const handleStopGeneration = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -278,6 +286,12 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           memoryEnabled: settings.memoryEnabled
         }
       );
+      // Stopped before any text arrived: leave a note instead of an empty bubble.
+      if (controller.signal.aborted && !finalContent) {
+        const msgs = [...updatedChat.messages];
+        msgs[msgs.length - 1] = { ...assistantMessagePlaceholder, content: "Stopped before the model replied." };
+        onUpdateChat({ ...updatedChat, messages: msgs });
+      }
     } catch (error) {
       console.error("Failed to generate response:", error);
       setIsGenerating(false);
@@ -403,18 +417,28 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           }}
         />
       </div>
-      <button
-        onClick={onSend}
-        disabled={!canSend || isGenerating}
-        className={cn(
-          "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
-          canSend && !isGenerating
-           ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
-           : "bg-white/5 text-zinc-600 cursor-not-allowed"
-        )}
-      >
-        <Send size={20} />
-      </button>
+      {isGenerating ? (
+        <button
+          onClick={handleStopGeneration}
+          title="Stop generating (Esc)"
+          className="w-12 h-12 rounded-xl mb-1 mr-1 flex items-center justify-center bg-red-600 text-white hover:bg-red-500 shadow-lg shadow-red-900/40 transition-all"
+        >
+          <Square size={18} className="fill-current" />
+        </button>
+      ) : (
+        <button
+          onClick={onSend}
+          disabled={!canSend}
+          className={cn(
+            "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
+            canSend
+             ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
+             : "bg-white/5 text-zinc-600 cursor-not-allowed"
+          )}
+        >
+          <Send size={20} />
+        </button>
+      )}
     </div>
     </div>
   );

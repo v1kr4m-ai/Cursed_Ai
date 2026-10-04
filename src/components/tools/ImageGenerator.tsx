@@ -3,6 +3,7 @@ import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { GalleryHistory, Toast } from "./GalleryHistory";
+import { friendlyError } from "../../services/errors";
 
 type Source = "cloud" | "local";
 
@@ -20,6 +21,7 @@ export function ImageGeneratorView() {
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [toast, setToast] = React.useState<string | null>(null);
   const [isGenerating, setIsGenerating] = React.useState(false);
+  const abortRef = React.useRef<AbortController | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   // Local (ComfyUI) only
@@ -61,6 +63,8 @@ export function ImageGeneratorView() {
     }
     setIsGenerating(true);
     setError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const endpoint = source === "cloud" ? "/api/image/generate" : "/api/comfyui/image/generate";
       const body = source === "cloud"
@@ -77,6 +81,7 @@ export function ImageGeneratorView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Generation failed");
@@ -84,8 +89,10 @@ export function ImageGeneratorView() {
       setRefreshKey(k => k + 1); // result was saved to disk; reload history
       setPrompt("");
     } catch (e: any) {
-      setError(e.message);
+      if (e?.name === "AbortError") setToast("Generation stopped");
+      else setError(friendlyError(e));
     } finally {
+      abortRef.current = null;
       setIsGenerating(false);
     }
   };
@@ -186,13 +193,22 @@ export function ImageGeneratorView() {
               placeholder="A robot holding a red skateboard, studio lighting..."
               className="flex-1 bg-white/5 border-none rounded-2xl px-6 py-3 text-white focus:outline-none focus:ring-1 focus:ring-pink-500 transition-all font-medium placeholder:text-zinc-700"
             />
-            <Button
-              onClick={generate}
-              disabled={isGenerating || !prompt.trim()}
-              className="bg-pink-600 hover:bg-pink-500 text-white rounded-2xl px-8 font-black uppercase text-[10px] tracking-widest h-auto"
-            >
-              {isGenerating ? <Loader2 className="animate-spin" size={16} /> : "Generate"}
-            </Button>
+            {isGenerating ? (
+              <Button
+                onClick={() => abortRef.current?.abort()}
+                className="bg-red-600 hover:bg-red-500 text-white rounded-2xl px-8 font-black uppercase text-[10px] tracking-widest h-auto gap-2"
+              >
+                <Loader2 className="animate-spin" size={14} /> Stop
+              </Button>
+            ) : (
+              <Button
+                onClick={generate}
+                disabled={!prompt.trim()}
+                className="bg-pink-600 hover:bg-pink-500 text-white rounded-2xl px-8 font-black uppercase text-[10px] tracking-widest h-auto"
+              >
+                Generate
+              </Button>
+            )}
           </div>
           {source === "local" && (
             <input

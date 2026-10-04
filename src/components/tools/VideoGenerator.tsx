@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { VideoJob } from "../../types";
 import { GalleryHistory, Toast } from "./GalleryHistory";
+import { friendlyError } from "../../services/errors";
 
 type Source = "cloud" | "local";
 
@@ -71,9 +72,15 @@ export function VideoGeneratorView() {
           console.error("Failed to poll video job", e);
         }
       }
-    }, 8000);
+    }, 3000);
     return () => clearInterval(timer);
   }, [jobs]);
+
+  const cancelJob = async (id: string) => {
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, status: "cancelled" } : j)); // instant feedback
+    try { await fetch(`/api/video/cancel/${id}`, { method: "POST" }); } catch { /* server gone; nothing to stop */ }
+    setToast("Video generation stopped");
+  };
 
   const generate = async () => {
     if (isSubmitting) return;
@@ -100,7 +107,7 @@ export function VideoGeneratorView() {
       setJobs(prev => [{ id: data.id, prompt: label, status: "pending", createdAt: Date.now() }, ...prev]);
       setPrompt("");
     } catch (e: any) {
-      setError(e.message);
+      setError(friendlyError(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -224,10 +231,13 @@ export function VideoGeneratorView() {
             <div key={job.id} className="glass rounded-[2rem] border-white/5 p-5 space-y-2">
               <div className="flex items-start justify-between gap-4">
                 <p className="text-sm text-zinc-300 flex-1">{job.prompt}</p>
-                <span className={`shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5 ${job.status === "error" ? "bg-red-500/10 text-red-400" : "bg-yellow-500/10 text-yellow-400"}`}>
+                <span className={`shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5 ${job.status === "error" ? "bg-red-500/10 text-red-400" : job.status === "cancelled" ? "bg-zinc-500/10 text-zinc-400" : "bg-yellow-500/10 text-yellow-400"}`}>
                   {job.status === "pending" && <Loader2 size={10} className="animate-spin" />}
-                  {job.status === "pending" ? "Generating" : "Failed"}
+                  {job.status === "pending" ? "Generating" : job.status === "cancelled" ? "Stopped" : "Failed"}
                 </span>
+                {job.status === "pending" && (
+                  <button onClick={() => cancelJob(job.id)} className="shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors">Stop</button>
+                )}
               </div>
               {job.status === "error" && <p className="text-xs text-red-400 flex items-center gap-2"><AlertTriangle size={12} /> {job.error}</p>}
               {job.status === "pending" && <p className="text-[10px] text-zinc-600 flex items-center gap-2 uppercase tracking-widest font-bold"><Clock size={12} /> Polling every 8s — this can take a few minutes</p>}
