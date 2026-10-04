@@ -25,12 +25,32 @@ interface Job {
 }
 type LiveJob = Job & { abort?: AbortController };
 
+// Where Ollama really keeps its models: the OLLAMA_MODELS variable, else the folder the Ollama app
+// printed in its own log when it started (it logs its settings), else the default.
+function ollamaModelsDir(): string {
+  if (process.env.OLLAMA_MODELS) return process.env.OLLAMA_MODELS;
+  try {
+    const log = path.join(process.env.LOCALAPPDATA || "", "Ollama", "server.log");
+    if (process.env.LOCALAPPDATA && fs.existsSync(log)) {
+      const size = fs.statSync(log).size;
+      const fd = fs.openSync(log, "r");
+      const len = Math.min(size, 400_000);
+      const buf = Buffer.alloc(len);
+      fs.readSync(fd, buf, 0, len, size - len);
+      fs.closeSync(fd);
+      const hits = [...buf.toString("utf8").matchAll(/OLLAMA_MODELS:(\S+)/g)].map(m => m[1].replace(/\\\\/g, "\\")).filter(p => fs.existsSync(p)); // the log escapes backslashes
+      if (hits.length) return hits[hits.length - 1];
+    }
+  } catch { /* fall through to the default */ }
+  return path.join(os.homedir(), ".ollama", "models");
+}
+
 export function modelDirs() {
   const home = os.homedir();
   const lm = [path.join(home, ".lmstudio", "models"), path.join(home, ".cache", "lm-studio", "models")].find(p => fs.existsSync(p)) || null;
   return {
     lmstudioDir: lm,
-    ollamaDir: process.env.OLLAMA_MODELS || path.join(home, ".ollama", "models"),
+    ollamaDir: ollamaModelsDir(),
   };
 }
 
@@ -71,7 +91,7 @@ async function searchOllama(q: string) {
   }).filter(m => m.name);
 }
 
-export function registerHub(app: express.Express, opts: { getModelsDir: () => string; ollamaUrl: string }) {
+export function registerHub(app: express.Express, opts: { getModelsDir: () => string; ollamaUrl: string; findExisting: (fileName: string) => string | undefined }) {
   const jobs = new Map<string, LiveJob>();
   const newJob = (source: Job["source"], label: string): LiveJob => {
     const job: LiveJob = { id: `${Date.now()}${Math.floor(Math.random() * 1000)}`, source, label, status: "running", progress: 0, received: 0, total: 0, message: "Starting...", abort: new AbortController() };
@@ -116,6 +136,9 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
     const { source, repo, file, name } = req.body || {};
     if (source === "hf") {
       if (!/^[\w.-]+\/[\w.-]+$/.test(repo || "") || !file || /\.\./.test(file)) return res.status(400).json({ error: "repo and file are required" });
+      // Never download a second copy of a file that is already in LM Studio / Ollama / any model folder.
+      const existing = req.body.force ? undefined : opts.findExisting(path.basename(file));
+      if (existing) return res.status(409).json({ error: `You already have this file, so it was not downloaded again: ${existing}` });
       const [publisher, repoName] = repo.split("/");
       const dest = path.join(opts.getModelsDir(), publisher, repoName, path.basename(file));
       const job = newJob("hf", `${repoName} / ${path.basename(file)}`);

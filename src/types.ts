@@ -52,6 +52,10 @@ export interface AIModel {
   tags?: string[];
   /** File size in bytes when known, for the RAM-fit hint. */
   sizeBytes?: number;
+  /** Which folder a local file came from (read-only unless it is the download folder). */
+  origin?: "download" | "lmstudio" | "ollama" | "custom";
+  /** Full path on disk, when it is a local file. */
+  location?: string;
 }
 
 export interface AppSettings {

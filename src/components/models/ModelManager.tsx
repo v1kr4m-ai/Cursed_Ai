@@ -53,6 +53,9 @@ function accentFor(m: AIModel) {
 function sourceLabel(m: AIModel) {
   if (m.source === "ollama") return "Ollama";
   if (m.source === "lmstudio") return "LM Studio";
+  if (m.origin === "ollama") return "Ollama folder";
+  if (m.origin === "lmstudio") return "LM Studio folder";
+  if (m.origin === "custom") return "Custom folder";
   return m.format || "GGUF";
 }
 
@@ -181,7 +184,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                       >
                         {active ? "Active" : "Use this model"}
                       </Button>
-                      {model.source !== "ollama" && model.source !== "lmstudio" && (
+                      {model.source !== "ollama" && model.source !== "lmstudio" && (!model.origin || model.origin === "download") && (
                         <Button
                           variant="ghost" size="icon"
                           className="w-9 h-9 rounded-xl bg-black/25 hover:bg-red-500/20 hover:text-red-400 text-zinc-400"

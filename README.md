@@ -25,7 +25,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image); saved to `outputs/` with the same history (delete, open file location) |
 | **Vision** | Pick an image, choose any installed model flagged Vision (llava, llama3.2-vision, qwen-vl... - detected from Ollama's own capability report) and ask about it |
 | **Console** | Live stream of the server's real log output (sits just above Settings in the sidebar) |
-| **Settings** | Sampling params, voice engine (browser vs. local Whisper), models folder with a folder browser (plus a one-click "use LM Studio's folder"), threads/context size |
+| **Settings** | Sampling params, voice engine (browser vs. local Whisper), **model locations** (see below), the download folder, threads/context size |
 
 **Cursed_Pirate, the live voice assistant** (the floating bot button, shown on every page; drag it - or the open panel by its header - anywhere, and its position is remembered): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and **is spoken sentence by sentence as it is written** (no waiting for the full answer), then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
 
@@ -79,6 +79,9 @@ npm run start
 
 ### Attachments
 Click the paperclip next to the chat box. Text, code, PDF and DOCX files are read on the server and sent to the model as text (first ~10,000 characters, to fit the context window). Images are downscaled and sent to **vision models served by Ollama or LM Studio** (e.g. `llava`, `llama3.2-vision`); local `.gguf` models ignore images. Scanned PDFs have no text layer and are not OCR'd.
+
+### One copy of every model
+Cursed_Ai does not keep its own private model store. **Settings -> Storage -> Model locations** lists the folders it reads models from, each with an on/off switch and a count: the download folder, **LM Studio's** folder, **Ollama's** folder (found automatically, even when you moved it with `OLLAMA_MODELS` or the Ollama app setting) and any folders you add. Models are run straight from there - for Ollama, the model blob in its own folder is loaded directly, no copy and no need for Ollama to be running - and a file reachable through several folders (LM Studio often holds links to Ollama's blobs) is listed once. These folders are read-only: delete a model in the app that owns it. Hugging Face downloads go to the **download folder** you choose (pick LM Studio's to share with it) and are refused if you already have the same file anywhere.
 
 ### Get a model
 The server reads `.gguf` files from `models/` (or any folder you pick in **Settings → Storage → Browse**). Either click Download in the **Models** tab, or point Settings at a folder you already have.

@@ -108,22 +108,32 @@ export default function App() {
         // Catalog entries: downloaded if a matching file is on disk.
         const known = prev.filter(m => !m.source || m.source === "gguf").map(m => ({
           ...m,
-          isDownloaded: available.some((f: string) =>
+          isDownloaded: available.filter((f: string) => !f.startsWith("@")).some((f: string) =>
             f.toLowerCase() === m.id.toLowerCase() ||
             f.toLowerCase() === `${m.id}.gguf`.toLowerCase() ||
             f.toLowerCase().includes(norm(m.name))
           ),
         }));
-        // Any other .gguf already in the user's models folder.
+        // Every other model file found in the user's model folders (download folder, LM Studio, Ollama, custom).
+        // Entries from Ollama's folder are skipped while Ollama itself is running - it already lists them below,
+        // and listing both would show the same model twice.
+        const ollamaUp = !!ext?.ollama?.running;
         const extraFiles: AIModel[] = available
-          .map((f: string) => f.replace(/\.gguf$/i, ""))
-          .filter((id: string) => !known.some(m => m.isDownloaded && (id.toLowerCase() === m.id.toLowerCase() || id.toLowerCase().includes(norm(m.name)))))
-          .map((id: string): AIModel => ({
-            id, name: id.split("/").pop() || id, description: id.includes("/") ? `GGUF in ${id.split("/").slice(0, -1).join("/")}` : "GGUF file from your models folder.", size: "", format: "GGUF",
-            isDownloaded: true, parameters: "", type: "General", source: "gguf",
-            sizeBytes: data?.sizes?.[`${id}.gguf`],
-            ...(data?.sizes?.[`${id}.gguf`] ? { size: `${(data.sizes[`${id}.gguf`] / 1024 ** 3).toFixed(1)} GB` } : {}),
-          }));
+          .filter((f: string) => !(ollamaUp && data?.details?.[f]?.origin === "ollama"))
+          .filter((f: string) => !/embed/i.test(data?.details?.[f]?.name || f))
+          .map((f: string) => ({ f, id: f.startsWith("@") ? f : f.replace(/\.gguf$/i, "") }))
+          .filter(({ id }: { id: string }) => !known.some(m => m.isDownloaded && (id.toLowerCase() === m.id.toLowerCase() || (!id.startsWith("@") && id.toLowerCase().includes(norm(m.name))))))
+          .map(({ f, id }: { f: string; id: string }): AIModel => {
+            const d = data?.details?.[f];
+            const bytes: number | undefined = data?.sizes?.[f];
+            return {
+              id, name: d?.name || id.split("/").pop() || id,
+              description: d ? `From ${d.label}: ${d.file}` : "GGUF file from your models folder.",
+              size: bytes ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : "", sizeBytes: bytes, format: "GGUF",
+              isDownloaded: true, parameters: "", type: "General", source: "gguf",
+              origin: d?.origin, location: d?.file,
+            };
+          });
         const fromServer = (provider: "ollama" | "lmstudio", label: string): AIModel[] =>
           (ext?.[provider]?.models || []).map((name: string): AIModel => ({
             id: `${provider}:${name}`, name, description: `Served by ${label} on this machine.`, size: "",

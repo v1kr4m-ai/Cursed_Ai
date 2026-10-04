@@ -407,98 +407,116 @@ export function EngineView() {
   );
 }
 
+interface ModelSourceInfo { id: string; kind: string; label: string; path: string; enabled: boolean; detected: boolean; exists: boolean; count: number }
+
 function ModelsDirectorySection() {
   const [modelsDir, setModelsDir] = React.useState<string | null>(null);
-  const [isDefault, setIsDefault] = React.useState(true);
-  const [input, setInput] = React.useState("");
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [sources, setSources] = React.useState<ModelSourceInfo[]>([]);
   const [error, setError] = React.useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = React.useState(false);
-  const [lmstudioDir, setLmstudioDir] = React.useState<string | null>(null);
-  const [ollamaDir, setOllamaDir] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  // which folder picker is open: choosing a download folder, or adding a folder to read models from
+  const [picker, setPicker] = React.useState<"download" | "add" | null>(null);
 
   const fetchConfig = React.useCallback(async () => {
     try {
-      const resp = await fetch("/api/config");
-      const data = await resp.json();
+      const data = await (await fetch("/api/config")).json();
       setModelsDir(data.modelsDir);
-      setIsDefault(data.isDefault);
-      setInput(data.modelsDir);
-      setLmstudioDir(data.lmstudioDir);
-      setOllamaDir(data.ollamaDir);
+      setSources(data.sources || []);
     } catch (e) {
       console.error("Failed to fetch config", e);
     }
   }, []);
-
   React.useEffect(() => { fetchConfig(); }, [fetchConfig]);
 
-  const save = async (pathOverride?: string) => {
-    const target = pathOverride ?? input;
-    if (!target.trim()) return;
-    setIsSaving(true);
-    setError(null);
+  const changed = () => { fetchConfig(); window.dispatchEvent(new Event("cursed:models-changed")); };
+
+  const setDownloadDir = async (dir: string) => {
+    setSaving(true); setError(null);
     try {
-      const resp = await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelsDir: target.trim() }),
-      });
+      const resp = await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelsDir: dir.trim() }) });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Failed to save");
-      setModelsDir(data.modelsDir);
-      setInput(data.modelsDir);
-      setIsDefault(data.isDefault);
-      window.dispatchEvent(new Event("cursed:models-changed")); // re-scan the new folder
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setIsSaving(false);
-    }
+      changed();
+    } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   };
+
+  const sourceAction = async (body: object) => {
+    setError(null);
+    const resp = await fetch("/api/config/sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if (!resp.ok) { setError(data.error || "Failed"); return; }
+    setSources(data.sources);
+    window.dispatchEvent(new Event("cursed:models-changed"));
+  };
+
+  const total = sources.filter(x => x.enabled).reduce((n, x) => n + x.count, 0);
 
   return (
     <section className="space-y-6">
       <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] border-b border-white/5 pb-3">Storage</h3>
+
       <div className="glass p-6 rounded-[2rem] border-white/5 space-y-4">
         <div className="space-y-1">
-          <Label className="text-zinc-100 font-bold tracking-tight">GGUF Models Directory</Label>
-          <p className="text-xs text-zinc-500">
-            Where the server reads/writes .gguf files. {isDefault ? "Currently the default." : "Currently a custom path."} Point this at a folder that already has your downloaded GGUF models, or type a path directly.
+          <Label className="text-zinc-100 font-bold tracking-tight">Model locations</Label>
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            Cursed_Ai runs models straight from the folders below - nothing is copied, so a model you already have in Ollama or LM Studio is never stored twice.
+            These folders are only read; deleting a model is done in the app that owns it. {total} model file{total === 1 ? "" : "s"} found.
+          </p>
+        </div>
+        <div className="space-y-2">
+          {sources.map(src => (
+            <div key={src.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
+              <Switch checked={src.enabled} onCheckedChange={(v) => sourceAction({ action: "toggle", id: src.id, enabled: v })} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                  {src.label}
+                  {src.detected && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">auto-detected</span>}
+                  {!src.exists && <span className="text-[9px] font-black uppercase tracking-widest text-red-400">folder missing</span>}
+                </p>
+                <p className="text-[10px] text-zinc-500 font-mono truncate" title={src.path}>{src.path}</p>
+              </div>
+              <span className="text-xs text-zinc-400 shrink-0">{src.enabled ? `${src.count} model${src.count === 1 ? "" : "s"}` : "off"}</span>
+              {src.kind === "custom" && (
+                <button onClick={() => sourceAction({ action: "remove", id: src.id })} title="Remove this folder from the list (files are not touched)" className="text-zinc-500 hover:text-red-400 text-xs">Remove</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <Button onClick={() => setPicker("add")} variant="ghost" className="bg-white/5 hover:bg-white/10 text-zinc-300 font-bold text-xs h-9">
+          <Folder size={14} className="mr-2" /> Add another models folder
+        </Button>
+      </div>
+
+      <div className="glass p-6 rounded-[2rem] border-white/5 space-y-4">
+        <div className="space-y-1">
+          <Label className="text-zinc-100 font-bold tracking-tight">Download folder</Label>
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            Where new models from Hugging Face are saved. Pick LM Studio's folder (or any folder above) to share downloads with that app. Cursed_Ai refuses to download a file you already have in any folder.
+            Models pulled from the Ollama library are stored by Ollama itself, in its own folder.
           </p>
         </div>
         <div className="flex gap-3">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="D:\Models or /home/user/models"
-            className="flex-1 bg-white/5 border-white/5 text-zinc-100 font-mono text-xs"
-          />
-          <Button onClick={() => setPickerOpen(true)} variant="ghost" className="bg-white/5 hover:bg-white/10 text-zinc-300 font-bold shrink-0">
-            <Folder size={16} className="mr-2" /> Browse
-          </Button>
-          <Button onClick={() => save()} disabled={isSaving || !input.trim() || input === modelsDir} className="bg-violet-600 hover:bg-violet-500 text-white font-bold shrink-0">
-            {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Save"}
+          <select
+            value={sources.some(x => x.path === modelsDir) ? modelsDir! : ""}
+            onChange={(e) => e.target.value && setDownloadDir(e.target.value)}
+            className="flex-1 h-10 rounded-xl bg-zinc-900 border border-white/10 text-zinc-100 text-xs px-3 font-mono"
+          >
+            {!sources.some(x => x.path === modelsDir) && <option value="">{modelsDir}</option>}
+            {sources.filter(x => x.kind !== "ollama" && x.exists).map(x => <option key={x.id} value={x.path}>{x.label} - {x.path}</option>)}
+          </select>
+          <Button onClick={() => setPicker("download")} variant="ghost" disabled={saving} className="bg-white/5 hover:bg-white/10 text-zinc-300 font-bold shrink-0">
+            {saving ? <Loader2 className="animate-spin" size={16} /> : <><Folder size={16} className="mr-2" /> Browse</>}
           </Button>
         </div>
         {error && <p className="text-xs text-red-400">{error}</p>}
-        {lmstudioDir && lmstudioDir !== modelsDir && (
-          <Button onClick={() => save(lmstudioDir)} variant="ghost" className="bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold h-9">
-            Use LM Studio's models folder ({lmstudioDir})
-          </Button>
-        )}
-        {modelsDir && <p className="text-[10px] text-zinc-600 font-mono truncate">Active: {modelsDir}</p>}
-        <p className="text-xs text-zinc-500 leading-relaxed">
-          Models downloaded from <b>Hugging Face</b> are saved here (in LM Studio's publisher/repo layout). Models pulled from the <b>Ollama library</b> are stored by the Ollama app itself
-          {ollamaDir ? <> in <span className="font-mono text-zinc-400">{ollamaDir}</span></> : null}. To move that folder, set the <span className="font-mono">OLLAMA_MODELS</span> environment variable and restart Ollama.
-        </p>
       </div>
 
       <FolderPickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
+        open={picker !== null}
+        onOpenChange={(o) => !o && setPicker(null)}
         initialPath={modelsDir || ""}
-        onSelect={(path) => save(path)}
+        title={picker === "add" ? "Add a models folder" : "Choose the download folder"}
+        onSelect={(p) => { if (picker === "add") sourceAction({ action: "add", path: p }); else setDownloadDir(p); setPicker(null); }}
       />
     </section>
   );

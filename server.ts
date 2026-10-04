@@ -1,4 +1,5 @@
 import { registerHub, modelDirs } from "./hub";
+import { createLocalModels, shortHash } from "./localModels";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -182,7 +183,7 @@ async function startServer() {
   // Config persistence (currently just modelsDir) — a real, user-editable
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
-  interface ServerConfig { modelsDir?: string; comfyuiPath?: string }
+  interface ServerConfig { modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -199,6 +200,12 @@ async function startServer() {
     ? serverConfig.modelsDir
     : path.join(process.cwd(), "models");
   fs.mkdirSync(MODELS_DIR, { recursive: true });
+
+  // Models are read where they already live (download folder, LM Studio, Ollama, user-added folders) - never copied.
+  const localModels = createLocalModels({
+    getDownloadDir: () => MODELS_DIR,
+    getConfig: () => ({ customDirs: serverConfig.customDirs, disabledSources: serverConfig.disabledSources }),
+  });
 
   async function ensureLlama() {
     if (!llama) {
@@ -228,6 +235,8 @@ async function startServer() {
   }
 
   function resolveModelPath(modelName: string): string {
+    const known = localModels.scan().models.find(m => m.id === modelName);
+    if (known) return known.file;
     const candidates = [
       inModelsDir(`${modelName}.gguf`),
       inModelsDir(modelName),
@@ -282,7 +291,7 @@ async function startServer() {
   // with by proxying - ids are "ollama:<name>" / "lmstudio:<id>".
   const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
   const LMSTUDIO_URL = process.env.LMSTUDIO_URL || "http://127.0.0.1:1234";
-  registerHub(app, { getModelsDir: () => MODELS_DIR, ollamaUrl: OLLAMA_URL });
+  registerHub(app, { getModelsDir: () => MODELS_DIR, ollamaUrl: OLLAMA_URL, findExisting: (fileName) => localModels.findByFileName(fileName)?.file });
 
   const ollamaCaps = new Map<string, string[]>();
   async function listExternalModels() {
@@ -605,12 +614,13 @@ async function startServer() {
 
   // API Route: Model Management
   app.get("/api/models", (req, res) => {
-    const localModels = listGguf();
+    const found = localModels.scan().models;
     res.json({
       storage: MODELS_DIR,
       active: activeModelName,
-      available: localModels,
-      sizes: Object.fromEntries(localModels.map(f => [f, fs.statSync(path.join(MODELS_DIR, f)).size])),
+      available: found.map(m => m.id),
+      sizes: Object.fromEntries(found.map(m => [m.id, m.size])),
+      details: Object.fromEntries(found.map(m => [m.id, { name: m.name, origin: m.origin, label: m.label, file: m.file }])),
     });
   });
 
@@ -664,6 +674,7 @@ async function startServer() {
 
   // API Route: Delete a downloaded model — actually removes the file this time.
   app.delete("/api/models/:id", (req, res) => {
+    if (req.params.id.startsWith("@")) return res.status(403).json({ error: "This model lives in another app's folder (LM Studio / Ollama / your own). Remove it from that app - Cursed_Ai only reads it." });
     const modelPath = inModelsDir(`${req.params.id}.gguf`);
     if (!modelPath) return res.status(400).json({ error: "Bad model id" });
     try {
@@ -682,7 +693,29 @@ async function startServer() {
 
   // API Route: Server config (currently just the models directory override)
   app.get("/api/config", (req, res) => {
-    res.json({ modelsDir: MODELS_DIR, isDefault: !serverConfig.modelsDir, ...modelDirs() });
+    res.json({ modelsDir: MODELS_DIR, isDefault: !serverConfig.modelsDir, ...modelDirs(), sources: localModels.scan().sources });
+  });
+
+  // Add / remove / switch off a folder Cursed_Ai reads models from (read-only; files are never moved or copied).
+  app.post("/api/config/sources", (req, res) => {
+    const { action, path: dir, id, enabled } = req.body || {};
+    serverConfig.customDirs ??= [];
+    serverConfig.disabledSources ??= [];
+    if (action === "add") {
+      if (typeof dir !== "string" || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return res.status(400).json({ error: "That folder doesn't exist." });
+      if (!serverConfig.customDirs.some(d => path.resolve(d).toLowerCase() === path.resolve(dir).toLowerCase())) serverConfig.customDirs.push(dir);
+    } else if (action === "remove") {
+      serverConfig.customDirs = serverConfig.customDirs.filter(d => `c-${shortHash(d)}` !== id);
+      serverConfig.disabledSources = serverConfig.disabledSources.filter(x => x !== id);
+    } else if (action === "toggle") {
+      const off = new Set(serverConfig.disabledSources);
+      if (enabled) off.delete(id); else off.add(id);
+      serverConfig.disabledSources = [...off];
+    } else {
+      return res.status(400).json({ error: "Unknown action" });
+    }
+    saveConfig();
+    res.json({ sources: localModels.scan().sources });
   });
 
   app.post("/api/config", (req, res) => {
