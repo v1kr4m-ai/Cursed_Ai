@@ -809,7 +809,7 @@ async function startServer() {
     createdAt: number;
   }
   const videoJobs = new Map<string, VideoJobInternal>();
-  const VIDEO_TMP_DIR = path.join(os.tmpdir(), "sunayna-videos");
+  const VIDEO_TMP_DIR = path.join(os.tmpdir(), "cursed-videos");
   fs.mkdirSync(VIDEO_TMP_DIR, { recursive: true });
 
   app.post("/api/video/generate", (req, res) => {
@@ -1093,7 +1093,7 @@ async function startServer() {
       let latentSource: [string, number];
       let denoise = 1;
       if (referenceImage) {
-        const uploadedName = await uploadImageToComfyUI(referenceImage, `sunayna-ref-${Date.now()}.png`);
+        const uploadedName = await uploadImageToComfyUI(referenceImage, `cursed-ref-${Date.now()}.png`);
         workflow["10"] = { class_type: "LoadImage", inputs: { image: uploadedName } };
         workflow["11"] = { class_type: "VAEEncode", inputs: { pixels: ["10", 0], vae: ["4", 2] } };
         latentSource = ["11", 0];
@@ -1111,7 +1111,7 @@ async function startServer() {
         },
       };
       workflow["8"] = { class_type: "VAEDecode", inputs: { samples: ["3", 0], vae: ["4", 2] } };
-      workflow["9"] = { class_type: "SaveImage", inputs: { filename_prefix: "sunayna", images: ["8", 0] } };
+      workflow["9"] = { class_type: "SaveImage", inputs: { filename_prefix: "cursed", images: ["8", 0] } };
 
       const output = await runComfyWorkflow(workflow, "9");
       const img = output?.images?.[0];
@@ -1168,7 +1168,7 @@ async function startServer() {
         let latentRef: [string, number];
 
         if (image) {
-          const uploadedName = await uploadImageToComfyUI(image, `sunayna-ltxv-${id}.png`);
+          const uploadedName = await uploadImageToComfyUI(image, `cursed-ltxv-${id}.png`);
           workflow["6"] = { class_type: "LoadImage", inputs: { image: uploadedName } };
           workflow["7"] = {
             class_type: "LTXVImgToVideo",
@@ -1199,7 +1199,7 @@ async function startServer() {
         workflow["12"] = { class_type: "VAEDecode", inputs: { samples: ["11", 0], vae: ["1", 2] } };
         // Core nodes only (no VideoHelperSuite needed): CreateVideo -> SaveVideo mp4.
         workflow["13"] = { class_type: "CreateVideo", inputs: { images: ["12", 0], fps: frameRate } };
-        workflow["14"] = { class_type: "SaveVideo", inputs: { video: ["13", 0], filename_prefix: "video/sunayna", format: "mp4", codec: "h264" } };
+        workflow["14"] = { class_type: "SaveVideo", inputs: { video: ["13", 0], filename_prefix: "video/cursed", format: "mp4", codec: "h264" } };
 
         const output = await runComfyWorkflow(workflow, "14");
         // SaveVideo reports its file under "images" (with animated:true); older
@@ -1238,7 +1238,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Sunayna Local API running on http://localhost:${PORT}`);
+    console.log(`Cursed Local API running on http://localhost:${PORT}`);
   });
 }
 

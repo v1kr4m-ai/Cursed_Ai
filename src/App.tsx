@@ -69,14 +69,14 @@ const INITIAL_MODELS: AIModel[] = [
 export default function App() {
   const [activeTab, setActiveTab] = useState("chat");
   const [chats, setChats] = useState<Chat[]>(() => {
-    try { return JSON.parse(localStorage.getItem("sunayna.chats") || "[]"); } catch { return []; }
+    try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]")); } catch { return []; }
   });
   const [activeChatId, setActiveChatId] = useState<string | undefined>(() => {
-    try { return JSON.parse(localStorage.getItem("sunayna.chats") || "[]")[0]?.id; } catch { return undefined; }
+    try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]"))[0]?.id; } catch { return undefined; }
   });
   // Chat history survives reloads (browser storage).
   useEffect(() => {
-    try { localStorage.setItem("sunayna.chats", JSON.stringify(chats)); } catch { /* storage full/blocked */ }
+    try { localStorage.setItem("cursed.chats", JSON.stringify(chats)); } catch { /* storage full/blocked */ }
   }, [chats]);
   const [models, setModels] = useState<AIModel[]>(INITIAL_MODELS);
   const [selectedModelId, setSelectedModelId] = useState("phi-3-mini");

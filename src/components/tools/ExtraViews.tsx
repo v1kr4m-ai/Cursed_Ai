@@ -747,7 +747,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                   <Shield size={12} className="text-emerald-400" />
                   <span className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Zero-Cloud Security Architecture</span>
                </div>
-               <p className="text-[9px] text-zinc-700 font-mono">SUNAYNA CORE • LOCAL RUNTIME</p>
+               <p className="text-[9px] text-zinc-700 font-mono">CURSED CORE • LOCAL RUNTIME</p>
             </div>
           </div>
         </ScrollArea>

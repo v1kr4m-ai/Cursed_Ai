@@ -11,7 +11,7 @@
 #include "llama.h"
 #include "ggml-backend.h"
 
-#define TAG "SunaynaNative"
+#define TAG "CursedNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
@@ -55,7 +55,7 @@ static void ensure_backend() {
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_loadModel(JNIEnv *env, jobject, jstring model_path, jint n_gpu_layers) {
+Java_com_cursed_runtime_jni_LlamaNative_loadModel(JNIEnv *env, jobject, jstring model_path, jint n_gpu_layers) {
     ensure_backend();
     const char *path = env->GetStringUTFChars(model_path, nullptr);
     LOGI("Loading GGUF model: %s (n_gpu_layers=%d)", path, n_gpu_layers);
@@ -113,7 +113,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_loadModel(JNIEnv *env, jobject, jstring
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong model_handler, jstring prompt,
+Java_com_cursed_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong model_handler, jstring prompt,
                                                    jfloat temperature, jfloat top_p, jint max_tokens, jobject callback) {
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
 
@@ -232,7 +232,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong mo
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_processImage(JNIEnv *env, jobject, jlong, jbyteArray) {
+Java_com_cursed_runtime_jni_LlamaNative_processImage(JNIEnv *env, jobject, jlong, jbyteArray) {
     // No CLIP/vision model is vendored in this build. Returning a fake
     // "embedded" response would be worse than being upfront about it.
     return env->NewStringUTF("{\"error\": \"Vision is not implemented in this build - no CLIP model is loaded\"}");
@@ -240,7 +240,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_processImage(JNIEnv *env, jobject, jlon
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_transcribeAudio(JNIEnv *env, jobject, jlong, jshortArray) {
+Java_com_cursed_runtime_jni_LlamaNative_transcribeAudio(JNIEnv *env, jobject, jlong, jshortArray) {
     // No Whisper model is vendored in this build (the app's own speech input
     // uses the browser's Web Speech API instead, which doesn't call this).
     return env->NewStringUTF("");
@@ -248,7 +248,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_transcribeAudio(JNIEnv *env, jobject, j
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_stopGeneration(JNIEnv *, jobject, jlong model_handler) {
+Java_com_cursed_runtime_jni_LlamaNative_stopGeneration(JNIEnv *, jobject, jlong model_handler) {
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
     if (inst) {
         inst->stop_flag = true;
@@ -258,7 +258,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_stopGeneration(JNIEnv *, jobject, jlong
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_releaseModel(JNIEnv *, jobject, jlong model_handler) {
+Java_com_cursed_runtime_jni_LlamaNative_releaseModel(JNIEnv *, jobject, jlong model_handler) {
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
     if (inst) {
         LOGI("Releasing model resources");
@@ -270,7 +270,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_releaseModel(JNIEnv *, jobject, jlong m
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_setPerformanceConfig(JNIEnv *, jobject, jlong model_handler, jint n_threads, jint n_batch) {
+Java_com_cursed_runtime_jni_LlamaNative_setPerformanceConfig(JNIEnv *, jobject, jlong model_handler, jint n_threads, jint n_batch) {
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
     if (!inst) return;
     inst->n_threads = n_threads;
@@ -283,7 +283,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_setPerformanceConfig(JNIEnv *, jobject,
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_restoreContext(JNIEnv *, jobject, jlong model_handler) {
+Java_com_cursed_runtime_jni_LlamaNative_restoreContext(JNIEnv *, jobject, jlong model_handler) {
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
     if (inst && inst->ctx) {
         // Each generate() call already clears the KV cache for a fresh turn,
@@ -295,7 +295,7 @@ Java_com_sunayna_runtime_jni_LlamaNative_restoreContext(JNIEnv *, jobject, jlong
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_sunayna_runtime_jni_LlamaNative_getStats(JNIEnv *env, jobject, jlong model_handler) {
+Java_com_cursed_runtime_jni_LlamaNative_getStats(JNIEnv *env, jobject, jlong model_handler) {
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
 
     const bool gpu_available = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU) != nullptr;

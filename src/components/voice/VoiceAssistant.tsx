@@ -251,7 +251,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     return (
       <button
         onClick={() => setOpen(true)}
-        title="Sunayna voice assistant"
+        title="Cursed voice assistant"
         className="fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform"
       >
         <Bot size={26} />
@@ -263,7 +263,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     <div className="fixed bottom-24 right-6 z-40 w-[400px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-8rem)] flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tighter">Sunayna Assistant</h1>
+          <h1 className="text-xl font-black text-white tracking-tighter">Cursed Assistant</h1>
           <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
             {usingWhisper ? "Local Whisper (offline)" : "Browser speech"} · {selectedModel.name}
           </p>

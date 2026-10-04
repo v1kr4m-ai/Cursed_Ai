@@ -1,5 +1,5 @@
 {
-  "name": "Sunayna",
+  "name": "Cursed",
   "description": "Offline-first AI Studio prototype. Mobile-ready local LLM interface with model management, memory system, and voice capabilities.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["AI Chat", "Model Manager", "Local Inference", "Vector Memory"]

@@ -10,11 +10,11 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Sunayna"
+        android:label="Cursed"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.Sunayna">
+        android:theme="@style/Theme.Cursed">
 
         <activity
             android:name=".MainActivity"
@@ -27,7 +27,7 @@
 
         <!-- The Background AI Engine Service -->
         <service
-            android:name=".services.SunaynaRuntimeService"
+            android:name=".services.CursedRuntimeService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse" />

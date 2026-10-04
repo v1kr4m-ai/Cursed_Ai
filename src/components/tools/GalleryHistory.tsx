@@ -26,7 +26,7 @@ export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video"; 
       const text = await resp.text();
       let data: any = null;
       try { data = JSON.parse(text); } catch { /* not JSON */ }
-      if (!resp.ok || !data) throw new Error("History unavailable - restart the Sunayna server (npm run dev) so it picks up the new version.");
+      if (!resp.ok || !data) throw new Error("History unavailable - restart the Cursed server (npm run dev) so it picks up the new version.");
       setItems(data.items || []);
       setDir(data.dir || "");
       setError(null);

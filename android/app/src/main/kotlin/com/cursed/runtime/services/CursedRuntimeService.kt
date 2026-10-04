@@ -1,4 +1,4 @@
-package com.sunayna.runtime.services
+package com.cursed.runtime.services
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -14,16 +14,16 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.sunayna.runtime.api.ApiServer
-import com.sunayna.runtime.inference.ModelManager
+import com.cursed.runtime.api.ApiServer
+import com.cursed.runtime.inference.ModelManager
 
 /**
- * The core background service that hosts the Sunayna Local AI Engine.
+ * The core background service that hosts the Cursed Local AI Engine.
  * Enhanced in Phase 9/10 for foreground persistence, lifecycle management, and battery-aware scheduling.
  */
-class SunaynaRuntimeService : Service() {
+class CursedRuntimeService : Service() {
     private var apiServer: ApiServer? = null
-    private val CHANNEL_ID = "SunaynaRuntimeChannel"
+    private val CHANNEL_ID = "CursedRuntimeChannel"
     private val NOTIFICATION_ID = 101
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -32,7 +32,7 @@ class SunaynaRuntimeService : Service() {
             val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
             val batteryPct = level * 100 / scale.toFloat()
 
-            Log.d("SunaynaRuntime", "Battery check: $batteryPct%")
+            Log.d("CursedRuntime", "Battery check: $batteryPct%")
 
             if (batteryPct < 15.0f) {
                 ModelManager.setPerformanceMode(ModelManager.PerformanceMode.BATTERY_SAVER)
@@ -46,7 +46,7 @@ class SunaynaRuntimeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i("SunaynaRuntime", "Initializing Local AI Service (Phase 10)...")
+        Log.i("CursedRuntime", "Initializing Local AI Service (Phase 10)...")
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification("Engine Ready"))
@@ -62,11 +62,11 @@ class SunaynaRuntimeService : Service() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        Log.w("SunaynaRuntime", "System Memory Pressure: level $level")
+        Log.w("CursedRuntime", "System Memory Pressure: level $level")
 
         if (level >= TRIM_MEMORY_MODERATE) {
             // Background caching: we keep the model warm but shed vision/aux heads if needed
-            Log.i("SunaynaRuntime", "Warm Retention: Compacting native cache...")
+            Log.i("CursedRuntime", "Warm Retention: Compacting native cache...")
             // In a real app, we'd call a native compact() method
         }
     }
@@ -75,7 +75,7 @@ class SunaynaRuntimeService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "Sunayna AI Engine",
+                "Cursed_Ai Engine",
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -84,14 +84,14 @@ class SunaynaRuntimeService : Service() {
     }
 
     private fun createNotification(status: String): Notification {
-        val notificationIntent = Intent(this, com.sunayna.runtime.MainActivity::class.java)
+        val notificationIntent = Intent(this, com.cursed.runtime.MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, notificationIntent,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Sunayna Local AI")
+            .setContentTitle("Cursed Local AI")
             .setContentText(status)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
@@ -114,7 +114,7 @@ class SunaynaRuntimeService : Service() {
     }
 
     override fun onDestroy() {
-        Log.i("SunaynaRuntime", "Shutting down Local AI Service...")
+        Log.i("CursedRuntime", "Shutting down Local AI Service...")
         unregisterReceiver(batteryReceiver)
         apiServer?.stop()
         ModelManager.unloadModel()

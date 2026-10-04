@@ -1,7 +1,7 @@
-package com.sunayna.runtime.inference
+package com.cursed.runtime.inference
 
 import android.content.Context
-import com.sunayna.runtime.jni.LlamaNative
+import com.cursed.runtime.jni.LlamaNative
 import java.io.File
 
 object ModelManager {
@@ -11,7 +11,7 @@ object ModelManager {
     // permission is effectively a no-op for shared storage on modern
     // Android) - configure() switches this to the app's own external files
     // dir, which needs zero runtime permissions.
-    var modelsDir: String = "/sdcard/Sunayna/models"
+    var modelsDir: String = "/sdcard/Cursed/models"
         private set
 
     fun configure(context: Context) {

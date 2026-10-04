@@ -1,6 +1,6 @@
-package com.sunayna.runtime.inference
+package com.cursed.runtime.inference
 
-import com.sunayna.runtime.jni.LlamaNative
+import com.cursed.runtime.jni.LlamaNative
 import android.util.Base64
 import android.util.Log
 

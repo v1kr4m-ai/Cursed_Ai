@@ -1,4 +1,4 @@
-package com.sunayna.runtime.jni
+package com.cursed.runtime.jni
 
 /**
  * JNI Bridge for llama.cpp native code.
@@ -6,7 +6,7 @@ package com.sunayna.runtime.jni
  */
 object LlamaNative {
     init {
-        System.loadLibrary("sunayna-local-engine")
+        System.loadLibrary("cursed-local-engine")
     }
 
     /**

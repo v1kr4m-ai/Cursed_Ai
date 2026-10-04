@@ -21,12 +21,12 @@ def hostTag = isWindows ? "windows-x86_64" : (isMac ? "darwin-x86_64" : "linux-x
 def glslcPath = "${sdkDir}/ndk/${ndkVer}/shader-tools/${hostTag}/glslc${isWindows ? '.exe' : ''}"
 
 android {
-    namespace 'com.sunayna.runtime'
+    namespace 'com.cursed.runtime'
     compileSdk 34
     ndkVersion "26.1.10909125"
 
     defaultConfig {
-        applicationId "com.sunayna.runtime"
+        applicationId "com.cursed.runtime"
         minSdk 26
         targetSdk 34
         versionCode 1

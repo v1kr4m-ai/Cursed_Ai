@@ -1,8 +1,8 @@
-package com.sunayna.runtime.api
+package com.cursed.runtime.api
 
-import com.sunayna.runtime.jni.LlamaNative
-import com.sunayna.runtime.inference.ModelManager
-import com.sunayna.runtime.inference.MultimodalManager
+import com.cursed.runtime.jni.LlamaNative
+import com.cursed.runtime.inference.ModelManager
+import com.cursed.runtime.inference.MultimodalManager
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*

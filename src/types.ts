@@ -1,5 +1,5 @@
 /**
- * Shared types for Sunayna App
+ * Shared types for Cursed App
  */
 
 export enum MessageRole {

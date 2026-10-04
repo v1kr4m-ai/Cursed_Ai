@@ -1,4 +1,4 @@
-# Sunayna AI
+# Cursed_Ai
 
 **A private, offline-first AI studio.** Chat with large language models running on your own machine, give them long-term memory, talk to them by voice, and generate images and video — locally through [ComfyUI](https://github.com/comfyanonymous/ComfyUI), or via the cloud when you choose to.
 
@@ -89,7 +89,7 @@ The server reads `.gguf` files from `models/` (or any folder you pick in **Setti
 3. Build from `android/` (`./gradlew :app:assembleDebug`) or open it in Android Studio. llama.cpp is vendored under `android/app/src/main/cpp/llama.cpp/` — no submodule step.
 4. Push a GGUF to the app's own storage (no permissions needed):
    ```bash
-   adb push model.gguf /sdcard/Android/data/com.sunayna.runtime/files/models/model.gguf
+   adb push model.gguf /sdcard/Android/data/com.cursed.runtime/files/models/model.gguf
    ```
 
 CPU inference on an unaccelerated emulator is very slow (tens of seconds per token); a real ARM phone is far faster.

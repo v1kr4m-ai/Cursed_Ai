@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project("sunayna-local-engine")
+project("cursed-local-engine")
 
 # llama.cpp is vendored (not a submodule) under ./llama.cpp, pruned to just
 # what a library consumer needs: ggml, src (the llama.cpp public API impl),
@@ -25,7 +25,7 @@ set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
 add_subdirectory(llama.cpp)
 
 add_library(${PROJECT_NAME} SHARED
-    sunayna-local-engine.cpp
+    cursed-local-engine.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

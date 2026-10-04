@@ -372,7 +372,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-8 shadow-2xl shadow-violet-500/10">
             <Bot size={40} className="text-violet-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Sunayna local AI Studio</h1>
+          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Cursed local AI Studio</h1>
           <p className="text-zinc-500 max-w-sm mb-10 text-sm leading-relaxed">
             Your private offline laboratory. Messages are processed locally on-device using the <span className="text-violet-400 font-mono">{selectedModel.name}</span> model.
           </p>

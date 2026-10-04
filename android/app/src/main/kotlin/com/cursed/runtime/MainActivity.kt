@@ -1,4 +1,4 @@
-package com.sunayna.runtime
+package com.cursed.runtime
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -10,7 +10,7 @@ import android.util.Log
 import android.os.Handler
 import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
-import com.sunayna.runtime.services.SunaynaRuntimeService
+import com.cursed.runtime.services.CursedRuntimeService
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
 
             webViewClient = object : WebViewClient() {
                 override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                    Log.e("Sunayna", "WebView Error ($errorCode): $description")
+                    Log.e("Cursed", "WebView Error ($errorCode): $description")
                     if (failingUrl?.contains("127.0.0.1") == true) {
                         // Retry after 2 seconds if local server not ready
                         handler.postDelayed({ view?.loadUrl(failingUrl) }, 2000)
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(webView)
 
         // Start background engine service
-        startForegroundService(Intent(this, SunaynaRuntimeService::class.java))
+        startForegroundService(Intent(this, CursedRuntimeService::class.java))
 
         // Point to the local Ktor server
         webView.loadUrl("http://127.0.0.1:11434/index.html")
