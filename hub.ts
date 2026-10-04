@@ -101,7 +101,7 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
         .map(f => ({
           file: f.path as string,
           size: (f.lfs?.size ?? f.size ?? 0) as number,
-          quant: /(IQ\d[\w]*?|Q\d[\w]*?|BF16|F16|F32)(?=[-.]|$)/i.exec(path.basename(f.path).replace(/\.gguf$/i, ""))?.[1]?.toUpperCase() || "",
+          quant: /(TQ\d[\w]*?|IQ\d[\w]*?|Q\d[\w]*?|BF16|F16|F32)(?=[-.]|$)/i.exec(path.basename(f.path).replace(/\.gguf$/i, ""))?.[1]?.toUpperCase() || "",
           split: /-\d{5}-of-\d{5}\.gguf$/i.test(f.path),
           vision: /mmproj/i.test(f.path),
         }))
