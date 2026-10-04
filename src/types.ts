@@ -32,6 +32,8 @@ export interface Chat {
   updatedAt: number;
   modelId: string;
   archived?: boolean;
+  /** Instructions given to the model at the start of this chat (persona, tone, rules). */
+  systemPrompt?: string;
 }
 
 export interface AIModel {

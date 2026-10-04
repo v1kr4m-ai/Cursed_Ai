@@ -100,7 +100,7 @@ export class AIService {
         signal: options?.signal,
         body: JSON.stringify({
           messages: messages.map(m => ({
-            role: m.role === MessageRole.USER ? "user" : "assistant",
+            role: m.role === MessageRole.USER ? "user" : m.role === MessageRole.SYSTEM ? "system" : "assistant",
             // Attached documents are sent to the model as text after the user's own words.
             content: [m.content, ...(m.attachments || []).filter(a => a.kind === "doc").map(a => `
 

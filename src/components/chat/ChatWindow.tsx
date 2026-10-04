@@ -21,11 +21,15 @@ import {
   Loader2,
   Paperclip,
   X,
-  FileText
+  FileText,
+  Pencil,
+  Download,
+  MessageSquareText
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "motion/react";
@@ -44,6 +48,21 @@ interface ChatWindowProps {
   selectedModel: AIModel;
   onSelectModel: (id: string) => void;
   settings: AppSettings;
+}
+
+/** Markdown code block with a copy button. */
+function CodeBlock({ children }: { children?: React.ReactNode }) {
+  const ref = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="relative group/code">
+      <pre ref={ref}>{children}</pre>
+      <button
+        onClick={() => { navigator.clipboard.writeText(ref.current?.innerText || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+        className="absolute top-2 right-2 px-2 py-1 rounded-md bg-black/60 text-[10px] font-bold text-zinc-300 hover:text-white opacity-0 group-hover/code:opacity-100 transition-opacity"
+      >{copied ? "Copied" : "Copy"}</button>
+    </div>
+  );
 }
 
 export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings }: ChatWindowProps) {
@@ -218,25 +237,28 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       attachments: pending.map(p => p.attachment),
       timestamp: Date.now(),
     };
+    const baseChat: Chat = {
+      ...activeChat,
+      messages: [...activeChat.messages, userMessage],
+      title: activeChat.messages.length === 0 ? ((input || pending[0]?.attachment.name || "Attachment").slice(0, 30) + (input.length > 30 ? "..." : "")) : activeChat.title,
+    };
+    setInput("");
+    setPending([]);
+    setAttachMsg(null);
+    await generateReply(baseChat);
+  };
 
+  // Streams a model reply for a chat whose last message is the user's. Used by send and by Regenerate.
+  const generateReply = async (baseChat: Chat) => {
     const assistantMessagePlaceholder: Message = {
-      id: (Date.now() + 1).toString(),
+      id: Date.now().toString() + "r",
       role: MessageRole.ASSISTANT,
       content: "",
       timestamp: Date.now() + 1,
     };
-
-    const updatedMessages = [...activeChat.messages, userMessage, assistantMessagePlaceholder];
-    const updatedChat = {
-      ...activeChat,
-      messages: updatedMessages,
-      title: activeChat.messages.length === 0 ? ((input || pending[0]?.attachment.name || "Attachment").slice(0, 30) + (input.length > 30 ? "..." : "")) : activeChat.title
-    };
+    const updatedChat: Chat = { ...baseChat, messages: [...baseChat.messages, assistantMessagePlaceholder] };
 
     onUpdateChat(updatedChat);
-    setInput("");
-    setPending([]);
-    setAttachMsg(null);
     setIsGenerating(true);
     setLiveTps(null);
 
@@ -244,11 +266,14 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     abortControllerRef.current = controller;
     const generationStart = performance.now();
     let tokenCount = 0;
+    let finalContent = "";
 
     try {
-      let finalContent = "";
+      const toModel: Message[] = baseChat.systemPrompt?.trim()
+        ? [{ id: "sys", role: MessageRole.SYSTEM, content: baseChat.systemPrompt.trim(), timestamp: 0 }, ...baseChat.messages]
+        : baseChat.messages;
       await AIService.generate(
-        [...activeChat.messages, userMessage],
+        toModel,
         selectedModel.id,
         {
           onToken: (token) => {
@@ -257,26 +282,18 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
             const elapsedSec = (performance.now() - generationStart) / 1000;
             if (elapsedSec > 0) setLiveTps(tokenCount / elapsedSec);
             const currentMessages = [...updatedChat.messages];
-            currentMessages[currentMessages.length - 1] = {
-              ...assistantMessagePlaceholder,
-              content: finalContent
-            };
+            currentMessages[currentMessages.length - 1] = { ...assistantMessagePlaceholder, content: finalContent };
             onUpdateChat({ ...updatedChat, messages: currentMessages });
           },
           onError: (error) => {
             console.error("Failed to generate response:", error);
             // Show the failure in the reply bubble instead of leaving it blank.
             const msgs = [...updatedChat.messages];
-            msgs[msgs.length - 1] = {
-              ...assistantMessagePlaceholder,
-              content: finalContent || `⚠️ ${error?.message || error}`,
-            };
+            msgs[msgs.length - 1] = { ...assistantMessagePlaceholder, content: finalContent || `⚠️ ${error?.message || error}` };
             onUpdateChat({ ...updatedChat, messages: msgs });
             setIsGenerating(false);
           },
-          onComplete: () => {
-            setIsGenerating(false);
-          }
+          onComplete: () => { setIsGenerating(false); }
         },
         {
           signal: controller.signal,
@@ -296,12 +313,42 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       console.error("Failed to generate response:", error);
       setIsGenerating(false);
     } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
+      if (abortControllerRef.current === controller) abortControllerRef.current = null;
       setIsGenerating(false);
     }
   };
+
+  // Re-run the last user message for a fresh answer.
+  const regenerate = () => {
+    if (!chat || isGenerating) return;
+    const lastUser = [...chat.messages].map((m, i) => ({ m, i })).reverse().find(x => x.m.role === MessageRole.USER);
+    if (!lastUser) return;
+    generateReply({ ...chat, messages: chat.messages.slice(0, lastUser.i + 1) });
+  };
+
+  // Put a sent message back in the box to change and resend; replies after it are dropped.
+  const editMessage = (idx: number) => {
+    if (!chat || isGenerating) return;
+    const m = chat.messages[idx];
+    if (idx < chat.messages.length - 2 && !window.confirm("Edit this message? The replies after it will be removed.")) return;
+    setInput(m.content);
+    onUpdateChat({ ...chat, messages: chat.messages.slice(0, idx) });
+  };
+
+  const exportMarkdown = () => {
+    if (!chat) return;
+    const md = [`# ${chat.title}`, chat.systemPrompt ? `> System prompt: ${chat.systemPrompt}\n` : "",
+      ...chat.messages.map(m => `**${m.role === MessageRole.USER ? "You" : "Assistant"}:**\n\n${m.content}\n`)].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+    a.download = `${chat.title.replace(/[^\w -]+/g, "").trim() || "chat"}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptDraft, setPromptDraft] = useState("");
 
   const copyToClipboard = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -497,10 +544,47 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
              <span className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-mono">Engine Online</span>
            </div>
            <div className="h-6 w-[1px] bg-white/5 mx-2"></div>
-           <button className="text-zinc-500 hover:text-white p-2 transition-colors"><RotateCcw size={18} /></button>
-           <button className="text-zinc-500 hover:text-white p-2 transition-colors"><MoreVertical size={18} /></button>
+           <button onClick={regenerate} disabled={isGenerating} title="Regenerate the last reply" className="text-zinc-500 hover:text-white p-2 transition-colors disabled:opacity-30"><RotateCcw size={18} /></button>
+           <div className="relative">
+             <button onClick={() => setMenuOpen(v => !v)} title="Chat options" className="text-zinc-500 hover:text-white p-2 transition-colors"><MoreVertical size={18} /></button>
+             {menuOpen && (
+               <>
+                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                 <div className="absolute right-0 top-full mt-2 w-56 bg-zinc-950 border border-white/15 rounded-2xl shadow-2xl shadow-black/60 z-50 overflow-hidden py-1">
+                   {[
+                     { icon: <MessageSquareText size={15} />, label: chat.systemPrompt ? "Edit system prompt" : "Set system prompt", act: () => { setPromptDraft(chat.systemPrompt || ""); setPromptOpen(true); } },
+                     { icon: <Download size={15} />, label: "Export as Markdown", act: exportMarkdown },
+                     { icon: <Trash2 size={15} />, label: "Clear chat", act: handleClearChat },
+                     { icon: <Archive size={15} />, label: "Archive chat", act: handleArchive },
+                   ].map(it => (
+                     <button key={it.label} onClick={() => { setMenuOpen(false); it.act(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-200 hover:bg-white/5 text-left">{it.icon}{it.label}</button>
+                   ))}
+                 </div>
+               </>
+             )}
+           </div>
         </div>
       </div>
+
+      <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white">System prompt</DialogTitle>
+            <DialogDescription>Instructions the model follows throughout this chat - a persona, tone or rules. Applies to every reply from now on.</DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={promptDraft}
+            onChange={(e) => setPromptDraft(e.target.value)}
+            rows={6}
+            placeholder="e.g. You are a concise assistant. Answer in at most three sentences."
+            className="w-full rounded-xl bg-zinc-900 border border-white/10 text-zinc-100 text-sm p-3 resize-none focus:outline-none focus:border-violet-500/50"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPromptOpen(false)}>Cancel</Button>
+            <Button className="bg-violet-600 hover:bg-violet-500 text-white" onClick={() => { onUpdateChat({ ...chat, systemPrompt: promptDraft.trim() || undefined }); setPromptOpen(false); }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Messages */}
       <div className="flex-1 min-h-0 overflow-y-auto px-8 py-8" ref={scrollRef}>
@@ -511,23 +595,31 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={cn(
-                "chat-bubble",
+                "chat-bubble group/msg",
                 m.role === MessageRole.USER ? "user-bubble" : "ai-bubble"
               )}
             >
               {m.role === MessageRole.ASSISTANT ? (
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>
                     {m.content || (isGenerating && idx === chat.messages.length - 1 ? "▋" : "")}
                   </ReactMarkdown>
                   {m.content && !(isGenerating && idx === chat.messages.length - 1) && (
-                    <button
-                      onClick={() => toggleSpeak(m.id, m.content)}
-                      title={speakingId === m.id ? "Stop reading" : "Read aloud"}
-                      className={cn("mt-3 p-1.5 rounded-lg transition-colors", speakingId === m.id ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-500 hover:text-white hover:bg-white/10")}
-                    >
-                      {speakingId === m.id ? <Square size={14} className="fill-current" /> : <Volume2 size={14} />}
-                    </button>
+                    <div className="mt-3 flex items-center gap-1">
+                      <button
+                        onClick={() => toggleSpeak(m.id, m.content)}
+                        title={speakingId === m.id ? "Stop reading" : "Read aloud"}
+                        className={cn("p-1.5 rounded-lg transition-colors", speakingId === m.id ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-500 hover:text-white hover:bg-white/10")}
+                      >
+                        {speakingId === m.id ? <Square size={14} className="fill-current" /> : <Volume2 size={14} />}
+                      </button>
+                      <button onClick={() => copyToClipboard(m.id, m.content)} title="Copy reply" className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-colors">
+                        {copiedId === m.id ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      </button>
+                      {idx === chat.messages.length - 1 && (
+                        <button onClick={regenerate} title="Regenerate this reply" className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-colors"><RotateCcw size={14} /></button>
+                      )}
+                    </div>
                   )}
                   {isGenerating && idx === chat.messages.length - 1 && (
                     <div className="flex items-center gap-2 mt-4 text-[10px] font-mono opacity-40 uppercase tracking-widest italic group">
@@ -547,6 +639,14 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
                     </div>
                   )}
                   {m.content}
+                  {!isGenerating && (
+                    <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                      <button onClick={() => copyToClipboard(m.id, m.content)} title="Copy message" className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10">
+                        {copiedId === m.id ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                      <button onClick={() => editMessage(idx)} title="Edit and resend" className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10"><Pencil size={13} /></button>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>

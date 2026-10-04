@@ -462,9 +462,13 @@ async function startServer() {
 
       if (messages && messages.length > 0) {
         userQuery = messages[messages.length - 1].content;
-        const history = messages.slice(0, -1);
+        // node-llama-cpp wants its own message shape ({type, text} / {type: "model", response}), not {role, content}.
+        const history = messages.slice(0, -1).map((m: any) =>
+          m.role === "system" ? { type: "system", text: m.content }
+          : m.role === "user" ? { type: "user", text: m.content }
+          : { type: "model", response: [m.content] });
         finalPrompt = userQuery;
-        await session.setChatHistory(history);
+        await session.setChatHistory(history as any);
       } else {
         userQuery = prompt;
         finalPrompt = prompt;
