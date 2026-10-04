@@ -60,10 +60,10 @@ export function Sidebar({
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
-    { id: "console", label: "Console", icon: Terminal },
     { id: "image", label: "Image", icon: ImagePlus },
     { id: "video", label: "Video", icon: Clapperboard },
     { id: "vision", label: "Vision", icon: Eye },
+    { id: "console", label: "Console", icon: Terminal },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -136,7 +136,7 @@ export function Sidebar({
 
         {!isCollapsed && activeTab === "chat" && (
           <div className="mt-8">
-            <h3 className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-3">Session Library</h3>
+            <h3 className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-3">History</h3>
             <div className="space-y-1 px-1">
               {chats.map((chat) => (
                 <Button
@@ -229,7 +229,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "models", "memory", "engine", "console", "image", "video", "vision", "settings"].map((tab) => (
+               {["chat", "models", "memory", "engine", "image", "video", "vision", "console", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

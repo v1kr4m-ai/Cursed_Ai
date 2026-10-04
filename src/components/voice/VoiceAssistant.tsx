@@ -36,6 +36,23 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const [history, setHistory] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const readViewport = () => ({ w: Math.max(window.innerWidth, 320), h: Math.max(window.innerHeight, 400) });
+  const [viewport, setViewport] = useState(readViewport);
+  // Position as fractions (0..1) of the free area, so it survives window resizes.
+  // null = default spot: right edge, above the chat box's send button.
+  const [posFrac, setPosFrac] = useState<{ fx: number; fy: number } | null>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("cursed.pirate.pos") || "null");
+      if (saved && typeof saved.fx === "number" && typeof saved.fy === "number") return saved;
+    } catch { /* ignore */ }
+    return null;
+  });
+  const dragRef = useRef<{ sx: number; sy: number; px: number; py: number; moved: boolean; mode: "fab" | "panel" } | null>(null);
+  useEffect(() => {
+    const onResize = () => setViewport(readViewport());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   // Refs mirror state for event handlers bound once (avoids stale closures).
@@ -271,12 +288,48 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     : state === "speaking" ? "Speaking..."
     : usingWhisper ? "Tap the mic, talk, tap again" : "Press Start to begin a live conversation";
 
+  // --- Floating position (draggable, remembered, always kept on screen) ---
+  const FAB = 56, M = 8;
+  const vw = viewport.w, vh = viewport.h;
+  const panelW = Math.min(400, vw - 2 * M), panelH = Math.min(560, vh - 2 * M);
+  const rangeX = vw - FAB - 2 * M, rangeY = vh - FAB - 2 * M;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+  const fab = posFrac
+    ? { x: M + clamp(posFrac.fx, 0, 1) * rangeX, y: M + clamp(posFrac.fy, 0, 1) * rangeY }
+    : { x: vw - FAB - 24, y: clamp(vh - FAB - 150, M, vh - FAB - M) };
+  // The open panel hangs off the icon's position but is kept fully on screen.
+  const panelLeft = clamp(fab.x + FAB - panelW, M, vw - panelW - M);
+  const panelTop = clamp(fab.y + FAB - panelH, M, vh - panelH - M);
+
+  const beginDrag = (e: React.PointerEvent, mode: "fab" | "panel") => {
+    if ((e.target as HTMLElement).closest("button") && mode === "panel") return; // header buttons stay clickable
+    dragRef.current = { sx: e.clientX, sy: e.clientY, px: fab.x, py: fab.y, moved: false, mode };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
+    if (d.moved) setPosFrac({ fx: clamp((d.px + dx - M) / rangeX, 0, 1), fy: clamp((d.py + dy - M) / rangeY, 0, 1) });
+  };
+  const endDrag = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    if (d.moved && posFrac) { try { localStorage.setItem("cursed.pirate.pos", JSON.stringify(posFrac)); } catch { /* storage blocked */ } }
+    if (d.mode === "fab" && !d.moved) setOpen(true);
+  };
+
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
-        title="Cursed_Pirate"
-        className="fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform"
+        onPointerDown={(e) => beginDrag(e, "fab")}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        title="Cursed_Pirate (drag to move)"
+        style={{ left: fab.x, top: fab.y }}
+        className="fixed z-40 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform touch-none cursor-grab active:cursor-grabbing"
       >
         <Bot size={26} />
       </button>
@@ -284,8 +337,11 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   }
 
   return (
-    <div className="fixed bottom-24 right-6 z-40 w-[400px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-8rem)] flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
-      <div className="flex items-center justify-between mb-4 shrink-0">
+    <div style={{ left: panelLeft, top: panelTop, width: panelW, height: panelH }} className="fixed z-40 flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
+      <div
+        onPointerDown={(e) => beginDrag(e, "panel")} onPointerMove={moveDrag} onPointerUp={endDrag}
+        title="Drag to move"
+        className="flex items-center justify-between mb-4 shrink-0 cursor-grab active:cursor-grabbing touch-none select-none">
         <div>
           <h1 className="text-xl font-black text-white tracking-tighter">Cursed_Pirate</h1>
           <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-[10px] mt-1">

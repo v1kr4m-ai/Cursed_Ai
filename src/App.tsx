@@ -313,7 +313,7 @@ export default function App() {
               </div>
             )}
           </main>
-          {activeTab === "chat" && settings.voiceEnabled && (
+          {settings.voiceEnabled && (
             <VoiceAssistant 
               selectedModel={selectedModel}
               settings={settings}
