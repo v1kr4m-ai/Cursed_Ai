@@ -291,7 +291,13 @@ async function startServer() {
   // with by proxying - ids are "ollama:<name>" / "lmstudio:<id>".
   const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
   const LMSTUDIO_URL = process.env.LMSTUDIO_URL || "http://127.0.0.1:1234";
-  registerHub(app, { getModelsDir: () => MODELS_DIR, ollamaUrl: OLLAMA_URL, findExisting: (fileName) => localModels.findByFileName(fileName)?.file });
+  registerHub(app, { getModelsDir: () => MODELS_DIR, ollamaUrl: OLLAMA_URL, findExisting: (fileName) => localModels.findByFileName(fileName)?.file,
+    getComfyModelsDir: () => {
+      const base = process.env.COMFYUI_PATH || serverConfig.comfyuiPath;
+      if (!base) return null;
+      return [path.join(base, "ComfyUI", "models"), path.join(base, "models")].find(p => fs.existsSync(p)) || null;
+    },
+  });
 
   const ollamaCaps = new Map<string, string[]>();
   async function listExternalModels() {

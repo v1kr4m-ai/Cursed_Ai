@@ -8,7 +8,7 @@ import { FlagChip, FitBadge, formatBytes } from "./flags";
 import { fitFor, paramsToBytes, useSystemInfo } from "../../lib/ramFit";
 
 interface HubModel {
-  source: "hf" | "ollama";
+  source: "hf" | "ollama" | "comfy";
   id: string;
   name: string;
   publisher: string;
@@ -16,7 +16,7 @@ interface HubModel {
   sizes?: string[];
   tags: string[];
 }
-interface HubFile { file: string; size: number; quant: string; split: boolean; vision: boolean }
+interface HubFile { file: string; size: number; quant: string; split: boolean; vision: boolean; kind?: string }
 interface Job {
   id: string; source: string; label: string; status: "running" | "done" | "error" | "cancelled";
   progress: number; received: number; total: number; message: string; error?: string; dest?: string;
@@ -26,7 +26,14 @@ interface Job {
  * Browse and download models from Hugging Face (GGUF files, saved into the
  * models folder) or the Ollama library (pulled by the Ollama app itself).
  */
-export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama"; flag: string | null; onInstalled: () => void }) {
+export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama" | "comfy"; flag: string | null; onInstalled: () => void }) {
+  // ComfyUI view: image or video checkpoints, saved into ComfyUI's own models folder.
+  const [kind, setKind] = React.useState<"image" | "video">("image");
+  const [folder, setFolder] = React.useState("checkpoints");
+  const [comfy, setComfy] = React.useState<{ root: string | null; folders: string[] }>({ root: null, folders: [] });
+  React.useEffect(() => {
+    if (source === "comfy") fetch("/api/hub/comfy-dirs").then(r => r.json()).then(setComfy).catch(() => {});
+  }, [source]);
   const sys = useSystemInfo();
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<HubModel[]>([]);
@@ -43,7 +50,7 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
     setError(null);
     const t = setTimeout(async () => {
       try {
-        const resp = await fetch(`/api/hub/search?source=${source}&q=${encodeURIComponent(query)}`);
+        const resp = await fetch(`/api/hub/search?source=${source}&q=${encodeURIComponent(query)}&kind=${kind}`);
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error);
         setResults(data.results);
@@ -55,7 +62,7 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
       }
     }, query ? 450 : 0);
     return () => clearTimeout(t);
-  }, [source, query]);
+  }, [source, query, kind]);
 
   // Poll downloads while any is running; tell the app when one finishes.
   const doneSeen = React.useRef(new Set<string>());
@@ -87,15 +94,16 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
   const openFiles = async (m: HubModel) => {
     setPicker(m); setFiles(null); setFilesError(null);
     try {
-      const resp = await fetch(`/api/hub/hf-files?repo=${encodeURIComponent(m.id)}`);
+      const resp = await fetch(`/api/hub/hf-files?repo=${encodeURIComponent(m.id)}${source === "comfy" ? "&kind=comfy" : ""}`);
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error);
       setFiles(data.files);
     } catch (e: any) { setFilesError(e.message); }
   };
 
-  const shown = flag ? results.filter(m => m.tags.includes(flag)) : results;
-  const visibleJobs = jobs.filter(j => j.source === source).slice(0, 6);
+  const shown = flag && source !== "comfy" ? results.filter(m => m.tags.includes(flag)) : results;
+  const isComfyJob = (j: Job) => j.label.startsWith("ComfyUI /");
+  const visibleJobs = jobs.filter(j => source === "comfy" ? isComfyJob(j) : source === "hf" ? j.source === "hf" && !isComfyJob(j) : j.source === source).slice(0, 6);
 
   return (
     <div className="space-y-5">
@@ -104,17 +112,27 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={source === "hf" ? "Search Hugging Face GGUF models (e.g. qwen coder, llama 3)..." : "Search the Ollama library (e.g. qwen, deepseek-r1, llava)..."}
+          placeholder={source === "comfy" ? `Search Hugging Face ${kind} models for ComfyUI (e.g. sdxl, flux, ltx)...` : source === "hf" ? "Search Hugging Face GGUF models (e.g. qwen coder, llama 3)..." : "Search the Ollama library (e.g. qwen, deepseek-r1, llava)..."}
           className="pl-11 h-11 bg-white/5 border-white/10 text-zinc-100 rounded-2xl"
         />
         {loading && <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-zinc-500" />}
       </div>
 
       <p className="text-[11px] text-zinc-500">
-        {source === "hf"
+        {source === "comfy"
+          ? (comfy.root ? `Downloads are saved straight into ComfyUI's own models folder (${comfy.root}), so nothing is stored twice. Files already in ComfyUI are never downloaded again.` : "ComfyUI's folder isn't set yet - open the Image or Video tab and use Set ComfyUI folder first.")
+          : source === "hf"
           ? "Downloads go into your models folder (Settings → Storage) using LM Studio's publisher/repo layout, so LM Studio and this app both see them."
           : "Downloads are pulled by the Ollama app and stored in Ollama's own models folder. Ollama must be running."}
       </p>
+
+      {source === "comfy" && (
+        <div className="flex gap-2">
+          {(["image", "video"] as const).map(k => (
+            <button key={k} onClick={() => setKind(k)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${kind === k ? "bg-pink-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>{k === "image" ? "Image models" : "Video models"}</button>
+          ))}
+        </div>
+      )}
 
       {error && <div className="flex items-start gap-2 text-red-400 text-xs bg-red-500/10 rounded-xl px-4 py-3"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{error}</div>}
 
@@ -143,7 +161,7 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {shown.map(m => (
-          <div key={`${m.source}:${m.id}`} className={`flex flex-col gap-3 p-4 rounded-2xl border bg-gradient-to-br ${source === "hf" ? "from-sky-600/20 to-violet-600/10 border-sky-500/25" : "from-orange-600/20 to-rose-600/10 border-orange-500/25"}`}>
+          <div key={`${m.source}:${m.id}`} className={`flex flex-col gap-3 p-4 rounded-2xl border bg-gradient-to-br ${source === "comfy" ? "from-pink-600/20 to-violet-600/10 border-pink-500/25" : source === "hf" ? "from-sky-600/20 to-violet-600/10 border-sky-500/25" : "from-orange-600/20 to-rose-600/10 border-orange-500/25"}`}>
             <div className="min-w-0">
               <p className="text-[10px] text-zinc-500 font-mono truncate">{m.publisher}</p>
               <h3 className="text-base font-bold text-white leading-tight truncate" title={m.id}>{m.name}</h3>
@@ -151,7 +169,7 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
             </div>
             {m.tags.length > 0 && <div className="flex flex-wrap gap-1.5">{m.tags.map(t => <FlagChip key={t} flag={t} />)}</div>}
 
-            {m.source === "hf" ? (
+            {m.source === "hf" || m.source === "comfy" ? (
               <Button className="mt-auto h-9 rounded-xl gap-2 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white" onClick={() => openFiles(m)}>
                 <Package size={14} /> Choose file & download
               </Button>
@@ -178,7 +196,12 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
         <DialogContent className="bg-zinc-950 border-white/10 max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-white">{picker?.name}</DialogTitle>
-            <DialogDescription>Pick a quantization. Smaller files need less RAM but are less accurate; Q4_K_M is a good default.</DialogDescription>
+            <DialogDescription>{source === "comfy" ? "Pick the file and the ComfyUI folder it belongs in (checkpoints for full models, loras, vae...)." : "Pick a quantization. Smaller files need less RAM but are less accurate; Q4_K_M is a good default."}</DialogDescription>
+            {source === "comfy" && (
+              <select value={folder} onChange={(e) => setFolder(e.target.value)} className="mt-2 h-9 rounded-lg bg-zinc-900 border border-white/10 text-zinc-100 text-xs px-2 font-mono">
+                {(comfy.folders.length ? comfy.folders : ["checkpoints", "loras", "vae"]).map(f => <option key={f} value={f}>models/{f}</option>)}
+              </select>
+            )}
           </DialogHeader>
           <div className="max-h-80 overflow-y-auto space-y-1.5 pr-1">
             {!files && !filesError && <div className="py-8 flex justify-center"><Loader2 className="animate-spin text-zinc-500" /></div>}
@@ -192,12 +215,12 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
               <div key={f.file} className="flex items-center justify-between gap-3 bg-white/5 rounded-xl px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-xs text-zinc-200 truncate" title={f.file}>{f.file}</p>
-                  <p className="text-[10px] text-zinc-500 flex flex-wrap items-center gap-1.5">{[f.quant, formatBytes(f.size), f.vision && "vision projector", f.split && "split file (not supported)"].filter(Boolean).join(" · ")}<FitBadge fit={f.vision ? null : fit} />{isBest && <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/25 text-sky-200">Best fit</span>}</p>
+                  <p className="text-[10px] text-zinc-500 flex flex-wrap items-center gap-1.5">{[f.quant, formatBytes(f.size), f.kind && `${f.kind} part`, f.vision && "vision projector", f.split && "split file (not supported)"].filter(Boolean).join(" · ")}<FitBadge fit={f.vision || source === "comfy" ? null : fit} />{isBest && <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/25 text-sky-200">Best fit</span>}</p>
                 </div>
                 <Button
                   size="sm" disabled={f.split}
                   className="h-8 rounded-lg text-xs bg-sky-600 hover:bg-sky-500 text-white gap-1.5 shrink-0"
-                  onClick={() => { start({ source: "hf", repo: picker!.id, file: f.file }); setPicker(null); }}
+                  onClick={() => { start(source === "comfy" ? { source: "comfy", repo: picker!.id, file: f.file, folder, size: f.size } : { source: "hf", repo: picker!.id, file: f.file, size: f.size }); setPicker(null); }}
                 ><Download size={13} /> Download</Button>
               </div>
               );

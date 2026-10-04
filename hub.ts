@@ -71,6 +71,23 @@ async function searchHF(q: string, limit: number) {
   });
 }
 
+// Diffusion models (image / video) for ComfyUI, from Hugging Face's text-to-image / text-to-video catalogue.
+async function searchHFDiffusion(q: string, kind: "image" | "video", limit: number) {
+  const pipeline = kind === "video" ? "text-to-video" : "text-to-image";
+  const url = `https://huggingface.co/api/models?pipeline_tag=${pipeline}&sort=downloads&direction=-1&limit=${limit}` + (q ? `&search=${encodeURIComponent(q)}` : "");
+  const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`Hugging Face returned HTTP ${r.status}`);
+  const list: any[] = await r.json();
+  return list.map(m => {
+    const [publisher, name] = String(m.id).split("/");
+    return {
+      source: "comfy", id: m.id, publisher, name: name || m.id,
+      description: `${(m.downloads || 0).toLocaleString("en-US")} downloads · ${m.likes || 0} likes · ${pipeline}`,
+      tags: [] as string[],
+    };
+  });
+}
+
 async function searchOllama(q: string) {
   const r = await fetch(`https://ollama.com/search?q=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(15000) });
   if (!r.ok) throw new Error(`ollama.com returned HTTP ${r.status}`);
@@ -91,7 +108,25 @@ async function searchOllama(q: string) {
   }).filter(m => m.name);
 }
 
-export function registerHub(app: express.Express, opts: { getModelsDir: () => string; ollamaUrl: string; findExisting: (fileName: string) => string | undefined }) {
+// First file with this name anywhere under a folder (a few levels deep).
+// With a size, only a file of that exact size counts (many repos reuse generic names like diffusion_pytorch_model.safetensors).
+function findFileDeep(dir: string, fileName: string, size?: number, depth = 0): string | null {
+  if (depth > 3) return null;
+  let entries: fs.Dirent[];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+  for (const e of entries) {
+    if (e.isFile() && e.name.toLowerCase() === fileName.toLowerCase()) {
+      const full = path.join(dir, e.name);
+      if (!size || fs.statSync(full).size === size) return full;
+    }
+  }
+  for (const e of entries) {
+    if (e.isDirectory()) { const f = findFileDeep(path.join(dir, e.name), fileName, size, depth + 1); if (f) return f; }
+  }
+  return null;
+}
+
+export function registerHub(app: express.Express, opts: { getModelsDir: () => string; ollamaUrl: string; findExisting: (fileName: string) => string | undefined; getComfyModelsDir: () => string | null }) {
   const jobs = new Map<string, LiveJob>();
   const newJob = (source: Job["source"], label: string): LiveJob => {
     const job: LiveJob = { id: `${Date.now()}${Math.floor(Math.random() * 1000)}`, source, label, status: "running", progress: 0, received: 0, total: 0, message: "Starting...", abort: new AbortController() };
@@ -100,12 +135,15 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
   };
 
   app.get("/api/hub/search", async (req, res) => {
-    const source = req.query.source === "ollama" ? "ollama" : "hf";
+    const source = req.query.source === "ollama" ? "ollama" : req.query.source === "comfy" ? "comfy" : "hf";
     const q = String(req.query.q || "").trim();
     try {
-      res.json({ results: source === "hf" ? await searchHF(q, 30) : await searchOllama(q) });
+      const results = source === "hf" ? await searchHF(q, 30)
+        : source === "comfy" ? await searchHFDiffusion(q, req.query.kind === "video" ? "video" : "image", 30)
+        : await searchOllama(q);
+      res.json({ results });
     } catch (e: any) {
-      res.status(502).json({ error: `Couldn't reach ${source === "hf" ? "Hugging Face" : "ollama.com"} (${e.message}). Check your internet connection.` });
+      res.status(502).json({ error: `Couldn't reach ${source === "ollama" ? "ollama.com" : "Hugging Face"} (${e.message}). Check your internet connection.` });
     }
   });
 
@@ -117,9 +155,11 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
       const r = await fetch(`https://huggingface.co/api/models/${repo}/tree/main?recursive=true`, { signal: AbortSignal.timeout(15000) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const tree: any[] = await r.json();
-      const files = tree.filter(f => f.type === "file" && /\.gguf$/i.test(f.path))
+      const wanted = req.query.kind === "comfy" ? /\.(safetensors|ckpt|pt|pth)$/i : /\.gguf$/i;
+      const files = tree.filter(f => f.type === "file" && wanted.test(f.path) && !(req.query.kind === "comfy" && /(^|\/)(optimizer|training)/i.test(f.path)))
         .map(f => ({
           file: f.path as string,
+          kind: /(^|\/)(vae|text_encoder|unet|transformer|scheduler|tokenizer|safety_checker|feature_extractor)/i.exec(f.path)?.[1]?.toLowerCase() || "",
           size: (f.lfs?.size ?? f.size ?? 0) as number,
           quant: /(TQ\d[\w]*?|IQ\d[\w]*?|Q\d[\w]*?|BF16|F16|F32)(?=[-.]|$)/i.exec(path.basename(f.path).replace(/\.gguf$/i, ""))?.[1]?.toUpperCase() || "",
           split: /-\d{5}-of-\d{5}\.gguf$/i.test(f.path),
@@ -134,10 +174,26 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
 
   app.post("/api/hub/download", (req, res) => {
     const { source, repo, file, name } = req.body || {};
+    if (source === "comfy") {
+      const root = opts.getComfyModelsDir();
+      if (!root) return res.status(400).json({ error: "ComfyUI's folder isn't set. Open the Image or Video tab and use \"Set ComfyUI folder\" first." });
+      const folder = String(req.body.folder || "checkpoints");
+      if (!/^[\w.-]+$/.test(folder) || !/^[\w.-]+\/[\w.-]+$/.test(repo || "") || !file || /\.\./.test(file)) return res.status(400).json({ error: "repo, file and folder are required" });
+      const base = path.basename(file);
+      const dupe = findFileDeep(root, base, Number(req.body.size) || undefined);
+      if (dupe) return res.status(409).json({ error: `ComfyUI already has this file, so it was not downloaded again: ${dupe}` });
+      const dest = path.join(root, folder, base);
+      const job = newJob("hf", `ComfyUI / ${folder} / ${base}`);
+      job.dest = dest;
+      downloadHF(job, repo, file, dest);
+      return res.json({ id: job.id });
+    }
     if (source === "hf") {
       if (!/^[\w.-]+\/[\w.-]+$/.test(repo || "") || !file || /\.\./.test(file)) return res.status(400).json({ error: "repo and file are required" });
       // Never download a second copy of a file that is already in LM Studio / Ollama / any model folder.
-      const existing = req.body.force ? undefined : opts.findExisting(path.basename(file));
+      const found = req.body.force ? undefined : opts.findExisting(path.basename(file));
+      const size = Number(req.body.size) || 0;
+      const existing = found && (!size || fs.statSync(found).size === size) ? found : undefined;
       if (existing) return res.status(409).json({ error: `You already have this file, so it was not downloaded again: ${existing}` });
       const [publisher, repoName] = repo.split("/");
       const dest = path.join(opts.getModelsDir(), publisher, repoName, path.basename(file));
@@ -163,6 +219,14 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
     const job = jobs.get(req.params.id);
     if (job?.status === "running") { job.abort?.abort(); job.status = "cancelled"; job.message = "Cancelled"; }
     res.json({ status: "success" });
+  });
+
+  // ComfyUI's models folder and which sub-folders (checkpoints, loras, vae...) it has.
+  app.get("/api/hub/comfy-dirs", (req, res) => {
+    const root = opts.getComfyModelsDir();
+    let folders: string[] = [];
+    try { if (root) folders = fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name); } catch {}
+    res.json({ root, folders });
   });
 
   app.get("/api/hub/dirs", (req, res) => {
