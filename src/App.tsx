@@ -320,7 +320,7 @@ export default function App() {
                   // Create a new chat if none is active
                   const newChat: Chat = {
                     id: Date.now().toString(),
-                    title: "Voice Conversation",
+                    title: "Cursed_Pirate conversation",
                     messages: [msg],
                     createdAt: Date.now(),
                     updatedAt: Date.now(),

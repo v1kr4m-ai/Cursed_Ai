@@ -26,7 +26,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image); saved to `outputs/` with the same history (delete, open file location) |
 | **Settings** | Sampling params, voice engine (browser vs. local Whisper), GGUF folder with a folder browser, threads/context size |
 
-**Live voice assistant** (the floating bot button): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and is spoken aloud, then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
+**Cursed_Pirate, the live voice assistant** (the floating bot button): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and is spoken aloud, then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
 
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).
 
