@@ -35,7 +35,9 @@ Voice has two engines: the browser's Web Speech API (fast, not fully offline) or
 ## Current status
 
 **Verified working**
-- Web chat (with saved history and scrolling), live voice assistant (browser engine, tested with the real microphone), memory/RAG, model download/delete, engine controls, console, local Whisper transcription.
+- Web chat (with saved history and scrolling), live voice assistant (browser engine, tested with the real microphone), memory/RAG, engine controls, console, local Whisper transcription.
+- **Models tab, end to end:** search Hugging Face, download a GGUF (progress + cancel), then chat with it through the built-in llama.cpp engine; search the Ollama library and pull a model through the Ollama app; capability flags and flag filters; nested LM Studio-style folders are found.
+- **Attachments:** PDF and text files read and answered correctly; images reach vision models in Ollama (`llava` answered a colour question correctly).
 - Local ComfyUI **image** (txt2img + img2img) and **video** (LTX-Video text-to-video, mp4) — all tested end-to-end against a real ComfyUI, including the saved-history gallery and a "generated" popup. A "Start ComfyUI" button launches it from a folder you choose (checks first; does nothing if already running).
 - Android: real llama.cpp loading a real GGUF and generating tokens on-device (emulator-tested).
 
@@ -43,6 +45,10 @@ Voice has two engines: the browser's Web Speech API (fast, not fully offline) or
 - Cloud image/video (Gemini/Imagen/Veo): error handling verified, real generation needs your `GEMINI_API_KEY`.
 
 **Known gaps**
+- The Ollama Library view reads ollama.com's search page (the site has no public search API), so a redesign of that page could break it. Hugging Face uses its documented API.
+- Capability flags are best-effort guesses from model names, Ollama's labels and Hugging Face tags; some will be wrong.
+- Hugging Face downloads support single-file GGUFs only (split `-0000N-of-0000M` files are listed but disabled) and gated repos need an `HF_TOKEN`.
+- Images in chat only work with vision models served by Ollama or LM Studio; local `.gguf` chat ignores them. Scanned PDFs are not OCR'd.
 - **Android parity**: the Android backend (Kotlin) does not have the newer endpoints (console, image, video, Whisper, models-folder config) — those tabs fail cleanly there until mirrored.
 - **Android inference** is CPU-only (Vulkan is wired but off; needs the Vulkan SDK), single-turn (no chat history threaded to the native layer yet), no vision/speech models.
 - No automated test suite; verification so far is manual and scripted.
@@ -105,12 +111,15 @@ CPU inference on an unaccelerated emulator is very slow (tens of seconds per tok
 src/                     React app (chat, models, voice, memory, engine, console, image, video, settings)
 components/ui/           shadcn-style primitives
 server.ts                Express API: chat (SSE), memory, models, engine, config, console, voice,
-                         image/video (Gemini + ComfyUI), filesystem browse
+                         image/video (Gemini + ComfyUI), attachments, filesystem browse
+hub.ts                   Model catalog: Hugging Face + Ollama search, background downloads
+src/lib/modelTags.ts     Capability-flag inference (shared by server and UI)
+start.bat                Windows launcher (frees port 3000, opens the browser, runs the dev server)
 android/                 Kotlin app, Ktor server, JNI bridge, vendored llama.cpp (CMake/NDK)
 models/                  Local GGUF storage (gitignored)
 ```
 
-Stack: React 19, TypeScript, Vite 6, Tailwind 4 · Express · `node-llama-cpp` · `@xenova/transformers` (embeddings + Whisper) · `@google/genai` · llama.cpp/GGML · Kotlin/Ktor.
+Stack: React 19, TypeScript, Vite 6, Tailwind 4 · Express · `node-llama-cpp` · `@xenova/transformers` (embeddings + Whisper) · `@google/genai` · `unpdf` + `mammoth` (PDF / DOCX text) · llama.cpp/GGML · Kotlin/Ktor.
 
 Local image/video work by POSTing hardcoded node graphs to ComfyUI's API (`/prompt`, `/history`, `/view`) and polling for the result.
 
