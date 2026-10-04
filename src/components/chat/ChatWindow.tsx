@@ -312,7 +312,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            className="absolute bottom-full mb-2 left-0 w-64 glass border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-20"
+            className="absolute bottom-full mb-2 left-0 w-72 max-h-80 overflow-y-auto bg-zinc-950 border border-white/15 rounded-2xl shadow-2xl shadow-black/60 z-50"
           >
             {models.map((m) => (
               <button
@@ -324,7 +324,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
                 }}
                 className={cn(
                   "w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors",
-                  m.isDownloaded ? "hover:bg-white/5 text-zinc-200" : "text-zinc-600 cursor-not-allowed"
+                  m.isDownloaded ? "hover:bg-white/5 text-zinc-200" : "text-zinc-500 cursor-not-allowed"
                 )}
               >
                 <div>
