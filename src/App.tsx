@@ -10,6 +10,8 @@ import { ChatWindow } from "./components/chat/ChatWindow";
 import { ModelManager } from "./components/models/ModelManager";
 import { inferFlags } from "./lib/modelTags";
 import { parseSize } from "./lib/ramFit";
+import { SystemBar } from "./components/layout/SystemBar";
+import { ToastHost } from "./components/layout/ToastHost";
 import { VisionView } from "./components/tools/VisionView";
 import { VoiceAssistant } from "./components/voice/VoiceAssistant";
 import { MemoryView, SettingsView, EngineView } from "./components/tools/ExtraViews";
@@ -170,7 +172,7 @@ export default function App() {
     apiEnabled: false,
     memoryEnabled: true,
     voiceEnabled: true,
-    voiceEngine: "browser",
+    voiceEngine: "auto",
     temperature: 0.7,
     topP: 0.9,
     maxTokens: 1024,
@@ -292,6 +294,7 @@ export default function App() {
     <TooltipProvider>
       <div className="flex h-screen bg-[#050505] text-[#e5e5e5] overflow-hidden font-sans selection:bg-violet-500/30 selection:text-violet-400 p-4 gap-4">
         <div className="atmosphere"></div>
+        <ToastHost activeTab={activeTab} onNavigate={setActiveTab} />
         {/* Desktop Sidebar */}
         <div className="hidden md:block h-full">
           <Sidebar
@@ -311,6 +314,7 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
+          <SystemBar />
           {!serverUp && (
             <div className="mx-2 mb-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
@@ -346,8 +350,9 @@ export default function App() {
             {activeTab === "memory" && <MemoryView />}
             {activeTab === "engine" && <EngineView />}
             {activeTab === "console" && <ConsoleView />}
-            {activeTab === "image" && <ImageGeneratorView />}
-            {activeTab === "video" && <VideoGeneratorView />}
+            {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
+            <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView /></div>
+            <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView /></div>
             {activeTab === "settings" && (
               <SettingsView 
                 settings={settings} 

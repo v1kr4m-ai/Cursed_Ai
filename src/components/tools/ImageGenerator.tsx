@@ -2,7 +2,8 @@ import React from "react";
 import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
-import { GalleryHistory, Toast } from "./GalleryHistory";
+import { GalleryHistory } from "./GalleryHistory";
+import { notify } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
 
 type Source = "cloud" | "local";
@@ -19,7 +20,7 @@ export function ImageGeneratorView() {
   const [prompt, setPrompt] = React.useState("");
   const [negativePrompt, setNegativePrompt] = React.useState("");
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [toast, setToast] = React.useState<string | null>(null);
+  const setToast = (m: string | null) => { if (m) notify({ message: m, tab: "image" }); };
   const [isGenerating, setIsGenerating] = React.useState(false);
   const abortRef = React.useRef<AbortController | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -227,7 +228,6 @@ export function ImageGeneratorView() {
 
         <div className="flex-1 overflow-y-auto pb-10">
           <GalleryHistory kind="image" refreshKey={refreshKey} />
-          <Toast message={toast} onDone={() => setToast(null)} />
         </div>
       </div>
     </div>

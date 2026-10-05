@@ -37,7 +37,9 @@ import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
 import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
+import { resolveEngine, speechInputAvailable } from "../../services/voiceEngine";
 import { cn } from "@/lib/utils";
+import { notify } from "../../lib/notify";
 
 interface ChatWindowProps {
   chat: Chat | null;
@@ -115,10 +117,11 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const dictationRef = useRef<any>(null);
   const localRecorderRef = useRef<LocalVoiceRecorder | null>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
-  const speechSupported = typeof window !== "undefined" &&
-    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-  const whisperSupported = LocalVoiceRecorder.isSupported;
-  const dictationSupported = settings.voiceEngine === "whisper" ? whisperSupported : speechSupported;
+  // Dictation works in every browser and offline: the browser's recognizer when it exists and is online,
+  // otherwise the local Whisper model (which listens until you stop talking).
+  const [browserSpeechFailed, setBrowserSpeechFailed] = useState(false);
+  const engine = resolveEngine(settings.voiceEngine, browserSpeechFailed);
+  const dictationSupported = speechInputAvailable();
 
   useEffect(() => {
     if (!showModelPicker) return;
@@ -131,38 +134,35 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [showModelPicker]);
 
-  const toggleDictation = async () => {
-    if (!dictationSupported) return;
-
-    if (settings.voiceEngine === "whisper") {
-      if (isDictating) {
-        setIsDictating(false);
-        setIsTranscribing(true);
-        try {
-          const text = await localRecorderRef.current?.stopAndTranscribe();
-          if (text) setInput(text);
-        } catch (e) {
-          console.error("Local transcription failed:", e);
-        } finally {
-          setIsTranscribing(false);
-        }
-        return;
-      }
-      localRecorderRef.current = new LocalVoiceRecorder();
-      try {
-        await localRecorderRef.current.start();
-        setIsDictating(true);
-      } catch (e) {
-        console.error("Failed to start recording:", e);
-      }
-      return;
-    }
-
-    if (isDictating) {
-      dictationRef.current?.stop();
+  const startWhisperDictation = async () => {
+    const recorder = new LocalVoiceRecorder();
+    localRecorderRef.current = recorder;
+    setIsDictating(true);
+    setAttachMsg(null);
+    try {
+      const text = await recorder.listenOnce({
+        onEnd: () => { setIsDictating(false); setIsTranscribing(true); },
+      });
+      if (text) setInput(prev => (prev ? prev + " " : "") + text);
+    } catch (e: any) {
+      const blocked = /permission|denied|notallowed/i.test(String(e?.name) + String(e?.message));
+      setAttachMsg(blocked ? "Microphone blocked - allow it for this site (lock icon in the address bar)." : `Voice input failed: ${e?.message || e}`);
+    } finally {
       setIsDictating(false);
+      setIsTranscribing(false);
+      localRecorderRef.current = null;
+    }
+  };
+
+  const toggleDictation = async () => {
+    if (!dictationSupported || isTranscribing) return;
+
+    if (isDictating) {            // second click = stop now
+      if (engine === "whisper") localRecorderRef.current?.finish();
+      else { dictationRef.current?.stop(); setIsDictating(false); }
       return;
     }
+    if (engine === "whisper") return startWhisperDictation();
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -170,13 +170,15 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     recognition.interimResults = true;
     recognition.lang = "en-US";
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((r: any) => r[0].transcript)
-        .join("");
+      const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join("");
       setInput(transcript);
     };
     recognition.onend = () => setIsDictating(false);
-    recognition.onerror = () => setIsDictating(false);
+    recognition.onerror = (e: any) => {
+      setIsDictating(false);
+      // No internet (or the browser's speech service is down): switch to the offline model and carry on.
+      if (e?.error === "network" || e?.error === "service-not-allowed") { setBrowserSpeechFailed(true); startWhisperDictation(); }
+    };
     dictationRef.current = recognition;
     setIsDictating(true);
     recognition.start();
@@ -303,6 +305,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           memoryEnabled: settings.memoryEnabled
         }
       );
+      if (!controller.signal.aborted && finalContent) notify({ message: "Your chat reply is ready", tab: "chat", onlyIfAway: true });
       // Stopped before any text arrived: leave a note instead of an empty bubble.
       if (controller.signal.aborted && !finalContent) {
         const msgs = [...updatedChat.messages];

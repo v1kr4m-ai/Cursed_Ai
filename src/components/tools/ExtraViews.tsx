@@ -742,25 +742,22 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                     <div className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-all">
                        <div className="space-y-1">
                           <Label className="text-zinc-100 font-bold tracking-tight">Voice Engine</Label>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-zinc-500 max-w-md">
                             {settings.voiceEngine === "whisper"
-                              ? "Real local Whisper model, fully offline (first use downloads ~40MB, then runs on-device)."
-                              : "Browser's built-in speech recognition — fast, but not fully offline."}
+                              ? "Always use the local Whisper model: works in every browser and fully offline (first use downloads ~40MB, then runs on this PC)."
+                              : settings.voiceEngine === "browser"
+                                ? "Use the browser's built-in recognizer (Chrome/Edge, needs internet). Falls back to Whisper when that isn't possible."
+                                : "Automatic: the browser's live recognizer when it's available and online, otherwise the offline Whisper model - the microphone always works."}
                           </p>
                        </div>
                        <div className="flex gap-2 shrink-0 ml-4">
-                          <button
-                            onClick={() => setSettings({ ...settings, voiceEngine: "browser" })}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${settings.voiceEngine === "browser" ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
-                          >
-                            Browser
-                          </button>
-                          <button
-                            onClick={() => setSettings({ ...settings, voiceEngine: "whisper" })}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${settings.voiceEngine === "whisper" ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
-                          >
-                            Local Whisper
-                          </button>
+                          {([["auto", "Auto"], ["browser", "Browser"], ["whisper", "Offline (Whisper)"]] as const).map(([id, label]) => (
+                            <button
+                              key={id}
+                              onClick={() => setSettings({ ...settings, voiceEngine: id })}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${settings.voiceEngine === id ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}
+                            >{label}</button>
+                          ))}
                        </div>
                     </div>
                   )}

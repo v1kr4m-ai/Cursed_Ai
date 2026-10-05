@@ -69,7 +69,7 @@ export interface AppSettings {
   voiceEnabled: boolean;
   /** 'browser' = Web Speech API (fast, needs Chrome + isn't fully offline).
    *  'whisper' = real local Whisper model via /api/voice/transcribe (offline, slower). */
-  voiceEngine: 'browser' | 'whisper';
+  voiceEngine: 'auto' | 'browser' | 'whisper';
   temperature: number;
   topP: number;
   maxTokens: number;

@@ -79,8 +79,61 @@ export class LocalVoiceRecorder {
     return data.text || "";
   }
 
+  private endListening: (() => void) | null = null;
+  private cancelled = false;
+
+  /**
+   * Hands-free capture: records until you stop talking (or the wait/length limit), then transcribes locally.
+   * Resolves "" if nothing was said. Works in any browser with a microphone, no internet needed.
+   */
+  async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
+    const { onLevel, onSpeechStart, onEnd, silenceMs = 1300, maxWaitMs = 10000, maxMs = 30000 } = opts;
+    this.cancelled = false;
+    await this.start();
+    const AudioCtx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AudioCtx();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    ctx.createMediaStreamSource(this.stream!).connect(analyser);
+    const buf = new Float32Array(analyser.fftSize);
+    const t0 = performance.now();
+    let noise = 0.01, spoke = false, lastLoud = 0;
+
+    await new Promise<void>((resolve) => {
+      this.endListening = resolve;
+      const timer = setInterval(() => {
+        analyser.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (const v of buf) sum += v * v;
+        const rms = Math.sqrt(sum / buf.length);
+        const now = performance.now();
+        if (now - t0 < 400) noise = Math.max(noise * 0.9, rms); // learn the room's background level first
+        const threshold = Math.max(0.02, noise * 2.5);
+        onLevel?.(Math.min(1, rms * 8));
+        if (rms > threshold) {
+          if (!spoke) { spoke = true; onSpeechStart?.(); }
+          lastLoud = now;
+        }
+        const quietFor = now - lastLoud;
+        if ((spoke && quietFor > silenceMs) || (!spoke && now - t0 > maxWaitMs) || now - t0 > maxMs) resolve();
+      }, 60);
+      const done = this.endListening;
+      this.endListening = () => { clearInterval(timer); done?.(); };
+    });
+    this.endListening = null;
+    ctx.close();
+    if (this.cancelled || !spoke) { this.cancel(); return ""; }
+    onEnd?.(); // the caller can show "transcribing..." while Whisper works
+    return this.stopAndTranscribe();
+  }
+
+  /** End the current listenOnce right now (what was said so far is still transcribed). */
+  finish(): void { this.endListening?.(); }
+
   cancel(): void {
-    this.mediaRecorder?.stop();
+    this.cancelled = true;
+    this.endListening?.();
+    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") this.mediaRecorder.stop();
     this.stream?.getTracks().forEach(t => t.stop());
     this.stream = null;
     this.mediaRecorder = null;

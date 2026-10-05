@@ -1,5 +1,6 @@
 import { registerHub, modelDirs } from "./hub";
 import { createLocalModels, shortHash } from "./localModels";
+import { registerSystemStats } from "./systemStats";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -337,6 +338,7 @@ async function startServer() {
   }
 
   app.get("/api/health", (req, res) => res.json({ ok: true }));
+  registerSystemStats(app);
 
   app.get("/api/external-models", async (req, res) => {
     res.json(await listExternalModels());

@@ -29,7 +29,11 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 **Cursed_Pirate, the live voice assistant** (the floating bot button, shown on every page; drag it - or the open panel by its header - anywhere, and its position is remembered): speak and your words appear live on screen; when you pause, the phrase goes to the model, the reply streams in and **is spoken sentence by sentence as it is written** (no waiting for the full answer), then it listens again. Conversation is added to the chat. If something is wrong (mic blocked, no speech reaching the browser, model error) it says so instead of failing silently.
 
+**Live status bar:** a strip at the top of every page shows real-time CPU, RAM, GPU, VRAM and temperature (GPU load/VRAM/temperature need an NVIDIA GPU with `nvidia-smi`; Windows offers no CPU temperature without extra tools, so Temp is the GPU's). **Popups** announce a finished image, video or (when you are on another page or tab) chat reply, and clicking one opens the right page; Image and Video pages stay alive in the background so a running job still reports.
+
 **Stop buttons and errors:** every long job can be stopped - chat (Stop button or Esc), image generation (also cancels the job inside ComfyUI), video generation, model downloads, Vision. A red banner appears if the local server stops answering, Models explains when Ollama / LM Studio are off, and failures show plain-language messages with the next step.
+
+Voice works **in every browser and fully offline**: the browser's live recognizer is used when it exists and you are online (Chrome/Edge); otherwise - Firefox, Safari without speech support, or no internet - the app switches by itself to the local Whisper model, which listens until you stop talking, transcribes on this PC and carries on hands-free. Chat dictation and the Cursed_Pirate assistant both do this (Settings -> Voice Engine: Auto / Browser / Offline). The microphone itself needs `localhost` or HTTPS.
 
 Voice has two engines: the browser's Web Speech API (fast, not fully offline) or **local Whisper** (transformers.js, fully offline, on-device).
 

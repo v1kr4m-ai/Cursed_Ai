@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { LocalVoiceRecorder } from "../../services/localVoice";
+import { resolveEngine } from "../../services/voiceEngine";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
@@ -25,10 +26,14 @@ const ERROR_TEXT: Record<string, string> = {
  * Live voice conversation. Browser engine: continuous listening with interim
  * results shown as you speak; a finished phrase is sent to the model, the
  * reply streams on screen and is spoken aloud, then it listens again.
- * Local Whisper engine can't stream partial text, so it's tap-to-talk.
+ * Without a usable browser recognizer (other browsers, or no internet) it switches to the local Whisper model:
+ * still hands-free - it listens until you stop talking, transcribes on this PC, then replies - fully offline.
  */
 export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceAssistantProps) {
-  const usingWhisper = settings.voiceEngine === "whisper";
+  const [browserFailed, setBrowserFailed] = useState(false);
+  const usingWhisper = resolveEngine(settings.voiceEngine, browserFailed) === "whisper";
+  const [level, setLevel] = useState(0);              // microphone loudness while listening offline
+  const [transcribing, setTranscribing] = useState(false);
 
   const [state, setState] = useState<VoiceState>("off");
   const [live, setLive] = useState("");            // what you're saying right now
@@ -53,7 +58,6 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   // Refs mirror state for event handlers bound once (avoids stale closures).
   const stateRef = useRef<VoiceState>("off");
@@ -94,10 +98,35 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     synth.speak(u);
   }, []);
 
+  // Offline listening: record until you stop talking, transcribe locally, then run the turn (which listens again).
+  const startListeningRef = useRef<() => void>(() => {});
+  const whisperListen = async () => {
+    if (!activeRef.current) return;
+    setLive("");
+    setTranscribing(false);
+    setVoiceState("listening");
+    const rec = new LocalVoiceRecorder();
+    recorderRef.current = rec;
+    try {
+      const text = await rec.listenOnce({ onLevel: setLevel, onEnd: () => setTranscribing(true) });
+      setTranscribing(false);
+      setLevel(0);
+      if (!activeRef.current) return;
+      if (text.trim()) { setLive(text.trim()); runTurnRef.current(text.trim()); }
+      else setTimeout(() => startListeningRef.current(), 0); // nothing said - keep listening
+    } catch (e: any) {
+      setTranscribing(false);
+      const blocked = /permission|denied|notallowed/i.test(String(e?.name) + String(e?.message));
+      setError(blocked ? ERROR_TEXT["not-allowed"] : e?.message || String(e));
+      activeRef.current = false;
+      setVoiceState("off");
+    }
+  };
+
   const startListening = useCallback(() => {
     if (!activeRef.current) return;
     setLive("");
-    if (usingWhisper) { setVoiceState("off"); return; } // tap-to-talk, handled in the button
+    if (usingWhisper) { void whisperListen(); return; }
     const rec = recognitionRef.current;
     if (!rec) return;
     try {
@@ -107,6 +136,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
       /* already started */
     }
   }, [usingWhisper]);
+  startListeningRef.current = startListening;
 
   // One full turn: send text to the model with history, stream + speak the reply.
   const runTurn = useCallback(async (text: string) => {
@@ -206,6 +236,12 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     };
     rec.onerror = (e: any) => {
       if (e.error === "no-speech" || e.error === "aborted") return; // normal silence
+      if (e.error === "network") {  // no internet: carry on with the offline model
+        setBrowserFailed(true);
+        setError("No internet for browser speech - switched to the offline voice model.");
+        if (activeRef.current) setTimeout(() => startListeningRef.current(), 100);
+        return;
+      }
       setError(ERROR_TEXT[e.error] || `Speech recognition error: ${e.error}`);
       if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
         activeRef.current = false;
@@ -238,14 +274,6 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     recorderRef.current?.cancel();
   }, []);
 
-  // Whisper recording timer
-  useEffect(() => {
-    if (!usingWhisper || state !== "listening") { setRecordingSeconds(0); return; }
-    const start = Date.now();
-    const t = setInterval(() => setRecordingSeconds(Math.floor((Date.now() - start) / 1000)), 250);
-    return () => clearInterval(t);
-  }, [usingWhisper, state]);
-
   const stopAll = () => {
     activeRef.current = false;
     abortRef.current?.abort();
@@ -258,23 +286,6 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
 
   const toggleConversation = async () => {
     setError(null);
-    if (usingWhisper) {
-      // tap-to-talk
-      if (stateRef.current === "listening") {
-        setVoiceState("thinking");
-        try {
-          const text = await recorderRef.current?.stopAndTranscribe();
-          setLive(text || "");
-          if (text) { activeRef.current = true; await runTurn(text); activeRef.current = false; setVoiceState("off"); return; }
-        } catch (e: any) { setError(e.message); }
-        setVoiceState("off");
-        return;
-      }
-      recorderRef.current = new LocalVoiceRecorder();
-      try { await recorderRef.current.start(); setLive(""); setReply(""); setVoiceState("listening"); }
-      catch (e: any) { setError(ERROR_TEXT["not-allowed"]); }
-      return;
-    }
     if (activeRef.current) return stopAll();
     activeRef.current = true;
     startListening();
@@ -283,10 +294,10 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const on = state !== "off";
   const closePanel = () => { stopAll(); setOpen(false); };
   const label =
-    state === "listening" ? (usingWhisper ? `Recording... ${recordingSeconds}s — tap to transcribe` : "Listening — just speak")
+    state === "listening" ? (transcribing ? "Transcribing..." : usingWhisper ? "Listening (offline) - just speak" : "Listening — just speak")
     : state === "thinking" ? "Thinking..."
     : state === "speaking" ? "Speaking..."
-    : usingWhisper ? "Tap the mic, talk, tap again" : "Press Start to begin a live conversation";
+    : "Press Start to begin a live conversation";
 
   // --- Floating position (draggable, remembered, always kept on screen) ---
   const FAB = 56, M = 8;
@@ -398,7 +409,9 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         <AnimatePresence>
           {state === "listening" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex gap-1.5 h-8 items-center">
-              {[1, 2, 3, 4, 5].map(i => (
+              {usingWhisper && !transcribing ? (
+                <div className="w-40 h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-violet-400 transition-all duration-100" style={{ width: `${Math.max(4, level * 100)}%` }} /></div>
+              ) : [1, 2, 3, 4, 5].map(i => (
                 <motion.div key={i} animate={{ height: [8, 28, 8] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }} className="w-1.5 bg-violet-400 rounded-full" />
               ))}
             </motion.div>
@@ -416,7 +429,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
           className={`h-16 rounded-2xl px-8 font-bold gap-3 shadow-xl ${state === "listening" ? "bg-red-500 hover:bg-red-600" : "bg-violet-600 hover:bg-violet-500"} text-white`}
         >
           {state === "listening" ? <MicOff size={22} /> : <Mic size={22} />}
-          {usingWhisper ? (state === "listening" ? "Stop & transcribe" : "Talk") : on ? "Listening..." : "Start conversation"}
+          {on ? "Listening..." : "Start conversation"}
         </Button>
         {state === "speaking" && (
           <Button variant="ghost" onClick={() => { speechRef.current.skipped = true; window.speechSynthesis.cancel(); }} className="text-zinc-400 gap-2 text-xs">

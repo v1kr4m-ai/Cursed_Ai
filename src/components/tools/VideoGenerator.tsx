@@ -3,7 +3,8 @@ import { Clapperboard, Loader2, AlertTriangle, Globe, Clock, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { VideoJob } from "../../types";
-import { GalleryHistory, Toast } from "./GalleryHistory";
+import { GalleryHistory } from "./GalleryHistory";
+import { notify } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
 
 type Source = "cloud" | "local";
@@ -19,7 +20,7 @@ export function VideoGeneratorView() {
   const [prompt, setPrompt] = React.useState("");
   const [jobs, setJobs] = React.useState<VideoJob[]>([]);
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [toast, setToast] = React.useState<string | null>(null);
+  const setToast = (m: string | null) => { if (m) notify({ message: m, tab: "video" }); };
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -244,7 +245,6 @@ export function VideoGeneratorView() {
             </div>
           ))}
           <GalleryHistory kind="video" refreshKey={refreshKey} />
-          <Toast message={toast} onDone={() => setToast(null)} />
         </div>
       </div>
     </div>
