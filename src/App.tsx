@@ -10,6 +10,7 @@ import { ChatWindow } from "./components/chat/ChatWindow";
 import { ModelManager } from "./components/models/ModelManager";
 import { inferFlags } from "./lib/modelTags";
 import { parseSize } from "./lib/ramFit";
+import { notifyError, notify } from "./lib/notify";
 import { SystemBar } from "./components/layout/SystemBar";
 import { ToastHost } from "./components/layout/ToastHost";
 import { VisionView } from "./components/tools/VisionView";
@@ -95,6 +96,12 @@ export default function App() {
     const t = setInterval(ping, 4000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+  const wasUp = useRef(true);
+  useEffect(() => {
+    if (wasUp.current && !serverUp) notifyError("Lost connection to the Cursed_Ai server - start it again with start.bat.");
+    if (!wasUp.current && serverUp) notify("Server connection restored");
+    wasUp.current = serverUp;
+  }, [serverUp]);
   const downloadControllers = useRef(new Map<string, AbortController>());
   const [models, setModels] = useState<AIModel[]>(INITIAL_MODELS);
   const [selectedModelId, setSelectedModelId] = useState("phi-3-mini");

@@ -17,4 +17,7 @@ export function resolveEngine(pref: VoiceEnginePref | undefined, browserFailed =
 }
 
 /** Can this device capture speech at all (either way)? */
+/** True when the browser says it is online (re-evaluated every call, so coming back online switches back by itself). */
+export const isOnline = () => typeof navigator === "undefined" || navigator.onLine !== false;
+
 export const speechInputAvailable = () => browserSpeechAvailable() || LocalVoiceRecorder.isSupported;

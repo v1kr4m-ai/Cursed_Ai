@@ -338,6 +338,19 @@ async function startServer() {
   }
 
   app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+  // Load the offline speech model and run one tiny dummy pass now, so the first spoken sentence is not slow.
+  ensureTranscriber().then(t => t(new Float32Array(16000), { max_new_tokens: 4 })).then(() => console.log("[Voice] Offline speech model warmed up.")).catch(() => { /* first real use will report the problem */ });
+
+  // What the built-in engine actually runs on (GPU backend picked by llama.cpp, or CPU).
+  app.get("/api/engine/gpu", async (req, res) => {
+    try {
+      const l: any = await ensureLlama();
+      res.json({ backend: l.gpu || "cpu", devices: await l.getGpuDeviceNames().catch(() => []) });
+    } catch (e: any) {
+      res.json({ backend: "unknown", devices: [] });
+    }
+  });
   registerSystemStats(app);
 
   app.get("/api/external-models", async (req, res) => {
@@ -830,7 +843,9 @@ async function startServer() {
     try {
       const t = await ensureTranscriber();
       const samples = new Float32Array(req.body.buffer, req.body.byteOffset, req.body.length / 4);
-      const result = await t(samples);
+      const t0 = Date.now();
+      const result = await t(samples, { max_new_tokens: 96, return_timestamps: false });
+      console.log(`[Voice] whisper inference ${Date.now() - t0} ms`);
       const text = Array.isArray(result) ? result.map((r: any) => r.text).join(" ") : result.text;
       console.log(`[Voice] Transcribed ${samples.length} samples (~${(samples.length / 16000).toFixed(1)}s) -> "${(text || "").slice(0, 60)}..."`);
       res.json({ text: text || "" });
@@ -1073,8 +1088,37 @@ async function startServer() {
     } catch { /* ComfyUI gone - nothing left to cancel */ }
   }
 
-  async function runComfyWorkflow(workflow: Record<string, any>, outputNodeId: string, signal?: AbortSignal): Promise<any> {
+  // Live progress of running jobs, polled by the UI: token -> { percent (null = unknown), label }.
+  const progressMap = new Map<string, { percent: number | null; label: string; at: number }>();
+  const setProgress = (token: string | undefined, percent: number | null, label: string) => { if (token) progressMap.set(token, { percent, label, at: Date.now() }); };
+  app.get("/api/progress/:token", (req, res) => res.json(progressMap.get(req.params.token) || { percent: null, label: "Starting..." }));
+  setInterval(() => { for (const [k, v] of progressMap) if (Date.now() - v.at > 600000) progressMap.delete(k); }, 60000).unref();
+
+  // ComfyUI reports sampler steps over its websocket; relay them so the UI can show a real bar.
+  async function runComfyWorkflow(workflow: Record<string, any>, outputNodeId: string, signal?: AbortSignal, progressToken?: string): Promise<any> {
     const clientId = crypto.randomUUID();
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(`${COMFYUI_URL.replace(/^http/, "ws")}/ws?clientId=${clientId}`);
+      ws.onmessage = (ev: MessageEvent) => {
+        if (typeof ev.data !== "string") return;
+        try {
+          const m = JSON.parse(ev.data);
+          if (m.type === "progress" && m.data?.max) setProgress(progressToken, Math.round((m.data.value / m.data.max) * 100), `Step ${m.data.value} of ${m.data.max}`);
+          else if (m.type === "execution_start") setProgress(progressToken, 0, "Loading model...");
+          else if (m.type === "executing" && m.data?.node) setProgress(progressToken, null, "Working...");
+        } catch { /* not JSON */ }
+      };
+    } catch { /* progress is a nicety; the job still runs */ }
+    setProgress(progressToken, null, "Queued...");
+    try {
+      return await runComfyWorkflowCore(workflow, outputNodeId, signal, progressToken, clientId);
+    } finally {
+      try { ws?.close(); } catch { /* already closed */ }
+    }
+  }
+
+  async function runComfyWorkflowCore(workflow: Record<string, any>, outputNodeId: string, signal: AbortSignal | undefined, progressToken: string | undefined, clientId: string): Promise<any> {
     const queueResp = await comfyFetch("/prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1099,6 +1143,7 @@ async function startServer() {
         throw new Error("ComfyUI workflow failed - check the ComfyUI console/terminal for the exact node error");
       }
       if (entry.outputs?.[outputNodeId]) {
+        setProgress(progressToken, 100, "Finishing...");
         return entry.outputs[outputNodeId];
       }
     }
@@ -1261,7 +1306,7 @@ async function startServer() {
       workflow["8"] = { class_type: "VAEDecode", inputs: { samples: ["3", 0], vae: ["4", 2] } };
       workflow["9"] = { class_type: "SaveImage", inputs: { filename_prefix: "cursed", images: ["8", 0] } };
 
-      const output = await runComfyWorkflow(workflow, "9", ctl.signal);
+      const output = await runComfyWorkflow(workflow, "9", ctl.signal, req.body.token);
       const img = output?.images?.[0];
       if (!img) throw new Error("ComfyUI returned no image output");
       const buffer = await fetchComfyFile(img.filename, img.subfolder, img.type);
@@ -1350,7 +1395,7 @@ async function startServer() {
         workflow["13"] = { class_type: "CreateVideo", inputs: { images: ["12", 0], fps: frameRate } };
         workflow["14"] = { class_type: "SaveVideo", inputs: { video: ["13", 0], filename_prefix: "video/cursed", format: "mp4", codec: "h264" } };
 
-        const output = await runComfyWorkflow(workflow, "14", job.abort!.signal);
+        const output = await runComfyWorkflow(workflow, "14", job.abort!.signal, id);
         // SaveVideo reports its file under "images" (with animated:true); older
         // video savers used "gifs"/"videos" - accept any.
         const videoInfo = output?.images?.[0] || output?.videos?.[0] || output?.gifs?.[0];
@@ -1387,8 +1432,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Cursed Local API running on http://localhost:${PORT}`);
+  // Listen on IPv6 + IPv4 together: "localhost" resolves to ::1 first on many systems, and an IPv4-only
+  // server makes every request wait for that attempt to fail (a ~2 s delay on Windows).
+  const onListening = () => console.log(`Cursed Local API running on http://localhost:${PORT}`);
+  const dualStack = app.listen(PORT, "::", onListening);
+  dualStack.on("error", (e: any) => {
+    if (e.code === "EAFNOSUPPORT" || e.code === "EADDRNOTAVAIL") app.listen(PORT, "0.0.0.0", onListening); // IPv6 off on this PC
+    else throw e;
   });
 }
 

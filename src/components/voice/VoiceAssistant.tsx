@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { LocalVoiceRecorder } from "../../services/localVoice";
-import { resolveEngine } from "../../services/voiceEngine";
+import { resolveEngine, isOnline } from "../../services/voiceEngine";
+import { notifyError } from "../../lib/notify";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
@@ -34,6 +35,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const usingWhisper = resolveEngine(settings.voiceEngine, browserFailed) === "whisper";
   const [level, setLevel] = useState(0);              // microphone loudness while listening offline
   const [transcribing, setTranscribing] = useState(false);
+  const [heardYou, setHeardYou] = useState(false);       // offline: speech detected
+  const [noSound, setNoSound] = useState(false);          // offline: mic is silent
 
   const [state, setState] = useState<VoiceState>("off");
   const [live, setLive] = useState("");            // what you're saying right now
@@ -41,6 +44,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
   const [history, setHistory] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (error) notifyError(error); }, [error]); // errors also pop up, even when minimised
   const readViewport = () => ({ w: Math.max(window.innerWidth, 320), h: Math.max(window.innerHeight, 400) });
   const [viewport, setViewport] = useState(readViewport);
   // Position as fractions (0..1) of the free area, so it survives window resizes.
@@ -104,12 +108,22 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     if (!activeRef.current) return;
     setLive("");
     setTranscribing(false);
+    setHeardYou(false);
+    setNoSound(false);
     setVoiceState("listening");
     const rec = new LocalVoiceRecorder();
     recorderRef.current = rec;
+    let peak = 0;
+    const startedAt = Date.now();
     try {
-      const text = await rec.listenOnce({ onLevel: setLevel, onEnd: () => setTranscribing(true) });
+      const text = await rec.listenOnce({
+        onLevel: (l) => { peak = Math.max(peak, l); setLevel(l); if (Date.now() - startedAt > 5000 && peak < 0.02) setNoSound(true); },
+        onSpeechStart: () => { setHeardYou(true); setNoSound(false); },
+        onPartial: (t) => setLive(t),            // live captions while you talk (offline)
+        onEnd: () => setTranscribing(true),
+      });
       setTranscribing(false);
+      setHeardYou(false);
       setLevel(0);
       if (!activeRef.current) return;
       if (text.trim()) { setLive(text.trim()); runTurnRef.current(text.trim()); }
@@ -288,19 +302,30 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
     setError(null);
     if (activeRef.current) return stopAll();
     activeRef.current = true;
+    if (isOnline()) setBrowserFailed(false); // internet is back: use the online recognizer again
     startListening();
   };
 
   const on = state !== "off";
-  const closePanel = () => { stopAll(); setOpen(false); };
+  // Closing just minimises to the bubble - the conversation keeps going. "End" is what stops it.
+  const closePanel = () => setOpen(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
   const label =
-    state === "listening" ? (transcribing ? "Transcribing..." : usingWhisper ? "Listening (offline) - just speak" : "Listening — just speak")
+    state === "listening" ? (transcribing ? "Transcribing..." : usingWhisper ? (heardYou ? "Hearing you..." : "Listening (offline) - just speak") : "Listening — just speak")
     : state === "thinking" ? "Thinking..."
     : state === "speaking" ? "Speaking..."
     : "Press Start to begin a live conversation";
 
   // --- Floating position (draggable, remembered, always kept on screen) ---
-  const FAB = 56, M = 8;
+  const FAB = 44, M = 8;
   const vw = viewport.w, vh = viewport.h;
   const panelW = Math.min(400, vw - 2 * M), panelH = Math.min(560, vh - 2 * M);
   const rangeX = vw - FAB - 2 * M, rangeY = vh - FAB - 2 * M;
@@ -338,20 +363,19 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         onPointerDown={(e) => beginDrag(e, "fab")}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
-        title="Cursed_Pirate (drag to move)"
+        title="Cursed_Pirate"
         style={{ left: fab.x, top: fab.y }}
-        className="fixed z-40 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform touch-none cursor-grab active:cursor-grabbing"
+        className="fixed z-40 h-11 w-11 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform touch-none cursor-grab active:cursor-grabbing"
       >
-        <Bot size={26} />
+        <Bot size={20} />
       </button>
     );
   }
 
   return (
-    <div style={{ left: panelLeft, top: panelTop, width: panelW, height: panelH }} className="fixed z-40 flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
+    <div ref={panelRef} style={{ left: panelLeft, top: panelTop, width: panelW, height: panelH }} className="fixed z-40 flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
       <div
         onPointerDown={(e) => beginDrag(e, "panel")} onPointerMove={moveDrag} onPointerUp={endDrag}
-        title="Drag to move"
         className="flex items-center justify-between mb-4 shrink-0 cursor-grab active:cursor-grabbing touch-none select-none">
         <div>
           <h1 className="text-xl font-black text-white tracking-tighter">Cursed_Pirate</h1>
@@ -365,7 +389,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
               <Power size={16} /> End
             </Button>
           )}
-          <Button onClick={closePanel} variant="ghost" title="Close" className="text-zinc-400"><X size={16} /></Button>
+          <Button onClick={closePanel} variant="ghost" title="Minimise" className="text-zinc-400"><X size={16} /></Button>
         </div>
       </div>
 
@@ -409,8 +433,20 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         <AnimatePresence>
           {state === "listening" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex gap-1.5 h-8 items-center">
-              {usingWhisper && !transcribing ? (
-                <div className="w-40 h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-violet-400 transition-all duration-100" style={{ width: `${Math.max(4, level * 100)}%` }} /></div>
+              {usingWhisper ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex items-end gap-1 h-8">
+                    {[0.5, 0.8, 1, 0.8, 0.5, 0.7, 0.9, 0.6].map((m, i) => (
+                      <div key={i} className={`w-1.5 rounded-full transition-all duration-100 ${transcribing ? "bg-amber-400 animate-pulse" : heardYou ? "bg-emerald-400" : "bg-violet-400/60"}`} style={{ height: transcribing ? 14 : Math.max(4, Math.min(32, 4 + level * 40 * m)) }} />
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5 text-[9px] font-black uppercase tracking-widest">
+                    {[["Waiting", !heardYou && !transcribing], ["Hearing", heardYou && !transcribing], ["Transcribing", transcribing]].map(([n, on]) => (
+                      <span key={n as string} className={`px-2 py-0.5 rounded-full ${on ? "bg-violet-500 text-white" : "bg-white/5 text-zinc-600"}`}>{n as string}</span>
+                    ))}
+                  </div>
+                  {noSound && <p className="text-[10px] text-amber-400 max-w-[260px] text-center">No sound is reaching the microphone - check which microphone the browser is using and that it is not muted.</p>}
+                </div>
               ) : [1, 2, 3, 4, 5].map(i => (
                 <motion.div key={i} animate={{ height: [8, 28, 8] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }} className="w-1.5 bg-violet-400 rounded-full" />
               ))}

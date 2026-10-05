@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { AIModel, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { pickFile } from "../../services/attachments";
+import { notifyError } from "../../lib/notify";
+import { ProgressBar } from "../layout/ProgressBar";
 
 /**
  * Ask a question about an image. Works with any installed model that has the
@@ -51,7 +53,7 @@ export function VisionView({ models, selectedModelId, onOpenModels }: { models: 
         modelId,
         {
           onToken: (t) => { text += t; setAnswer(text); },
-          onError: (e) => setError(e?.message || String(e)),
+          onError: (e) => { const m = e?.message || String(e); setError(m); notifyError(m, "vision"); },
           onComplete: () => {},
         },
         { signal: controller.signal, memoryEnabled: false, maxTokens: 1024 },
@@ -107,6 +109,7 @@ export function VisionView({ models, selectedModelId, onOpenModels }: { models: 
           </div>
 
           <div className="rounded-2xl bg-black/20 border border-white/5 p-5 min-h-[200px]">
+            {busy && <div className="mb-3"><ProgressBar value={null} label="The model is looking at the image..." color="bg-violet-500" /></div>}
             {error && <div className="flex items-start gap-2 text-red-400 text-xs bg-red-500/10 rounded-xl px-4 py-3 mb-3"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{error}</div>}
             {answer
               ? <p className="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">{answer}</p>

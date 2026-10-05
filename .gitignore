@@ -30,3 +30,8 @@ android/local.properties
 
 # Editor
 .vscode/
+
+# Unrelated sibling project copies kept next to the app for reference
+claude_code_Gui/
+AI_Hub_Cursed_Pirate/
+Pirate_AI_LLama_PC/

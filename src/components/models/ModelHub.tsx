@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { FlagChip, FitBadge, formatBytes } from "./flags";
+import { notify, notifyError } from "../../lib/notify";
 import { fitFor, paramsToBytes, useSystemInfo } from "../../lib/ramFit";
 
 interface HubModel {
@@ -71,7 +72,8 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
       const data = await (await fetch("/api/hub/downloads")).json();
       setJobs(data.downloads);
       for (const j of data.downloads as Job[]) {
-        if (j.status === "done" && !doneSeen.current.has(j.id)) { doneSeen.current.add(j.id); onInstalled(); }
+        if (j.status === "done" && !doneSeen.current.has(j.id)) { doneSeen.current.add(j.id); onInstalled(); notify({ message: `Model downloaded: ${j.label}`, tab: "models" }); }
+        if (j.status === "error" && !doneSeen.current.has(j.id)) { doneSeen.current.add(j.id); notifyError(`Download failed (${j.label}): ${j.error}`, "models"); }
       }
     } catch { /* server restarting */ }
   }, [onInstalled]);
@@ -86,7 +88,7 @@ export function ModelHub({ source, flag, onInstalled }: { source: "hf" | "ollama
   const start = async (body: object) => {
     setError(null);
     const resp = await fetch("/api/hub/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!resp.ok) { setError((await resp.json()).error || "Couldn't start the download"); return; }
+    if (!resp.ok) { const m = (await resp.json()).error || "Couldn't start the download"; setError(m); notifyError(m, "models"); return; }
     pollJobs();
   };
   const cancel = async (id: string) => { await fetch(`/api/hub/downloads/${id}/cancel`, { method: "POST" }); pollJobs(); };

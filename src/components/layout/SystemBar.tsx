@@ -8,18 +8,19 @@ interface Live {
   gpu: { name: string; util: number; vramUsedMB: number; vramTotalMB: number; tempC: number } | null;
 }
 
-function Tile({ label, value, text, color, hint }: { label: string; value: number | null; text: string; color: string; hint?: string }) {
+/** One small pill: a soft fill shows the level behind "LABEL value". */
+function Pill({ label, value, text, color, hint }: { label: string; value: number | null; text: string; color: string; hint?: string }) {
   const pct = value === null ? 0 : Math.min(100, Math.max(0, value));
   return (
-    <div title={hint} className="relative h-11 min-w-[78px] flex-1 max-w-[120px] rounded-lg bg-white/[0.06] border border-white/5 overflow-hidden">
-      <div className={`absolute inset-y-0 left-0 transition-all duration-700 ${color}`} style={{ width: `${pct}%`, opacity: 0.85 }} />
-      <span className="absolute right-2 top-1 text-sm font-bold text-white drop-shadow">{text}</span>
-      <span className="absolute left-2 bottom-1 text-[10px] font-medium text-white/80 drop-shadow">{label}</span>
+    <div title={hint} className="relative h-6 px-2.5 rounded-full bg-white/[0.04] border border-white/10 overflow-hidden flex items-center gap-1.5 text-[10px] leading-none">
+      <div className={`absolute inset-y-0 left-0 opacity-30 transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+      <span className="relative font-semibold text-zinc-400 tracking-wide">{label}</span>
+      <span className="relative font-bold text-zinc-100 tabular-nums">{text}</span>
     </div>
   );
 }
 
-/** Real-time CPU / RAM / GPU / VRAM / temperature readings, refreshed every 2 seconds. */
+/** Real-time CPU / RAM / GPU / VRAM / temperature readings, refreshed every 2 seconds. Small, top-right. */
 export function SystemBar() {
   const [live, setLive] = React.useState<Live | null>(null);
   const [offline, setOffline] = React.useState(false);
@@ -40,15 +41,15 @@ export function SystemBar() {
   if (!live) return null;
   const g = live.gpu;
   const vramPct = g && g.vramTotalMB ? Math.round((g.vramUsedMB / g.vramTotalMB) * 100) : null;
-  const hot = (v: number, warn: number, bad: number, ok: string) => v >= bad ? "bg-red-500" : v >= warn ? "bg-amber-500" : ok;
+  const level = (v: number, warn: number, bad: number, ok: string) => v >= bad ? "bg-red-500" : v >= warn ? "bg-amber-500" : ok;
 
   return (
-    <div className={`flex items-center gap-2 mb-2 shrink-0 ${offline ? "opacity-40" : ""}`}>
-      <Tile label="CPU" value={live.cpu} text={`${live.cpu}%`} color={hot(live.cpu, 70, 90, "bg-emerald-600")} hint="Processor load" />
-      <Tile label="RAM" value={live.ram} text={`${live.ram}%`} color={hot(live.ram, 80, 92, "bg-emerald-600")} hint={`${live.ramUsedGB.toFixed(1)} of ${live.ramTotalGB.toFixed(1)} GB in use`} />
-      <Tile label="GPU" value={g ? g.util : null} text={g ? `${g.util}%` : "n/a"} color={hot(g?.util ?? 0, 70, 90, "bg-violet-600")} hint={g ? g.name : "No NVIDIA GPU reading available"} />
-      <Tile label="VRAM" value={vramPct} text={vramPct === null ? "n/a" : `${vramPct}%`} color={hot(vramPct ?? 0, 80, 92, "bg-sky-600")} hint={g ? `${(g.vramUsedMB / 1024).toFixed(1)} of ${(g.vramTotalMB / 1024).toFixed(1)} GB video memory in use` : undefined} />
-      <Tile label="Temp" value={g ? Math.min(100, g.tempC) : null} text={g ? `${g.tempC}°` : "n/a"} color={hot(g?.tempC ?? 0, 75, 85, "bg-yellow-600")} hint="GPU temperature" />
+    <div className={`flex items-center justify-end gap-1.5 px-1 mb-1.5 shrink-0 ${offline ? "opacity-40" : ""}`}>
+      <Pill label="CPU" value={live.cpu} text={`${live.cpu}%`} color={level(live.cpu, 70, 90, "bg-emerald-500")} hint="Processor load" />
+      <Pill label="RAM" value={live.ram} text={`${live.ram}%`} color={level(live.ram, 80, 92, "bg-emerald-500")} hint={`${live.ramUsedGB.toFixed(1)} of ${live.ramTotalGB.toFixed(1)} GB in use`} />
+      <Pill label="GPU" value={g ? g.util : null} text={g ? `${g.util}%` : "n/a"} color={level(g?.util ?? 0, 70, 90, "bg-violet-500")} hint={g ? g.name : "No NVIDIA GPU reading available"} />
+      <Pill label="VRAM" value={vramPct} text={vramPct === null ? "n/a" : `${vramPct}%`} color={level(vramPct ?? 0, 80, 92, "bg-sky-500")} hint={g ? `${(g.vramUsedMB / 1024).toFixed(1)} of ${(g.vramTotalMB / 1024).toFixed(1)} GB video memory in use` : undefined} />
+      <Pill label="TEMP" value={g ? Math.min(100, g.tempC) : null} text={g ? `${g.tempC}°` : "n/a"} color={level(g?.tempC ?? 0, 75, 85, "bg-yellow-500")} hint="GPU temperature" />
     </div>
   );
 }

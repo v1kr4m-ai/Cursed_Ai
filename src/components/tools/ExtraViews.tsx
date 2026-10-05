@@ -40,6 +40,7 @@ import { AppSettings } from "../../types";
 
 import { AIService } from "../../services/aiService";
 import { FolderPickerDialog } from "./FolderPickerDialog";
+import { MicTest } from "./MicTest";
 
 export function MemoryView() {
   const [memories, setMemories] = React.useState<{ text: string, timestamp: number }[]>([]);
@@ -738,7 +739,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                      </div>
                      <Switch checked={settings.voiceEnabled} onCheckedChange={(val) => setSettings({ ...settings, voiceEnabled: val })} />
                   </div>
-                  {settings.voiceEnabled && (
+                  {settings.voiceEnabled && (<>
                     <div className="p-6 flex items-center justify-between hover:bg-white/[0.02] transition-all">
                        <div className="space-y-1">
                           <Label className="text-zinc-100 font-bold tracking-tight">Voice Engine</Label>
@@ -760,7 +761,8 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                           ))}
                        </div>
                     </div>
-                  )}
+                    <MicTest pref={settings.voiceEngine} />
+                  </>)}
                </div>
             </section>
 

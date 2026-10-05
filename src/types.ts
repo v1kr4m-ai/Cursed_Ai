@@ -1,5 +1,5 @@
 /**
- * Shared types for Cursed App
+ * Shared types for Cursed_Ai
  */
 
 export enum MessageRole {

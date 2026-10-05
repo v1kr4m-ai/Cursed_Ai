@@ -3,7 +3,8 @@ import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { GalleryHistory } from "./GalleryHistory";
-import { notify } from "../../lib/notify";
+import { notify, notifyError } from "../../lib/notify";
+import { ProgressBar } from "../layout/ProgressBar";
 import { friendlyError } from "../../services/errors";
 
 type Source = "cloud" | "local";
@@ -23,6 +24,7 @@ export function ImageGeneratorView() {
   const setToast = (m: string | null) => { if (m) notify({ message: m, tab: "image" }); };
   const [isGenerating, setIsGenerating] = React.useState(false);
   const abortRef = React.useRef<AbortController | null>(null);
+  const [progress, setProgress] = React.useState<{ percent: number | null; label: string } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   // Local (ComfyUI) only
@@ -66,11 +68,18 @@ export function ImageGeneratorView() {
     setError(null);
     const controller = new AbortController();
     abortRef.current = controller;
+    // Local (ComfyUI) generation reports real sampler steps; cloud has no percentage, so its bar just slides.
+    const token = `img-${Date.now()}`;
+    setProgress({ percent: null, label: source === "cloud" ? "Waiting for Gemini..." : "Queued..." });
+    const poll = source === "local" ? setInterval(async () => {
+      try { setProgress(await (await fetch(`/api/progress/${token}`)).json()); } catch { /* server busy */ }
+    }, 700) : null;
     try {
       const endpoint = source === "cloud" ? "/api/image/generate" : "/api/comfyui/image/generate";
       const body = source === "cloud"
         ? { prompt }
         : {
+            token,
             prompt,
             negativePrompt,
             checkpoint,
@@ -91,9 +100,11 @@ export function ImageGeneratorView() {
       setPrompt("");
     } catch (e: any) {
       if (e?.name === "AbortError") setToast("Generation stopped");
-      else setError(friendlyError(e));
+      else { const m = friendlyError(e); setError(m); notifyError(m, "image"); }
     } finally {
       abortRef.current = null;
+      if (poll) clearInterval(poll);
+      setProgress(null);
       setIsGenerating(false);
     }
   };
@@ -211,6 +222,7 @@ export function ImageGeneratorView() {
               </Button>
             )}
           </div>
+          {isGenerating && progress && <ProgressBar value={progress.percent} label={progress.label} color="bg-pink-500" />}
           {source === "local" && (
             <input
               value={negativePrompt}

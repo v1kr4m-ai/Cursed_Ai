@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { motion, AnimatePresence } from "motion/react";
 import { Chat } from "../../types";
+import { useGpuInfo } from "../../lib/gpuInfo";
 
 interface SidebarProps {
   activeTab: string;
@@ -58,6 +59,7 @@ export function Sidebar({
   onDeleteChat,
   voiceEnabled = true
 }: SidebarProps) {
+  const gpu = useGpuInfo();
   const [historySearch, setHistorySearch] = React.useState("");
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
@@ -245,8 +247,8 @@ export function Sidebar({
               <Terminal size={16} className="text-emerald-400" />
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-bold text-zinc-200 truncate">Vulkan Core</p>
-              <p className="text-[10px] text-emerald-500/70 font-medium">GPU Acceleration</p>
+              <p className="text-xs font-bold text-zinc-200 truncate">{gpu ? (gpu.backend === "cpu" ? "CPU Core" : `${gpu.backend[0].toUpperCase()}${gpu.backend.slice(1)} Core`) : "Engine"}</p>
+              <p className="text-[10px] text-emerald-500/70 font-medium truncate" title={gpu?.devices?.join(", ")}>{gpu ? (gpu.backend === "cpu" ? "No GPU in use" : "GPU Acceleration") : "Checking GPU..."}</p>
             </div>
             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse"></div>
           </div>

@@ -7,6 +7,11 @@
 
 const TARGET_SAMPLE_RATE = 16000;
 
+// Whisper writes things like [BLANK_AUDIO], (silence) or [MUSIC] for non-speech; those are not words.
+function cleanTranscript(text: string): string {
+  return text.replace(/\[[^\]]*\]|\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+}
+
 async function decodeToMono16k(blob: Blob): Promise<Float32Array> {
   const arrayBuffer = await blob.arrayBuffer();
   const AudioCtx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -81,50 +86,124 @@ export class LocalVoiceRecorder {
 
   private endListening: (() => void) | null = null;
   private cancelled = false;
+  private pcmStop: (() => void) | null = null;
+
+  /** POST 16 kHz mono samples to the local Whisper endpoint. */
+  private static async transcribe(samples: Float32Array): Promise<string> {
+    const response = await fetch("/api/voice/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: samples.buffer.slice(samples.byteOffset, samples.byteOffset + samples.byteLength) as ArrayBuffer,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Transcription failed (HTTP ${response.status})`);
+    }
+    return cleanTranscript((await response.json()).text || "");
+  }
+
+  /** Linear resample to 16 kHz. */
+  private static to16k(input: Float32Array, rate: number): Float32Array {
+    if (rate === TARGET_SAMPLE_RATE) return input;
+    const ratio = rate / TARGET_SAMPLE_RATE;
+    const out = new Float32Array(Math.floor(input.length / ratio));
+    for (let i = 0; i < out.length; i++) {
+      const pos = i * ratio, i0 = Math.floor(pos), i1 = Math.min(i0 + 1, input.length - 1);
+      out[i] = input[i0] + (input[i1] - input[i0]) * (pos - i0);
+    }
+    return out;
+  }
 
   /**
-   * Hands-free capture: records until you stop talking (or the wait/length limit), then transcribes locally.
-   * Resolves "" if nothing was said. Works in any browser with a microphone, no internet needed.
+   * Hands-free capture: records until you stop talking, then transcribes locally (no internet needed).
+   * Audio is taken as raw samples (no encode/decode step), a short pause ends the phrase, and
+   * transcription is started a moment BEFORE the pause is confirmed, so the answer is ready sooner.
+   * Resolves "" if nothing was said.
    */
-  async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
-    const { onLevel, onSpeechStart, onEnd, silenceMs = 1300, maxWaitMs = 10000, maxMs = 30000 } = opts;
+  async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onPartial?: (text: string) => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
+    const { onLevel, onSpeechStart, onPartial, onEnd, silenceMs = 650, maxWaitMs = 10000, maxMs = 30000 } = opts;
     this.cancelled = false;
-    await this.start();
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     const AudioCtx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioCtx();
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    ctx.createMediaStreamSource(this.stream!).connect(analyser);
-    const buf = new Float32Array(analyser.fftSize);
+    // Browsers can create an audio context "suspended" when it was not started by a click; wake it up.
+    try { await ctx.resume(); } catch { /* already running */ }
+    const rate = ctx.sampleRate;
+    const source = ctx.createMediaStreamSource(this.stream);
+    const proc = ctx.createScriptProcessor(2048, 1, 1);   // universal across browsers
+    const mute = ctx.createGain(); mute.gain.value = 0;    // keep the node running without playing the mic back
+    source.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+
+    const chunks: Float32Array[] = [];
     const t0 = performance.now();
-    let noise = 0.01, spoke = false, lastLoud = 0;
+    let noise = 0.008, spoke = false, speechStartIdx = 0, lastLoud = 0, quietChunks = 0;
+    let speculative: { len: number; promise: Promise<string> } | null = null;
+    let partialBusy = false, lastPartialAt = t0, finished = false;
+    const lastLoudChunk = { i: -1 };
+
+    const merge = (from: number, to: number) => {
+      const part = chunks.slice(from, to);
+      const out = new Float32Array(part.reduce((n, c) => n + c.length, 0));
+      let o = 0;
+      for (const c of part) { out.set(c, o); o += c.length; }
+      return out;
+    };
+    // Speech from ~300 ms before it was detected up to a short tail after the last loud moment.
+    const utterance = () => {
+      const pre = Math.ceil((0.3 * rate) / 2048);
+      return LocalVoiceRecorder.to16k(merge(Math.max(0, speechStartIdx - pre), Math.min(chunks.length, lastLoudChunk.i + 1 + Math.ceil((0.25 * rate) / 2048))), rate);
+    };
 
     await new Promise<void>((resolve) => {
-      this.endListening = resolve;
-      const timer = setInterval(() => {
-        analyser.getFloatTimeDomainData(buf);
+      const stop = () => { proc.onaudioprocess = null; resolve(); };
+      this.pcmStop = stop;
+      this.endListening = stop;
+      proc.onaudioprocess = (e) => {
+        const data = new Float32Array(e.inputBuffer.getChannelData(0)); // copy: the browser reuses its buffer
+        const idx = chunks.push(data) - 1;
         let sum = 0;
-        for (const v of buf) sum += v * v;
-        const rms = Math.sqrt(sum / buf.length);
+        for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+        const rms = Math.sqrt(sum / data.length);
         const now = performance.now();
-        if (now - t0 < 400) noise = Math.max(noise * 0.9, rms); // learn the room's background level first
-        const threshold = Math.max(0.02, noise * 2.5);
+        if (now - t0 < 350) noise = Math.max(noise * 0.9, rms); // learn the room's background level first
+        const threshold = Math.max(0.015, noise * 3);
         onLevel?.(Math.min(1, rms * 8));
         if (rms > threshold) {
-          if (!spoke) { spoke = true; onSpeechStart?.(); }
-          lastLoud = now;
+          if (!spoke) { spoke = true; speechStartIdx = idx; onSpeechStart?.(); }
+          lastLoud = now; lastLoudChunk.i = idx; quietChunks = 0;
+          speculative = null; // still talking: any early transcription is stale
+          // Live captions while you speak: transcribe what has been said so far every ~1.5 s.
+          if (onPartial && !partialBusy && now - lastPartialAt > 1500) {
+            partialBusy = true; lastPartialAt = now;
+            LocalVoiceRecorder.transcribe(utterance())
+              .then(t => { if (!finished && t.trim()) onPartial(t.trim()); })
+              .catch(() => {})
+              .finally(() => { partialBusy = false; });
+          }
+        } else if (spoke) {
+          quietChunks++;
+          const quietFor = now - lastLoud;
+          // Halfway to the pause: begin transcribing what we have. If you keep quiet it is already under way.
+          if (!speculative && quietFor > silenceMs * 0.5) {
+            const samples = utterance();
+            speculative = { len: samples.length, promise: LocalVoiceRecorder.transcribe(samples) };
+            speculative.promise.catch(() => {});
+          }
+          if (quietFor > silenceMs) return stop();
         }
-        const quietFor = now - lastLoud;
-        if ((spoke && quietFor > silenceMs) || (!spoke && now - t0 > maxWaitMs) || now - t0 > maxMs) resolve();
-      }, 60);
-      const done = this.endListening;
-      this.endListening = () => { clearInterval(timer); done?.(); };
+        if ((!spoke && now - t0 > maxWaitMs) || now - t0 > maxMs) stop();
+      };
     });
-    this.endListening = null;
+    finished = true;
+    this.pcmStop = null; this.endListening = null;
+    this.stream?.getTracks().forEach(t => t.stop());
+    this.stream = null;
     ctx.close();
-    if (this.cancelled || !spoke) { this.cancel(); return ""; }
+    if (this.cancelled || !spoke) return "";
     onEnd?.(); // the caller can show "transcribing..." while Whisper works
-    return this.stopAndTranscribe();
+    const final = utterance();
+    const spec = speculative as { len: number; promise: Promise<string> } | null;
+    return spec && spec.len === final.length ? spec.promise : LocalVoiceRecorder.transcribe(final);
   }
 
   /** End the current listenOnce right now (what was said so far is still transcribed). */
@@ -133,6 +212,7 @@ export class LocalVoiceRecorder {
   cancel(): void {
     this.cancelled = true;
     this.endListening?.();
+    this.pcmStop?.();
     if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") this.mediaRecorder.stop();
     this.stream?.getTracks().forEach(t => t.stop());
     this.stream = null;

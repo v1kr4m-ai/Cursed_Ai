@@ -37,9 +37,12 @@ import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
 import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
-import { resolveEngine, speechInputAvailable } from "../../services/voiceEngine";
+import { resolveEngine, speechInputAvailable, isOnline } from "../../services/voiceEngine";
 import { cn } from "@/lib/utils";
-import { notify } from "../../lib/notify";
+import { notify, notifyError, notifyWarning } from "../../lib/notify";
+import { ProgressBar } from "../layout/ProgressBar";
+import { fitFor, useSystemInfo } from "../../lib/ramFit";
+import { useGpuInfo, gpuLabel } from "../../lib/gpuInfo";
 
 interface ChatWindowProps {
   chat: Chat | null;
@@ -95,10 +98,11 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       }
     }
     setReading(false);
-    if (notes.length) setAttachMsg(notes.join(" "));
+    if (notes.length) { setAttachMsg(notes.join(" ")); notes.forEach(n => (/only the first/.test(n) ? notifyWarning(n) : notifyError(n))); }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
   const canSend = (!!input.trim() || pending.length > 0) && !reading;
+  const gpu = useGpuInfo();
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const toggleSpeak = (id: string, text: string) => {
     const synth = window.speechSynthesis;
@@ -120,6 +124,12 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   // Dictation works in every browser and offline: the browser's recognizer when it exists and is online,
   // otherwise the local Whisper model (which listens until you stop talking).
   const [browserSpeechFailed, setBrowserSpeechFailed] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
+  useEffect(() => {                       // internet is back: use the online recognizer again
+    const back = () => setBrowserSpeechFailed(false);
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, []);
   const engine = resolveEngine(settings.voiceEngine, browserSpeechFailed);
   const dictationSupported = speechInputAvailable();
 
@@ -139,14 +149,19 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     localRecorderRef.current = recorder;
     setIsDictating(true);
     setAttachMsg(null);
+    const base = input;                       // live captions replace only what is dictated
     try {
       const text = await recorder.listenOnce({
-        onEnd: () => { setIsDictating(false); setIsTranscribing(true); },
+        onLevel: setMicLevel,
+        onPartial: (t) => setInput((base ? base + " " : "") + t),
+        onEnd: () => { setIsDictating(false); setIsTranscribing(true); setMicLevel(0); },
       });
-      if (text) setInput(prev => (prev ? prev + " " : "") + text);
+      if (text) setInput((base ? base + " " : "") + text);
     } catch (e: any) {
       const blocked = /permission|denied|notallowed/i.test(String(e?.name) + String(e?.message));
-      setAttachMsg(blocked ? "Microphone blocked - allow it for this site (lock icon in the address bar)." : `Voice input failed: ${e?.message || e}`);
+      const msg = blocked ? "Microphone blocked - allow it for this site (lock icon in the address bar)." : `Voice input failed: ${e?.message || e}`;
+      setAttachMsg(msg);
+      notifyError(msg);
     } finally {
       setIsDictating(false);
       setIsTranscribing(false);
@@ -156,6 +171,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
 
   const toggleDictation = async () => {
     if (!dictationSupported || isTranscribing) return;
+    if (isOnline() && !isDictating) setBrowserSpeechFailed(false);
 
     if (isDictating) {            // second click = stop now
       if (engine === "whisper") localRecorderRef.current?.finish();
@@ -263,6 +279,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     onUpdateChat(updatedChat);
     setIsGenerating(true);
     setLiveTps(null);
+    setGenTokens(0);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -281,6 +298,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           onToken: (token) => {
             finalContent += token;
             tokenCount++;
+            setGenTokens(tokenCount);
             const elapsedSec = (performance.now() - generationStart) / 1000;
             if (elapsedSec > 0) setLiveTps(tokenCount / elapsedSec);
             const currentMessages = [...updatedChat.messages];
@@ -289,6 +307,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           },
           onError: (error) => {
             console.error("Failed to generate response:", error);
+            notifyError(error?.message || String(error), "chat");
             // Show the failure in the reply bubble instead of leaving it blank.
             const msgs = [...updatedChat.messages];
             msgs[msgs.length - 1] = { ...assistantMessagePlaceholder, content: finalContent || `⚠️ ${error?.message || error}` };
@@ -349,6 +368,17 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     URL.revokeObjectURL(a.href);
   };
 
+  const [genTokens, setGenTokens] = useState(0);
+  // Warn once per model when it is a poor fit for this PC's memory.
+  const sys = useSystemInfo();
+  const warnedModel = useRef<string | null>(null);
+  useEffect(() => {
+    const fit = fitFor(selectedModel.sizeBytes, sys);
+    if (fit && fit.level !== "ok" && warnedModel.current !== selectedModel.id) {
+      warnedModel.current = selectedModel.id;
+      notifyWarning(`${selectedModel.name}: ${fit.label}. ${fit.detail}`);
+    }
+  }, [selectedModel.id, sys]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptDraft, setPromptDraft] = useState("");
@@ -435,7 +465,8 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           <button
             onClick={toggleDictation}
             disabled={isTranscribing}
-            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : "Dictate message"}
+            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : engine === "browser" ? "Dictate message (online browser speech)" : "Dictate message (offline)"}
+            style={isDictating && engine === "whisper" ? { boxShadow: `0 0 0 ${Math.round(micLevel * 10)}px rgba(239,68,68,0.35)` } : undefined}
             className={cn(
               "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
               isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500",
@@ -538,7 +569,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="model-tag">{selectedModel.name} v1</div>
-            <div className="vulkan-tag">Vulkan Enabled</div>
+            <div className="vulkan-tag" title={gpu?.devices?.join(", ")}>{gpuLabel(gpu)}</div>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -677,6 +708,14 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
             </AnimatePresence>
           </div>
           
+          {isGenerating && (
+            <div className="mb-2">
+              <ProgressBar
+                value={genTokens > 0 ? (genTokens / Math.max(1, settings.maxTokens)) * 100 : null}
+                label={genTokens > 0 ? `Writing reply - ${genTokens} of up to ${settings.maxTokens} tokens` : "Loading model / thinking..."}
+              />
+            </div>
+          )}
           {inputBar(() => handleSendMessage(), `Command ${selectedModel.name} via local core...`)}
           <div className="mt-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-4">

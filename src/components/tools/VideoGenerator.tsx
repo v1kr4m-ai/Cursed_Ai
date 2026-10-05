@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { VideoJob } from "../../types";
 import { GalleryHistory } from "./GalleryHistory";
-import { notify } from "../../lib/notify";
+import { notify, notifyError } from "../../lib/notify";
+import { ProgressBar } from "../layout/ProgressBar";
 import { friendlyError } from "../../services/errors";
 
 type Source = "cloud" | "local";
@@ -20,6 +21,7 @@ export function VideoGeneratorView() {
   const [prompt, setPrompt] = React.useState("");
   const [jobs, setJobs] = React.useState<VideoJob[]>([]);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  const [progress, setProgress] = React.useState<Record<string, { percent: number | null; label: string }>>({});
   const setToast = (m: string | null) => { if (m) notify({ message: m, tab: "video" }); };
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -64,6 +66,7 @@ export function VideoGeneratorView() {
         try {
           const resp = await fetch(`/api/video/status/${job.id}`);
           const data = await resp.json();
+          if (data.status === "error" && data.error) notifyError(`Video failed: ${data.error}`, "video");
           if (data.status === "done") { setRefreshKey(k => k + 1); setToast("Video generated and saved to history"); }
           setJobs(prev => prev.map(j => j.id === job.id
             ? { ...j, status: data.status, resultUrl: data.resultUrl, error: data.error }
@@ -75,6 +78,17 @@ export function VideoGeneratorView() {
       }
     }, 3000);
     return () => clearInterval(timer);
+  }, [jobs]);
+
+  React.useEffect(() => {
+    const running = jobs.filter(j => j.status === "pending");
+    if (running.length === 0) return;
+    const t = setInterval(async () => {
+      for (const j of running) {
+        try { const p = await (await fetch(`/api/progress/${j.id}`)).json(); setProgress(prev => ({ ...prev, [j.id]: p })); } catch { /* ignore */ }
+      }
+    }, 1000);
+    return () => clearInterval(t);
   }, [jobs]);
 
   const cancelJob = async (id: string) => {
@@ -108,7 +122,9 @@ export function VideoGeneratorView() {
       setJobs(prev => [{ id: data.id, prompt: label, status: "pending", createdAt: Date.now() }, ...prev]);
       setPrompt("");
     } catch (e: any) {
-      setError(friendlyError(e));
+      const m = friendlyError(e);
+      setError(m);
+      notifyError(m, "video");
     } finally {
       setIsSubmitting(false);
     }
@@ -241,7 +257,7 @@ export function VideoGeneratorView() {
                 )}
               </div>
               {job.status === "error" && <p className="text-xs text-red-400 flex items-center gap-2"><AlertTriangle size={12} /> {job.error}</p>}
-              {job.status === "pending" && <p className="text-[10px] text-zinc-600 flex items-center gap-2 uppercase tracking-widest font-bold"><Clock size={12} /> Polling every 8s — this can take a few minutes</p>}
+              {job.status === "pending" && <ProgressBar value={source === "local" ? (progress[job.id]?.percent ?? null) : null} label={source === "local" ? (progress[job.id]?.label || "Starting...") : "Generating with Veo - this can take a few minutes"} color="bg-orange-500" />}
             </div>
           ))}
           <GalleryHistory kind="video" refreshKey={refreshKey} />
