@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { LocalVoiceRecorder } from "../../services/localVoice";
-import { resolveEngine, isOnline } from "../../services/voiceEngine";
+import { resolveEngine, isOnline, micBlockedReason } from "../../services/voiceEngine";
+import { VoiceEngineMenu } from "./VoiceEngineMenu";
+import { notify } from "../../lib/notify";
 import { notifyError } from "../../lib/notify";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
   onNewMessage: (msg: Message) => void;
   settings: AppSettings;
+  onSetVoiceEngine?: (pref: "auto" | "browser" | "whisper") => void;
 }
 
 type VoiceState = "off" | "listening" | "thinking" | "speaking";
@@ -30,7 +33,8 @@ const ERROR_TEXT: Record<string, string> = {
  * Without a usable browser recognizer (other browsers, or no internet) it switches to the local Whisper model:
  * still hands-free - it listens until you stop talking, transcribes on this PC, then replies - fully offline.
  */
-export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceAssistantProps) {
+export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoiceEngine }: VoiceAssistantProps) {
+  const [micMenu, setMicMenu] = useState<{ x: number; y: number } | null>(null);
   const [browserFailed, setBrowserFailed] = useState(false);
   const usingWhisper = resolveEngine(settings.voiceEngine, browserFailed) === "whisper";
   const [level, setLevel] = useState(0);              // microphone loudness while listening offline
@@ -300,6 +304,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
 
   const toggleConversation = async () => {
     setError(null);
+    const blocked = micBlockedReason();
+    if (blocked && !activeRef.current) { setError(blocked); return; }
     if (activeRef.current) return stopAll();
     activeRef.current = true;
     if (isOnline()) setBrowserFailed(false); // internet is back: use the online recognizer again
@@ -378,7 +384,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         onPointerDown={(e) => beginDrag(e, "panel")} onPointerMove={moveDrag} onPointerUp={endDrag}
         className="flex items-center justify-between mb-4 shrink-0 cursor-grab active:cursor-grabbing touch-none select-none">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tighter">Cursed_Pirate</h1>
+          <h1 className="text-xl font-black text-white tracking-tighter" onContextMenu={(e) => { e.preventDefault(); setMicMenu({ x: e.clientX, y: e.clientY }); }}>Cursed_Pirate</h1>
           <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
             {usingWhisper ? "Local Whisper (offline)" : "Browser speech"} · {selectedModel.name}
           </p>
@@ -392,6 +398,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
           <Button onClick={closePanel} variant="ghost" title="Minimise" className="text-zinc-400"><X size={16} /></Button>
         </div>
       </div>
+
+      {micMenu && <VoiceEngineMenu x={micMenu.x} y={micMenu.y} pref={settings.voiceEngine} onClose={() => setMicMenu(null)} onSelect={(p) => { onSetVoiceEngine?.(p); notify({ message: p === "browser" ? "Microphone: online browser speech" : p === "whisper" ? "Microphone: offline (Whisper)" : "Microphone: automatic" }); }} />}
 
       {/* Conversation */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
@@ -461,6 +469,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings }: VoiceA
         <Button
           size="lg"
           onClick={toggleConversation}
+          onContextMenu={(e) => { e.preventDefault(); setMicMenu({ x: e.clientX, y: e.clientY }); }}
+          title="Right-click to choose the microphone"
           disabled={state === "thinking" || state === "speaking"}
           className={`h-16 rounded-2xl px-8 font-bold gap-3 shadow-xl ${state === "listening" ? "bg-red-500 hover:bg-red-600" : "bg-violet-600 hover:bg-violet-500"} text-white`}
         >

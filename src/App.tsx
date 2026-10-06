@@ -179,13 +179,18 @@ export default function App() {
     apiEnabled: false,
     memoryEnabled: true,
     voiceEnabled: true,
-    voiceEngine: "auto",
+    voiceEngine: ((): "auto" | "browser" | "whisper" => { try { const v = localStorage.getItem("cursed.voiceEngine"); return v === "browser" || v === "whisper" ? v : "auto"; } catch { return "auto"; } })(),
     temperature: 0.7,
     topP: 0.9,
     maxTokens: 1024,
     threads: 4,
     kvCacheSize: 4096,
   });
+
+  const setVoiceEngine = (v: "auto" | "browser" | "whisper") => {
+    setSettings(prev => ({ ...prev, voiceEngine: v }));
+  };
+  useEffect(() => { try { localStorage.setItem("cursed.voiceEngine", settings.voiceEngine); } catch { /* storage blocked */ } }, [settings.voiceEngine]);
 
   const selectedModel = models.find(m => m.id === selectedModelId) || models[0];
   const activeChat = chats.find(c => c.id === activeChatId) || null;
@@ -341,6 +346,7 @@ export default function App() {
                 selectedModel={selectedModel}
                 onSelectModel={setSelectedModelId}
                 settings={settings}
+                onSetVoiceEngine={setVoiceEngine}
               />
             )}
             {activeTab === "models" && (
@@ -374,6 +380,7 @@ export default function App() {
             <VoiceAssistant 
               selectedModel={selectedModel}
               settings={settings}
+              onSetVoiceEngine={setVoiceEngine}
               onNewMessage={(msg) => {
                 if (activeChat) {
                   updateChat({

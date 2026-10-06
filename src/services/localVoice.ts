@@ -89,7 +89,11 @@ export class LocalVoiceRecorder {
   private pcmStop: (() => void) | null = null;
 
   /** POST 16 kHz mono samples to the local Whisper endpoint. */
-  private static async transcribe(samples: Float32Array): Promise<string> {
+  private static async transcribe(raw: Float32Array): Promise<string> {
+    // Quiet microphones: scale the clip up (never more than 40x) so Whisper gets a healthy signal.
+    let peak = 0;
+    for (let i = 0; i < raw.length; i++) { const a = Math.abs(raw[i]); if (a > peak) peak = a; }
+    const samples = peak > 0 && peak < 0.5 ? raw.map(v => v * Math.min(40, 0.8 / peak)) : raw;
     const response = await fetch("/api/voice/transcribe", {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
@@ -123,7 +127,7 @@ export class LocalVoiceRecorder {
   async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onPartial?: (text: string) => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
     const { onLevel, onSpeechStart, onPartial, onEnd, silenceMs = 650, maxWaitMs = 10000, maxMs = 30000 } = opts;
     this.cancelled = false;
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const AudioCtx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioCtx();
     // Browsers can create an audio context "suspended" when it was not started by a click; wake it up.
@@ -136,7 +140,7 @@ export class LocalVoiceRecorder {
 
     const chunks: Float32Array[] = [];
     const t0 = performance.now();
-    let noise = 0.008, spoke = false, speechStartIdx = 0, lastLoud = 0, quietChunks = 0;
+    let noise = 0.004, spoke = false, speechStartIdx = 0, lastLoud = 0, quietChunks = 0;
     let speculative: { len: number; promise: Promise<string> } | null = null;
     let partialBusy = false, lastPartialAt = t0, finished = false;
     const lastLoudChunk = { i: -1 };
@@ -166,7 +170,7 @@ export class LocalVoiceRecorder {
         const rms = Math.sqrt(sum / data.length);
         const now = performance.now();
         if (now - t0 < 350) noise = Math.max(noise * 0.9, rms); // learn the room's background level first
-        const threshold = Math.max(0.015, noise * 3);
+        const threshold = Math.max(0.003, noise * 3); // sensitive enough for quiet microphones
         onLevel?.(Math.min(1, rms * 8));
         if (rms > threshold) {
           if (!spoke) { spoke = true; speechStartIdx = idx; onSpeechStart?.(); }

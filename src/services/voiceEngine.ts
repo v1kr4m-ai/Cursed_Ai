@@ -21,3 +21,22 @@ export function resolveEngine(pref: VoiceEnginePref | undefined, browserFailed =
 export const isOnline = () => typeof navigator === "undefined" || navigator.onLine !== false;
 
 export const speechInputAvailable = () => browserSpeechAvailable() || LocalVoiceRecorder.isSupported;
+
+/** Why the microphone cannot work on this page at all (null = fine). Browsers only allow it on https or localhost. */
+export function micBlockedReason(): string | null {
+  if (typeof window === "undefined") return null;
+  if (!window.isSecureContext) return "The microphone only works on http://localhost or https. Open the app at http://localhost:3000 on this PC.";
+  if (!navigator.mediaDevices?.getUserMedia && !browserSpeechAvailable()) return "This browser can't use a microphone. Try Chrome, Edge or Firefox.";
+  return null;
+}
+
+/** Plain-language text for a SpeechRecognition error code. */
+export function speechErrorText(code: string): string {
+  switch (code) {
+    case "not-allowed": case "service-not-allowed": return "Microphone blocked - allow it for this site (lock icon in the address bar), then try again.";
+    case "audio-capture": return "No microphone found. Plug one in or pick it in your system sound settings.";
+    case "no-speech": return "I didn't hear anything. Check that the right microphone is selected and not muted.";
+    case "network": return "Browser speech needs internet - switching to the offline microphone.";
+    default: return `Speech recognition error: ${code}`;
+  }
+}

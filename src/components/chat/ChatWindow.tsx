@@ -37,7 +37,8 @@ import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
 import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
-import { resolveEngine, speechInputAvailable, isOnline } from "../../services/voiceEngine";
+import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speechErrorText } from "../../services/voiceEngine";
+import { VoiceEngineMenu } from "../voice/VoiceEngineMenu";
 import { cn } from "@/lib/utils";
 import { notify, notifyError, notifyWarning } from "../../lib/notify";
 import { ProgressBar } from "../layout/ProgressBar";
@@ -53,6 +54,7 @@ interface ChatWindowProps {
   selectedModel: AIModel;
   onSelectModel: (id: string) => void;
   settings: AppSettings;
+  onSetVoiceEngine?: (pref: "auto" | "browser" | "whisper") => void;
 }
 
 /** Markdown code block with a copy button. */
@@ -70,7 +72,8 @@ function CodeBlock({ children }: { children?: React.ReactNode }) {
   );
 }
 
-export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings }: ChatWindowProps) {
+export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings, onSetVoiceEngine }: ChatWindowProps) {
+  const [micMenu, setMicMenu] = useState<{ x: number; y: number } | null>(null);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -170,15 +173,19 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   };
 
   const toggleDictation = async () => {
-    if (!dictationSupported || isTranscribing) return;
+    if (isTranscribing) return;
+    const blocked = micBlockedReason();
+    if (blocked || !dictationSupported) { notifyError(blocked || "No microphone is available in this browser."); return; }
     if (isOnline() && !isDictating) setBrowserSpeechFailed(false);
 
+    // Decide at click time (not from the last render): the internet or the browser may have changed since.
+    const engineNow = resolveEngine(settings.voiceEngine, browserSpeechFailed);
     if (isDictating) {            // second click = stop now
-      if (engine === "whisper") localRecorderRef.current?.finish();
+      if (engineNow === "whisper") localRecorderRef.current?.finish();
       else { dictationRef.current?.stop(); setIsDictating(false); }
       return;
     }
-    if (engine === "whisper") return startWhisperDictation();
+    if (engineNow === "whisper") return startWhisperDictation();
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -192,8 +199,11 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     recognition.onend = () => setIsDictating(false);
     recognition.onerror = (e: any) => {
       setIsDictating(false);
+      const code = e?.error || "unknown";
+      if (code === "aborted") return;
       // No internet (or the browser's speech service is down): switch to the offline model and carry on.
-      if (e?.error === "network" || e?.error === "service-not-allowed") { setBrowserSpeechFailed(true); startWhisperDictation(); }
+      if (code === "network" || code === "service-not-allowed") { notifyWarning(speechErrorText("network")); setBrowserSpeechFailed(true); startWhisperDictation(); return; }
+      notifyError(speechErrorText(code));
     };
     dictationRef.current = recognition;
     setIsDictating(true);
@@ -438,6 +448,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
 
   const inputBar = (onSend: () => void, placeholder: string) => (
     <div>
+    {micMenu && <VoiceEngineMenu x={micMenu.x} y={micMenu.y} pref={settings.voiceEngine} onClose={() => setMicMenu(null)} onSelect={(p) => { onSetVoiceEngine?.(p); notify({ message: p === "browser" ? "Microphone: online browser speech" : p === "whisper" ? "Microphone: offline (Whisper)" : "Microphone: automatic" }); }} />}
     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => onFilesChosen(e.target.files)}
       accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cs,.go,.rs,.sh,.sql,.yaml,.yml,.log,.ini,.toml" />
     {(pending.length > 0 || reading || attachMsg) && (
@@ -464,8 +475,9 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         {dictationSupported && (
           <button
             onClick={toggleDictation}
+            onContextMenu={(e) => { e.preventDefault(); setMicMenu({ x: e.clientX, y: e.clientY }); }}
             disabled={isTranscribing}
-            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : engine === "browser" ? "Dictate message (online browser speech)" : "Dictate message (offline)"}
+            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : engine === "browser" ? "Dictate message (online browser speech) - right-click to change" : "Dictate message (offline) - right-click to change"}
             style={isDictating && engine === "whisper" ? { boxShadow: `0 0 0 ${Math.round(micLevel * 10)}px rgba(239,68,68,0.35)` } : undefined}
             className={cn(
               "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
