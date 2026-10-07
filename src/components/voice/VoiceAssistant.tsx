@@ -6,7 +6,7 @@ import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { LocalVoiceRecorder } from "../../services/localVoice";
 import { resolveEngine, isOnline, micBlockedReason } from "../../services/voiceEngine";
-import { VoiceEngineMenu } from "./VoiceEngineMenu";
+import { MicModeButton } from "./MicModeButton";
 import { notify } from "../../lib/notify";
 import { notifyError } from "../../lib/notify";
 
@@ -34,7 +34,6 @@ const ERROR_TEXT: Record<string, string> = {
  * still hands-free - it listens until you stop talking, transcribes on this PC, then replies - fully offline.
  */
 export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoiceEngine }: VoiceAssistantProps) {
-  const [micMenu, setMicMenu] = useState<{ x: number; y: number } | null>(null);
   const [browserFailed, setBrowserFailed] = useState(false);
   const usingWhisper = resolveEngine(settings.voiceEngine, browserFailed) === "whisper";
   const [level, setLevel] = useState(0);              // microphone loudness while listening offline
@@ -280,9 +279,21 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     recognitionRef.current = rec;
     return () => {
       activeRef.current = false;
+      rec.onend = null; rec.onresult = null; rec.onerror = null;
       try { rec.abort(); } catch {}
       recognitionRef.current = null;
     };
+  }, [usingWhisper]);
+
+  const prevWhisper = useRef(usingWhisper);
+  useEffect(() => {
+    if (prevWhisper.current === usingWhisper) return;
+    prevWhisper.current = usingWhisper;
+    if (activeRef.current && stateRef.current === "listening") {
+      recorderRef.current?.cancel();
+      try { recognitionRef.current?.abort(); } catch { /* not started */ }
+      setTimeout(() => startListeningRef.current(), 200);
+    }
   }, [usingWhisper]);
 
   useEffect(() => () => {
@@ -384,7 +395,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
         onPointerDown={(e) => beginDrag(e, "panel")} onPointerMove={moveDrag} onPointerUp={endDrag}
         className="flex items-center justify-between mb-4 shrink-0 cursor-grab active:cursor-grabbing touch-none select-none">
         <div>
-          <h1 className="text-xl font-black text-white tracking-tighter" onContextMenu={(e) => { e.preventDefault(); setMicMenu({ x: e.clientX, y: e.clientY }); }}>Cursed_Pirate</h1>
+          <h1 className="text-xl font-black text-white tracking-tighter">Cursed_Pirate</h1>
           <p className="text-zinc-500 font-medium uppercase tracking-[0.2em] text-[10px] mt-1">
             {usingWhisper ? "Local Whisper (offline)" : "Browser speech"} · {selectedModel.name}
           </p>
@@ -398,8 +409,6 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
           <Button onClick={closePanel} variant="ghost" title="Minimise" className="text-zinc-400"><X size={16} /></Button>
         </div>
       </div>
-
-      {micMenu && <VoiceEngineMenu x={micMenu.x} y={micMenu.y} pref={settings.voiceEngine} onClose={() => setMicMenu(null)} onSelect={(p) => { onSetVoiceEngine?.(p); notify({ message: p === "browser" ? "Microphone: online browser speech" : p === "whisper" ? "Microphone: offline (Whisper)" : "Microphone: automatic" }); }} />}
 
       {/* Conversation */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
@@ -466,17 +475,23 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
           {state === "speaking" && <Volume2 size={12} className="text-emerald-400" />}
           {label}
         </p>
+        <div className="flex items-center gap-3">
+        <MicModeButton
+          pref={settings.voiceEngine}
+          onSelect={(p) => { onSetVoiceEngine?.(p); notify({ message: p === "browser" ? "Microphone: online browser speech" : p === "whisper" ? "Microphone: offline (Whisper)" : "Microphone: automatic" }); }}
+          title="Choose the microphone type"
+          className="shrink-0"
+        />
         <Button
           size="lg"
           onClick={toggleConversation}
-          onContextMenu={(e) => { e.preventDefault(); setMicMenu({ x: e.clientX, y: e.clientY }); }}
-          title="Right-click to choose the microphone"
           disabled={state === "thinking" || state === "speaking"}
           className={`h-16 rounded-2xl px-8 font-bold gap-3 shadow-xl ${state === "listening" ? "bg-red-500 hover:bg-red-600" : "bg-violet-600 hover:bg-violet-500"} text-white`}
         >
           {state === "listening" ? <MicOff size={22} /> : <Mic size={22} />}
           {on ? "Listening..." : "Start conversation"}
         </Button>
+        </div>
         {state === "speaking" && (
           <Button variant="ghost" onClick={() => { speechRef.current.skipped = true; window.speechSynthesis.cancel(); }} className="text-zinc-400 gap-2 text-xs">
             <Square size={12} className="fill-current" /> Skip speaking

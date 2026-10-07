@@ -38,7 +38,7 @@ import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
 import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speechErrorText } from "../../services/voiceEngine";
-import { VoiceEngineMenu } from "../voice/VoiceEngineMenu";
+import { MicModeButton } from "../voice/MicModeButton";
 import { cn } from "@/lib/utils";
 import { notify, notifyError, notifyWarning } from "../../lib/notify";
 import { ProgressBar } from "../layout/ProgressBar";
@@ -73,7 +73,6 @@ function CodeBlock({ children }: { children?: React.ReactNode }) {
 }
 
 export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings, onSetVoiceEngine }: ChatWindowProps) {
-  const [micMenu, setMicMenu] = useState<{ x: number; y: number } | null>(null);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -448,7 +447,6 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
 
   const inputBar = (onSend: () => void, placeholder: string) => (
     <div>
-    {micMenu && <VoiceEngineMenu x={micMenu.x} y={micMenu.y} pref={settings.voiceEngine} onClose={() => setMicMenu(null)} onSelect={(p) => { onSetVoiceEngine?.(p); notify({ message: p === "browser" ? "Microphone: online browser speech" : p === "whisper" ? "Microphone: offline (Whisper)" : "Microphone: automatic" }); }} />}
     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => onFilesChosen(e.target.files)}
       accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cs,.go,.rs,.sh,.sql,.yaml,.yml,.log,.ini,.toml" />
     {(pending.length > 0 || reading || attachMsg) && (
@@ -473,20 +471,16 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           className="w-10 h-10 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-colors flex items-center justify-center"
         ><Paperclip size={18} /></button>
         {dictationSupported && (
-          <button
+          <MicModeButton
+            pref={settings.voiceEngine}
+            onSelect={(p) => { onSetVoiceEngine?.(p); notify({ message: p === "browser" ? "Microphone: online browser speech" : p === "whisper" ? "Microphone: offline (Whisper)" : "Microphone: automatic" }); }}
             onClick={toggleDictation}
-            onContextMenu={(e) => { e.preventDefault(); setMicMenu({ x: e.clientX, y: e.clientY }); }}
+            active={isDictating}
+            busy={isTranscribing}
             disabled={isTranscribing}
-            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : engine === "browser" ? "Dictate message (online browser speech) - right-click to change" : "Dictate message (offline) - right-click to change"}
-            style={isDictating && engine === "whisper" ? { boxShadow: `0 0 0 ${Math.round(micLevel * 10)}px rgba(239,68,68,0.35)` } : undefined}
-            className={cn(
-              "w-10 h-10 rounded-xl transition-colors flex items-center justify-center",
-              isDictating ? "bg-red-500/20 text-red-400" : "hover:bg-white/5 text-zinc-500",
-              isTranscribing && "opacity-60 cursor-wait"
-            )}
-          >
-            {isTranscribing ? <Loader2 size={18} className="animate-spin" /> : isDictating ? <MicOff size={18} /> : <Mic size={18} />}
-          </button>
+            ringPx={engine === "whisper" ? micLevel * 10 : 0}
+            title={isDictating ? "Stop dictation" : isTranscribing ? "Transcribing locally..." : engine === "browser" ? "Dictate (online browser speech)" : "Dictate (offline)"}
+          />
         )}
       </div>
       <div className="flex-1">
