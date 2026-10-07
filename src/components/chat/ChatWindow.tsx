@@ -191,9 +191,10 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = "en-US";
+    const base = input;   // dictation adds to what is already typed, and never sends - you press Send
     recognition.onresult = (event: any) => {
       const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join("");
-      setInput(transcript);
+      setInput((base ? base + " " : "") + transcript);
     };
     recognition.onend = () => setIsDictating(false);
     recognition.onerror = (e: any) => {

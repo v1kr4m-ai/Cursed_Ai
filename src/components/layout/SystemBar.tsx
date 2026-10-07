@@ -5,7 +5,7 @@ interface Live {
   ram: number;
   ramUsedGB: number;
   ramTotalGB: number;
-  gpu: { name: string; util: number; vramUsedMB: number; vramTotalMB: number; tempC: number } | null;
+  gpu: { name: string; util: number; vramUsedMB: number; vramTotalMB: number; tempC: number | null; memory: "dedicated" | "shared"; detail: string } | null;
 }
 
 /** One small pill: a soft fill shows the level behind "LABEL value". */
@@ -47,9 +47,9 @@ export function SystemBar() {
     <div className={`flex items-center justify-end gap-1.5 px-1 mb-1.5 shrink-0 ${offline ? "opacity-40" : ""}`}>
       <Pill label="CPU" value={live.cpu} text={`${live.cpu}%`} color={level(live.cpu, 70, 90, "bg-emerald-500")} hint="Processor load" />
       <Pill label="RAM" value={live.ram} text={`${live.ram}%`} color={level(live.ram, 80, 92, "bg-emerald-500")} hint={`${live.ramUsedGB.toFixed(1)} of ${live.ramTotalGB.toFixed(1)} GB in use`} />
-      <Pill label="GPU" value={g ? g.util : null} text={g ? `${g.util}%` : "n/a"} color={level(g?.util ?? 0, 70, 90, "bg-violet-500")} hint={g ? g.name : "No NVIDIA GPU reading available"} />
-      <Pill label="VRAM" value={vramPct} text={vramPct === null ? "n/a" : `${vramPct}%`} color={level(vramPct ?? 0, 80, 92, "bg-sky-500")} hint={g ? `${(g.vramUsedMB / 1024).toFixed(1)} of ${(g.vramTotalMB / 1024).toFixed(1)} GB video memory in use` : undefined} />
-      <Pill label="TEMP" value={g ? Math.min(100, g.tempC) : null} text={g ? `${g.tempC}°` : "n/a"} color={level(g?.tempC ?? 0, 75, 85, "bg-yellow-500")} hint="GPU temperature" />
+      <Pill label="GPU" value={g ? g.util : null} text={g ? `${g.util}%` : "n/a"} color={level(g?.util ?? 0, 70, 90, "bg-violet-500")} hint={g ? g.detail : "No GPU reading available"} />
+      <Pill label="VRAM" value={vramPct} text={vramPct === null ? "n/a" : `${vramPct}%`} color={level(vramPct ?? 0, 80, 92, "bg-sky-500")} hint={g ? `${(g.vramUsedMB / 1024).toFixed(1)} of ${(g.vramTotalMB / 1024).toFixed(1)} GB ${g.memory === "shared" ? "shared GPU memory (borrowed from RAM)" : "video memory"} in use` : undefined} />
+      <Pill label="TEMP" value={g?.tempC != null ? Math.min(100, g.tempC) : null} text={g?.tempC != null ? `${g.tempC}°` : "n/a"} color={level(g?.tempC ?? 0, 75, 85, "bg-yellow-500")} hint="NVIDIA GPU temperature" />
     </div>
   );
 }
