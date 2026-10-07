@@ -48,12 +48,17 @@ Voice has two engines: the browser's Web Speech API (fast, not fully offline) or
 - **Models tab, end to end:** search Hugging Face, download a GGUF (progress + cancel), then chat with it through the built-in llama.cpp engine; search the Ollama library and pull a model through the Ollama app; capability flags and flag filters; nested LM Studio-style folders are found.
 - **Attachments:** PDF and text files read and answered correctly; images reach vision models in Ollama (`llava` answered a colour question correctly).
 - Local ComfyUI **image** (txt2img + img2img) and **video** (LTX-Video text-to-video, mp4) — all tested end-to-end against a real ComfyUI, including the saved-history gallery and a "generated" popup. A "Start ComfyUI" button launches it from a folder you choose (checks first; does nothing if already running).
+- **Offline microphone:** the local Whisper model transcribes a recorded sentence correctly, with live captions, hands-free turns and the level / stage display, in a browser without any speech recognition. Switching between the online and offline mic - from the mic button's own menu - works mid-conversation. (Tested with recorded audio; the in-app browser cannot reach a real microphone.)
+- **Status bar, popups, progress and stop buttons:** real CPU / RAM / GPU readings, success / warning / error popups, ComfyUI "Step n of 20" progress, and stopping chat, image and video jobs (ComfyUI is told to cancel too).
+- **GPU:** the built-in engine runs on the GPU through Vulkan (about 3x faster than CPU on the test PC). A CUDA build was not available for an RTX 50-series card.
 - Android: real llama.cpp loading a real GGUF and generating tokens on-device (emulator-tested).
 
 **Written but not yet run end-to-end**
 - Cloud image/video (Gemini/Imagen/Veo): error handling verified, real generation needs your `GEMINI_API_KEY`.
 
 **Known gaps**
+- Real-microphone voice (online and offline) is not verified on every machine: if it cannot hear you, open Settings -> Voice -> Microphone test, and make sure you are in a normal browser at `http://localhost:3000` (the Claude desktop app's built-in browser blocks the microphone).
+- Hugging Face's search API was down during one round of testing, so the ComfyUI model search itself has not been seen returning results (downloads and the duplicate guard were tested).
 - The Ollama Library view reads ollama.com's search page (the site has no public search API), so a redesign of that page could break it. Hugging Face uses its documented API.
 - Capability flags are best-effort guesses from model names, Ollama's labels and Hugging Face tags; some will be wrong.
 - Hugging Face downloads support single-file GGUFs only (split `-0000N-of-0000M` files are listed but disabled) and gated repos need an `HF_TOKEN`.
@@ -122,15 +127,21 @@ CPU inference on an unaccelerated emulator is very slow (tens of seconds per tok
 ## Architecture
 
 ```
-src/                     React app (chat, models, voice, memory, engine, console, image, video, settings)
+src/                     React app (chat, models, voice, memory, engine, console, image, video, vision, settings)
+  components/            chat, models (cards, hub, flags), voice (assistant, mic selector), layout (sidebar, status bar, popups, progress)
+  lib/                   modelTags (capability flags), ramFit (will it fit?), notify (popups), gpuInfo
+  services/              aiService (chat streaming), localVoice (offline mic), voiceEngine (online/offline choice), attachments, errors
 components/ui/           shadcn-style primitives
 server.ts                Express API: chat (SSE), memory, models, engine, config, console, voice,
-                         image/video (Gemini + ComfyUI), attachments, filesystem browse
-hub.ts                   Model catalog: Hugging Face + Ollama search, background downloads
-src/lib/modelTags.ts     Capability-flag inference (shared by server and UI)
-start.bat                Windows launcher (frees port 3000, opens the browser, runs the dev server)
+                         image/video (Gemini + ComfyUI, with live progress), attachments, filesystem browse
+hub.ts                   Model catalog: Hugging Face + Ollama + ComfyUI model search, background downloads
+localModels.ts           Finds models in place: download folder, LM Studio, Ollama (manifests -> blobs), custom folders
+systemStats.ts           Live CPU / RAM / GPU / VRAM / temperature readings for the status bar
+tests/                   vitest unit tests + smoke.mjs (checks a running server)
+start.bat / setup.bat    Windows launcher / one-time setup (installs, desktop shortcut)
 android/                 Kotlin app, Ktor server, JNI bridge, vendored llama.cpp (CMake/NDK)
-models/                  Local GGUF storage (gitignored)
+models/                  Default download folder for Hugging Face models (gitignored)
+outputs/                 Generated images and videos (gitignored)
 ```
 
 Stack: React 19, TypeScript, Vite 6, Tailwind 4 · Express · `node-llama-cpp` · `@xenova/transformers` (embeddings + Whisper) · `@google/genai` · `unpdf` + `mammoth` (PDF / DOCX text) · llama.cpp/GGML · Kotlin/Ktor.
