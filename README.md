@@ -53,12 +53,14 @@ Voice has two engines: the browser's Web Speech API (fast, not fully offline) or
 - **Offline microphone:** the local Whisper model transcribes a recorded sentence correctly, with live captions, hands-free turns and the level / stage display, in a browser without any speech recognition. Switching between the online and offline mic - from the mic button's own menu - works mid-conversation. (Tested with recorded audio; the in-app browser cannot reach a real microphone.)
 - **Status bar, popups, progress and stop buttons:** real CPU / RAM / GPU readings, success / warning / error popups, ComfyUI "Step n of 20" progress, and stopping chat, image and video jobs (ComfyUI is told to cancel too).
 - **GPU:** the built-in engine runs on the GPU through Vulkan (about 3x faster than CPU on the test PC). A CUDA build was not available for an RTX 50-series card.
+- **Chat conveniences:** drag-and-drop and paste attach files, Ctrl+K / Ctrl+/ shortcuts, regenerate / edit-and-resend, system prompts, history search / rename / delete (checked in the browser).
 - Android: real llama.cpp loading a real GGUF and generating tokens on-device (emulator-tested).
 
 **Written but not yet run end-to-end**
 - Cloud image/video (Gemini/Imagen/Veo): error handling verified, real generation needs your `GEMINI_API_KEY`.
 
 **Known gaps**
+- The speaking-voice picker (Settings -> Voice) was not heard end to end: the test browser lists no installed voices. It uses the voices of your own browser and PC.
 - Real-microphone voice (online and offline) is not verified on every machine: if it cannot hear you, open Settings -> Voice -> Microphone test, and make sure you are in a normal browser at `http://localhost:3000` (the Claude desktop app's built-in browser blocks the microphone).
 - Hugging Face's search API was down during one round of testing, so the ComfyUI model search itself has not been seen returning results (downloads and the duplicate guard were tested).
 - The Ollama Library view reads ollama.com's search page (the site has no public search API), so a redesign of that page could break it. Hugging Face uses its documented API.
@@ -132,7 +134,7 @@ CPU inference on an unaccelerated emulator is very slow (tens of seconds per tok
 src/                     React app (chat, models, voice, memory, engine, console, image, video, vision, settings)
   components/            chat, models (cards, hub, flags), voice (assistant, mic selector), layout (sidebar, status bar, popups, progress)
   lib/                   modelTags (capability flags), ramFit (will it fit?), notify (popups), gpuInfo
-  services/              aiService (chat streaming), localVoice (offline mic), voiceEngine (online/offline choice), attachments, errors
+  services/              aiService (chat streaming), localVoice (offline mic), voiceEngine (online/offline choice), tts (voice + speed), attachments, errors
 components/ui/           shadcn-style primitives
 server.ts                Express API: chat (SSE), memory, models, engine, config, console, voice,
                          image/video (Gemini + ComfyUI, with live progress), attachments, filesystem browse
