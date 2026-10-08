@@ -18,7 +18,8 @@ import {
   ImagePlus,
   Clapperboard,
   Pencil,
-  Trash2
+  Trash2,
+  Pin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -43,6 +44,7 @@ interface SidebarProps {
   onUnarchiveChat?: (id: string) => void;
   onRenameChat?: (id: string, title: string) => void;
   onDeleteChat?: (id: string) => void;
+  onPinChat?: (id: string) => void;
   voiceEnabled?: boolean;
 }
 
@@ -57,6 +59,7 @@ export function Sidebar({
   onUnarchiveChat,
   onRenameChat,
   onDeleteChat,
+  onPinChat,
   voiceEnabled = true
 }: SidebarProps) {
   const gpu = useGpuInfo();
@@ -67,6 +70,18 @@ export function Sidebar({
   const shownChats = q
     ? chats.filter(c => c.title.toLowerCase().includes(q) || c.messages.some(m => m.content.toLowerCase().includes(q)))
     : chats;
+  const dayStart = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const today = dayStart(Date.now());
+  const groupOf = (c: Chat) => {
+    if (c.pinned) return "Pinned";
+    const age = (today - dayStart(c.updatedAt || c.createdAt)) / 86400000;
+    return age <= 0 ? "Today" : age <= 1 ? "Yesterday" : age <= 7 ? "Previous 7 days" : "Older";
+  };
+  const groups: { name: string; items: Chat[] }[] = q
+    ? [{ name: "", items: shownChats }]
+    : ["Pinned", "Today", "Yesterday", "Previous 7 days", "Older"]
+        .map(name => ({ name, items: shownChats.filter(c => groupOf(c) === name).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)) }))
+        .filter(g => g.items.length > 0);
   const commitRename = () => {
     if (renamingId && renameValue.trim()) onRenameChat?.(renamingId, renameValue.trim());
     setRenamingId(null);
@@ -85,6 +100,45 @@ export function Sidebar({
     { id: "console", label: "Console", icon: Terminal },
     { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  const renderRow = (chat: Chat) => (
+    <div key={chat.id} className="group relative">
+      {renamingId === chat.id ? (
+        <input
+          autoFocus
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
+          className="w-full h-10 rounded-xl bg-white/10 border border-violet-500/40 px-3 text-[13px] text-white focus:outline-none"
+        />
+      ) : (
+        <>
+          <Button
+            variant="ghost"
+            className={`w-full justify-start h-10 text-[13px] truncate p-3 pr-24 rounded-xl transition-all ${
+              activeChatId === chat.id
+                ? "bg-violet-900/20 text-violet-400 border-l-2 border-l-violet-500 rounded-l-none"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+            }`}
+            onClick={() => { setActiveChatId(chat.id); }}
+          >
+            <MessageSquare size={14} className="mr-3 flex-shrink-0 opacity-50" />
+            <span className="truncate">{chat.title || "Untitled History"}</span>
+          </Button>
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
+        <button title={chat.pinned ? "Unpin" : "Pin to top"} onClick={() => onPinChat?.(chat.id)} className={`p-1.5 rounded-md hover:bg-white/10 ${chat.pinned ? "text-violet-400" : "text-zinc-500 hover:text-white"}`}><Pin size={13} className={chat.pinned ? "fill-current" : ""} /></button>
+            <button title="Rename" onClick={() => { setRenamingId(chat.id); setRenameValue(chat.title); }} className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10"><Pencil size={13} /></button>
+            <button
+              title="Delete chat"
+              onClick={() => { if (window.confirm(`Delete "${chat.title}"? This can't be undone.`)) onDeleteChat?.(chat.id); }}
+              className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-white/10"
+            ><Trash2 size={13} /></button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className={`h-full glass rounded-3xl flex flex-col transition-all duration-300 ${isCollapsed ? "w-16" : "w-72"}`}>
@@ -170,41 +224,10 @@ export function Sidebar({
             )}
             <div className="space-y-1 px-1">
               {chats.length > 0 && shownChats.length === 0 && <p className="px-3 py-2 text-xs text-zinc-600">No chats match.</p>}
-              {shownChats.map((chat) => (
-                <div key={chat.id} className="group relative">
-                  {renamingId === chat.id ? (
-                    <input
-                      autoFocus
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
-                      className="w-full h-10 rounded-xl bg-white/10 border border-violet-500/40 px-3 text-[13px] text-white focus:outline-none"
-                    />
-                  ) : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        className={`w-full justify-start h-10 text-[13px] truncate p-3 pr-16 rounded-xl transition-all ${
-                          activeChatId === chat.id
-                            ? "bg-violet-900/20 text-violet-400 border-l-2 border-l-violet-500 rounded-l-none"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-                        }`}
-                        onClick={() => { setActiveChatId(chat.id); }}
-                      >
-                        <MessageSquare size={14} className="mr-3 flex-shrink-0 opacity-50" />
-                        <span className="truncate">{chat.title || "Untitled History"}</span>
-                      </Button>
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
-                        <button title="Rename" onClick={() => { setRenamingId(chat.id); setRenameValue(chat.title); }} className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10"><Pencil size={13} /></button>
-                        <button
-                          title="Delete chat"
-                          onClick={() => { if (window.confirm(`Delete "${chat.title}"? This can't be undone.`)) onDeleteChat?.(chat.id); }}
-                          className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-white/10"
-                        ><Trash2 size={13} /></button>
-                      </div>
-                    </>
-                  )}
+              {groups.map(g => (
+                <div key={g.name || "results"} className="space-y-1">
+                  {g.name && <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-700 flex items-center gap-1.5">{g.name === "Pinned" && <Pin size={9} />}{g.name}</p>}
+                  {g.items.map(renderRow)}
                 </div>
               ))}
             </div>

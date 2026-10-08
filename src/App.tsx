@@ -238,6 +238,10 @@ export default function App() {
     setChats(prev => prev.map(c => c.id === id ? { ...c, title } : c));
   };
 
+  const pinChat = (id: string) => {
+    setChats(prev => prev.map(c => c.id === id ? { ...c, pinned: !c.pinned } : c));
+  };
+
   const deleteChat = (id: string) => {
     setChats(prev => prev.filter(c => c.id !== id));
     if (activeChatId === id) setActiveChatId(undefined);
@@ -330,6 +334,7 @@ export default function App() {
             onUnarchiveChat={unarchiveChat}
             onRenameChat={renameChat}
             onDeleteChat={deleteChat}
+            onPinChat={pinChat}
             voiceEnabled={settings.voiceEnabled}
           />
         </div>
