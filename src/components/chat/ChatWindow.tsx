@@ -41,6 +41,7 @@ import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speech
 import { MicModeButton } from "../voice/MicModeButton";
 import { cn } from "@/lib/utils";
 import { notify, notifyError, notifyWarning } from "../../lib/notify";
+import { makeUtterance } from "../../services/tts";
 import { ProgressBar } from "../layout/ProgressBar";
 import { fitFor, useSystemInfo } from "../../lib/ramFit";
 import { useGpuInfo, gpuLabel } from "../../lib/gpuInfo";
@@ -82,6 +83,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const [showModelPicker, setShowModelPicker] = useState(false);
   // Files attached to the message being written
   const [pending, setPending] = useState<Picked[]>([]);
+  const [dragging, setDragging] = useState(false);
   const [attachMsg, setAttachMsg] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +114,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     const wasThis = speakingId === id;
     synth.cancel();
     if (wasThis) return setSpeakingId(null);
-    const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ""));
+    const u = makeUtterance(text);
     u.onend = u.onerror = () => setSpeakingId(cur => (cur === id ? null : cur));
     setSpeakingId(id);
     synth.speak(u);
@@ -446,6 +448,18 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     </div>
   );
 
+  // Drop files anywhere on the chat, or paste an image / file straight into the text box.
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } },
+    onDragLeave: (e: React.DragEvent) => { if (e.currentTarget === e.target) setDragging(false); },
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) onFilesChosen(e.dataTransfer.files); },
+  };
+  const dropOverlay = dragging && (
+    <div className="absolute inset-0 z-30 rounded-[2.5rem] border-2 border-dashed border-violet-400/70 bg-violet-600/10 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+      <p className="text-white font-bold text-lg flex items-center gap-3"><Paperclip size={22} /> Drop to attach images, PDFs or documents</p>
+    </div>
+  );
+
   const inputBar = (onSend: () => void, placeholder: string) => (
     <div>
     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => onFilesChosen(e.target.files)}
@@ -488,6 +502,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); onFilesChosen(e.clipboardData.files); } }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -533,7 +548,8 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
 
   if (!chat) {
     return (
-      <div className="flex-1 flex flex-col h-full glass rounded-[2.5rem] overflow-hidden">
+      <div {...dropProps} className="flex-1 flex flex-col h-full glass rounded-[2.5rem] overflow-hidden relative">
+        {dropOverlay}
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center overflow-y-auto">
           <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-8 shadow-2xl shadow-violet-500/10">
             <Bot size={40} className="text-violet-400" />
@@ -570,7 +586,8 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full glass rounded-[2.5rem] overflow-hidden relative">
+    <div {...dropProps} className="flex-1 flex flex-col h-full glass rounded-[2.5rem] overflow-hidden relative">
+      {dropOverlay}
       {/* Chat header */}
       <div className="h-20 border-b border-white/5 px-8 flex items-center justify-between bg-transparent backdrop-blur-md z-10">
         <div className="flex items-center gap-6">

@@ -9,6 +9,7 @@ import { resolveEngine, isOnline, micBlockedReason } from "../../services/voiceE
 import { MicModeButton } from "./MicModeButton";
 import { notify } from "../../lib/notify";
 import { notifyError } from "../../lib/notify";
+import { makeUtterance } from "../../services/tts";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
@@ -97,7 +98,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     const sp = speechRef.current;
     if (!synth || !clean || sp.skipped) return;
     sp.pending++;
-    const u = new SpeechSynthesisUtterance(clean);
+    const u = makeUtterance(clean);
     const finish = () => { sp.pending--; if (sp.ended && sp.pending <= 0) sp.done(); };
     u.onend = finish;
     u.onerror = finish;

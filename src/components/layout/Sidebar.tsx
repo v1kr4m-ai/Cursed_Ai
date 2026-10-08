@@ -113,6 +113,7 @@ export function Sidebar({
           <Button 
             className="w-full justify-start gap-3 bg-violet-600 hover:bg-violet-500 text-white font-bold h-11 rounded-xl shadow-lg shadow-violet-900/20 px-4"
             onClick={createNewChat}
+            title="New chat (Ctrl+K)"
           >
             <Plus size={18} />
             New Chat
@@ -123,6 +124,7 @@ export function Sidebar({
             size="icon"
             className="w-full flex justify-center bg-violet-600 hover:bg-violet-500 text-white h-11 rounded-xl"
             onClick={createNewChat}
+            title="New chat (Ctrl+K)"
           >
             <Plus size={18} />
           </Button>

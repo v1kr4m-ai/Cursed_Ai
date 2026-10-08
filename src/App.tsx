@@ -96,6 +96,16 @@ export default function App() {
     const t = setInterval(ping, 4000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+  // Keyboard shortcuts: Ctrl+K new chat, Ctrl+/ jump to the message box.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key.toLowerCase() === "k") { e.preventDefault(); setActiveChatId(undefined); setActiveTab("chat"); setTimeout(() => document.querySelector("textarea")?.focus(), 80); }
+      else if (e.key === "/") { e.preventDefault(); setActiveTab("chat"); setTimeout(() => document.querySelector("textarea")?.focus(), 80); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const wasUp = useRef(true);
   useEffect(() => {
     if (wasUp.current && !serverUp) notifyError("Lost connection to the Cursed_Ai server - start it again with start.bat.");

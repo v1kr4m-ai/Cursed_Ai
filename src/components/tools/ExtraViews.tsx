@@ -41,6 +41,7 @@ import { AppSettings } from "../../types";
 import { AIService } from "../../services/aiService";
 import { FolderPickerDialog } from "./FolderPickerDialog";
 import { MicTest } from "./MicTest";
+import { VoiceSpeechSettings } from "./VoiceSpeechSettings";
 
 export function MemoryView() {
   const [memories, setMemories] = React.useState<{ text: string, timestamp: number }[]>([]);
@@ -762,6 +763,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                        </div>
                     </div>
                     <MicTest pref={settings.voiceEngine} />
+                    <VoiceSpeechSettings />
                   </>)}
                </div>
             </section>
