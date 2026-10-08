@@ -69,7 +69,7 @@ export function VisionView({ models, selectedModelId, onOpenModels }: { models: 
 
   return (
     <div className="flex-1 flex flex-col glass rounded-3xl h-full p-6 overflow-y-auto">
-      <h1 className="text-3xl font-black text-white tracking-tighter flex items-center gap-3 mb-1"><Eye className="text-violet-400" /> Vision</h1>
+      <h1 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3 mb-1"><Eye className="text-violet-400" /> Vision</h1>
       <p className="text-zinc-500 text-xs uppercase tracking-[0.2em] mb-6">Ask questions about an image</p>
 
       {visionModels.length === 0 ? (

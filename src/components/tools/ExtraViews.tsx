@@ -41,6 +41,7 @@ import { AppSettings } from "../../types";
 import { AIService } from "../../services/aiService";
 import { FolderPickerDialog } from "./FolderPickerDialog";
 import { MicTest } from "./MicTest";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { VoiceSpeechSettings } from "./VoiceSpeechSettings";
 
 export function MemoryView() {
@@ -73,7 +74,7 @@ export function MemoryView() {
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
       <div className="max-w-4xl mx-auto h-full flex flex-col">
         <header className="mb-10 mt-6 shrink-0">
-           <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+           <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
               <BrainCircuit className="text-violet-500" size={32} />
               Vector Memory
             </h1>
@@ -211,7 +212,7 @@ export function EngineView() {
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
       <div className="max-w-4xl mx-auto h-full flex flex-col">
         <header className="mb-10 mt-6 shrink-0">
-            <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+            <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
                <Cpu className="text-cyan-500" size={32} />
                Native Engine
             </h1>
@@ -553,7 +554,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
       <div className="max-w-4xl mx-auto h-full flex flex-col">
         <header className="mb-10 mt-6">
-           <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+           <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
               <Settings className="text-violet-500" size={32} />
               Engine Config
             </h1>
@@ -767,6 +768,8 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
                   </>)}
                </div>
             </section>
+
+            <AppearanceSettings />
 
             <ModelsDirectorySection />
 

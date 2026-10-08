@@ -62,7 +62,7 @@ export function MicModeButton({ pref, onSelect, onClick, active, busy, disabled,
         disabled={disabled}
         title={title}
         style={active && ringPx ? { boxShadow: `0 0 0 ${Math.round(ringPx)}px rgba(239,68,68,0.35)` } : undefined}
-        className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? "bg-red-500/20 text-red-400" : `hover:bg-white/5 ${mode.color}`} ${busy ? "opacity-70 cursor-wait" : ""}`}
+        className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${active ? "bg-red-500/20 text-red-400" : `hover:bg-white/5 ${mode.color}`} ${busy ? "opacity-70 cursor-wait" : ""}`}
       >
         {busy ? <Loader2 size={18} className="animate-spin" /> : <Mic size={18} />}
         <span className={`absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white ${mode.badgeBg}`}>{mode.badge}</span>

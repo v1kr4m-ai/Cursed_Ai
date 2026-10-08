@@ -80,7 +80,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
       <div className="max-w-6xl mx-auto w-full flex flex-col h-full bg-transparent">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10 mt-6">
           <div>
-            <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+            <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
               <Database className="text-violet-500" size={32} />
               Model Library
             </h1>

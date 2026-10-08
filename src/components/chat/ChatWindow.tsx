@@ -406,7 +406,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       <button
         onClick={() => setShowModelPicker(v => !v)}
         title="Select model"
-        className="h-10 px-3 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 border border-white/5"
+        className="h-9 px-2.5 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 border border-white/5"
       >
         <Cpu size={16} className="text-violet-400" />
         <span className="text-xs font-bold max-w-[100px] truncate">{selectedModel.name}</span>
@@ -461,7 +461,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   );
 
   const inputBar = (onSend: () => void, placeholder: string) => (
-    <div>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => onFilesChosen(e.target.files)}
       accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.cs,.go,.rs,.sh,.sql,.yaml,.yml,.log,.ini,.toml" />
     {(pending.length > 0 || reading || attachMsg) && (
@@ -477,14 +477,14 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         {attachMsg && <span className="text-xs text-amber-400">{attachMsg}</span>}
       </div>
     )}
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-2 flex items-end gap-2 focus-within:border-white/20 transition-all shadow-2xl shadow-black/40">
-      <div className="flex gap-1 mb-1 ml-1">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-1.5 flex items-end gap-1.5 transition-all duration-300 ease-out shadow-xl shadow-black/40 focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
+      <div className="flex gap-0.5 mb-0.5 ml-0.5">
         {modelPicker}
         <button
           onClick={() => fileInputRef.current?.click()}
           title="Attach images, documents, PDFs..."
-          className="w-10 h-10 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-colors flex items-center justify-center"
-        ><Paperclip size={18} /></button>
+          className="w-9 h-9 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+        ><Paperclip size={17} /></button>
         {dictationSupported && (
           <MicModeButton
             pref={settings.voiceEngine}
@@ -511,7 +511,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           }}
           placeholder={placeholder}
           rows={1}
-          className="w-full bg-transparent border-none focus:ring-0 text-white placeholder:text-white/20 resize-none p-3 py-4 max-h-48 scrollbar-hide text-[15px]"
+          className="w-full bg-transparent border-none focus:ring-0 text-white placeholder:text-white/20 resize-none px-3 py-2 max-h-40 scrollbar-hide text-sm transition-[height] duration-150 ease-out"
           style={{ height: 'auto' }}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement;
@@ -524,26 +524,27 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         <button
           onClick={handleStopGeneration}
           title="Stop generating (Esc)"
-          className="w-12 h-12 rounded-xl mb-1 mr-1 flex items-center justify-center bg-red-600 text-white hover:bg-red-500 shadow-lg shadow-red-900/40 transition-all"
+          className="w-9 h-9 rounded-xl mb-0.5 mr-0.5 flex items-center justify-center bg-red-600 text-white hover:bg-red-500 hover:scale-105 active:scale-95 shadow-lg shadow-red-900/40 transition-all animate-[cursed-pop_0.25s_ease-out]"
         >
-          <Square size={18} className="fill-current" />
+          <Square size={15} className="fill-current" />
         </button>
       ) : (
         <button
+          key={canSend ? "ready" : "empty"}
           onClick={onSend}
           disabled={!canSend}
           className={cn(
-            "w-12 h-12 rounded-xl transition-all mb-1 mr-1 flex items-center justify-center",
+            "w-9 h-9 rounded-xl transition-all duration-200 mb-0.5 mr-0.5 flex items-center justify-center",
             canSend
-             ? "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/40"
+             ? "bg-violet-600 text-white hover:bg-violet-500 hover:scale-105 active:scale-95 shadow-lg shadow-violet-900/40 animate-[cursed-pop_0.3s_ease-out]"
              : "bg-white/5 text-zinc-600 cursor-not-allowed"
           )}
         >
-          <Send size={20} />
+          <Send size={16} className={canSend ? "translate-x-px" : ""} />
         </button>
       )}
     </div>
-    </div>
+    </motion.div>
   );
 
   if (!chat) {
@@ -554,7 +555,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           <div className="w-20 h-20 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center mb-8 shadow-2xl shadow-violet-500/10">
             <Bot size={40} className="text-violet-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Cursed local AI Studio</h1>
+          <h1 className="text-2xl font-bold text-white mb-3 tracking-tight">Cursed local AI Studio</h1>
           <p className="text-zinc-500 max-w-sm mb-10 text-sm leading-relaxed">
             Your private offline laboratory. Messages are processed locally on-device using the <span className="text-violet-400 font-mono">{selectedModel.name}</span> model.
           </p>

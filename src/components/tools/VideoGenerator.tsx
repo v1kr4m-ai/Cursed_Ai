@@ -134,7 +134,7 @@ export function VideoGeneratorView() {
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
       <div className="max-w-5xl mx-auto h-full flex flex-col">
         <header className="mb-8 mt-6 shrink-0">
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+          <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
             <Clapperboard className="text-orange-500" size={32} />
             Video Studio
           </h1>

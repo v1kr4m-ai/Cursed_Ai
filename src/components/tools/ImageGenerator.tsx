@@ -113,7 +113,7 @@ export function ImageGeneratorView() {
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
       <div className="max-w-6xl mx-auto h-full flex flex-col">
         <header className="mb-8 mt-6 shrink-0">
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+          <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
             <ImagePlus className="text-pink-500" size={32} />
             Image Studio
           </h1>

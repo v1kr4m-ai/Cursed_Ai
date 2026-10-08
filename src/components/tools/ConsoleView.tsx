@@ -56,7 +56,7 @@ export function ConsoleView() {
       <div className="max-w-5xl mx-auto h-full flex flex-col">
         <header className="mb-8 mt-6 shrink-0 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
+            <h1 className="text-2xl font-black text-white mb-2 tracking-tighter flex items-center gap-4">
               <Terminal className="text-emerald-500" size={32} />
               Console
             </h1>
