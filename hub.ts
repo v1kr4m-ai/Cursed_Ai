@@ -238,12 +238,23 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
     try {
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       const headers: Record<string, string> = process.env.HF_TOKEN ? { Authorization: `Bearer ${process.env.HF_TOKEN}` } : {};
+      // A half-finished earlier attempt is kept as "<file>.part": ask the server for the rest instead of starting over.
+      let start = 0;
+      try { start = fs.statSync(tmp).size; } catch { /* nothing to resume */ }
+      if (start > 0) headers.Range = `bytes=${start}-`;
       const r = await fetch(`https://huggingface.co/${repo}/resolve/main/${file.split("/").map(encodeURIComponent).join("/")}`, { headers, signal: job.abort!.signal });
       if (r.status === 401 || r.status === 403) throw new Error("This model is gated - accept its licence on huggingface.co and set an HF_TOKEN in .env.local.");
+      if (r.status === 416) { // the saved part is not usable (file changed or already complete): start fresh
+        fs.unlinkSync(tmp);
+        return downloadHF(job, repo, file, dest);
+      }
       if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
-      job.total = Number(r.headers.get("content-length") || 0);
-      job.message = "Downloading...";
-      const out = fs.createWriteStream(tmp);
+      const resumed = start > 0 && r.status === 206;
+      if (start > 0 && !resumed) start = 0; // server ignored the range: it is sending the whole file again
+      job.received = start;
+      job.total = start + Number(r.headers.get("content-length") || 0);
+      job.message = resumed ? `Resuming from ${(start / 1048576).toFixed(0)} MB...` : "Downloading...";
+      const out = fs.createWriteStream(tmp, { flags: resumed ? "a" : "w" });
       const reader = r.body.getReader();
       while (true) {
         const { done, value } = await reader.read();
@@ -256,9 +267,9 @@ export function registerHub(app: express.Express, opts: { getModelsDir: () => st
       fs.renameSync(tmp, dest);
       job.progress = 100; job.status = "done"; job.message = "Saved";
     } catch (e: any) {
-      try { fs.unlinkSync(tmp); } catch {}
+      // The partial file stays on disk, so starting the same download again resumes where it stopped.
       if (job.status === "cancelled") return;
-      job.status = "error"; job.error = e.message; job.message = "Failed";
+      job.status = "error"; job.error = `${e.message} (progress is kept - start the download again to resume)`; job.message = "Failed";
     }
   }
 
