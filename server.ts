@@ -565,6 +565,35 @@ async function startServer() {
     res.json(memoryStore.map(({ text, timestamp }) => ({ text, timestamp })));
   });
 
+  // API Route: Delete one memory (identified by its timestamp)
+  app.delete("/api/memory/:ts", (req, res) => {
+    const ts = Number(req.params.ts);
+    const before = memoryStore.length;
+    memoryStore = memoryStore.filter(e => e.timestamp !== ts);
+    if (memoryStore.length === before) return res.status(404).json({ error: "Memory not found" });
+    saveMemory();
+    res.json({ status: "success", count: memoryStore.length });
+  });
+
+  // API Route: Edit one memory - the text is embedded again so retrieval follows the new wording
+  app.put("/api/memory/:ts", async (req, res) => {
+    const ts = Number(req.params.ts);
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ error: "Text is required" });
+    const entry = memoryStore.find(e => e.timestamp === ts);
+    if (!entry) return res.status(404).json({ error: "Memory not found" });
+    try {
+      const e = await ensureEmbedder();
+      const output = await e(text, { pooling: "mean", normalize: true });
+      entry.text = text;
+      entry.vector = Array.from(output.data) as number[];
+      saveMemory();
+      res.json({ status: "success" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // API Route: Wipe the entire memory store
   app.delete("/api/memory", (req, res) => {
     memoryStore = [];

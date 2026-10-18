@@ -25,7 +25,9 @@ import {
   MessageSquare,
   Image as ImageIcon,
   Loader2,
-  Folder
+  Folder,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppSettings } from "../../types";
 
 import { AIService } from "../../services/aiService";
+import { notifyError } from "../../lib/notify";
 import { FolderPickerDialog } from "./FolderPickerDialog";
 import { MicTest } from "./MicTest";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -49,6 +52,16 @@ export function MemoryView() {
   const [newMemory, setNewMemory] = React.useState("");
   const [isAdding, setIsAdding] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [editing, setEditing] = React.useState<number | null>(null);
+  const [draft, setDraft] = React.useState("");
+
+  const removeMemory = async (m: { timestamp: number }) => {
+    try { await AIService.deleteMemory(m.timestamp); fetchMemories(); } catch (e: any) { notifyError(e.message, "memory"); }
+  };
+  const saveEdit = async () => {
+    if (editing === null || !draft.trim()) return;
+    try { await AIService.editMemory(editing, draft.trim()); setEditing(null); fetchMemories(); } catch (e: any) { notifyError(e.message, "memory"); }
+  };
 
   const filteredMemories = memories.filter(m => m.text.toLowerCase().includes(search.toLowerCase()));
 
@@ -123,15 +136,29 @@ export function MemoryView() {
                     </p>
                  </div>
                )}
-               {filteredMemories.map((m, i) => (
-                 <div key={i} className="p-6 hover:bg-white/5 transition-colors group relative overflow-hidden">
+               {filteredMemories.map((m) => (
+                 <div key={m.timestamp} className="p-6 hover:bg-white/5 transition-colors group relative overflow-hidden">
                     <div className="flex justify-between items-start mb-3">
                       <div className="model-tag text-[9px]">Memory Chunk</div>
-                      <span className="text-[10px] font-mono text-zinc-600 flex items-center gap-2 group-hover:text-zinc-400 transition-colors">
-                        <Clock size={11} /> {new Date(m.timestamp).toLocaleDateString()}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-mono text-zinc-600 flex items-center gap-2 group-hover:text-zinc-400 transition-colors">
+                          <Clock size={11} /> {new Date(m.timestamp).toLocaleDateString()}
+                        </span>
+                        <button onClick={() => { setEditing(m.timestamp); setDraft(m.text); }} title="Edit memory" className="p-1.5 rounded-lg text-zinc-500 hover:text-violet-400 hover:bg-white/5 transition-colors"><Pencil size={14} /></button>
+                        <button onClick={() => removeMemory(m)} title="Delete memory" className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-white/5 transition-colors"><Trash2 size={14} /></button>
+                      </div>
                     </div>
-                    <p className="text-[15px] text-zinc-300 mb-4 leading-relaxed font-medium">{m.text}</p>
+                    {editing === m.timestamp ? (
+                      <div className="mb-4 space-y-2">
+                        <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setEditing(null); if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) saveEdit(); }} rows={3} className="w-full bg-white/5 border-none rounded-2xl px-4 py-3 text-[15px] text-white focus:outline-none focus:ring-1 focus:ring-violet-500 resize-y" />
+                        <div className="flex gap-2">
+                          <button onClick={saveEdit} disabled={!draft.trim()} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40">Save</button>
+                          <button onClick={() => setEditing(null)} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[15px] text-zinc-300 mb-4 leading-relaxed font-medium">{m.text}</p>
+                    )}
                     <div className="flex items-center justify-between pt-2 border-t border-white/[0.03]">
                        <div className="flex gap-1.5 items-center">
                           <div className="stat-bar w-24">

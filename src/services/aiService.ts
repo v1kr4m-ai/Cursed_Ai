@@ -63,6 +63,16 @@ export class AIService {
     }
   }
 
+  static async deleteMemory(timestamp: number) {
+    const r = await fetch(`/api/memory/${timestamp}`, { method: "DELETE" });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed to delete memory");
+  }
+
+  static async editMemory(timestamp: number, text: string) {
+    const r = await fetch(`/api/memory/${timestamp}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed to edit memory");
+  }
+
   static async getMemories() {
     try {
       const response = await fetch("/api/memory");
