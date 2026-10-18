@@ -4,6 +4,7 @@ import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
 import { PromptSource } from "./PromptSource";
+import { Converter } from "./Converter";
 import { ACCENT, HistoryItem, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, postJson } from "./types";
 
 const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
@@ -384,6 +385,8 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
           </div>
         </div>
       )}
+
+      {folder && <Converter kind={kind} source={folder} />}
 
       <FolderPickerDialog
         open={picker !== null}
