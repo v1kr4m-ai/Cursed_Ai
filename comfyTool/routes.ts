@@ -8,7 +8,7 @@ import { listWorkflows, loadApiWorkflow, loadWorkflowInfo, loadWorkflowJson, isU
 import { convertUiWorkflow } from "./convert";
 import { extractUpload, PROMPT_FILE_EXTENSIONS } from "./extract";
 import { findPrompt } from "./promptFinder";
-import { autoOutputName, cancelPrompt, runWorkflow, RunEvent } from "./runner";
+import { autoOutputName, cancelPrompt, runWorkflow, uniqueDestination, RunEvent } from "./runner";
 import { createStore, Kind } from "./store";
 
 type Json = Record<string, any>;
@@ -167,6 +167,21 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(f => ({ name: f.name, path: f.path, type: VIDEO_EXT.has(f.ext) ? "video" : AUDIO_EXT.has(f.ext) ? "audio" : "image" }));
     res.json({ items });
+  });
+
+  // Dropped reference file: saved into the reference folder (or outputs/references when none is chosen yet).
+  app.post("/api/tool/ref-upload", express.raw({ type: "*/*", limit: "500mb" }), (req, res) => {
+    const name = path.basename(String(req.query.name || "")).replace(/[^A-Za-z0-9 ._()-]+/g, "_");
+    const ext = path.extname(name).toLowerCase();
+    if (!name || !(IMAGE_EXT.has(ext) || VIDEO_EXT.has(ext) || AUDIO_EXT.has(ext))) return res.status(400).json({ error: "Not an image, video or audio file" });
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: "Empty file" });
+    const c = store.loadConfig();
+    const folder = c.refFolder && fs.existsSync(c.refFolder) ? c.refFolder : path.join(opts.dataDir, "outputs", "references");
+    fs.mkdirSync(folder, { recursive: true });
+    if (c.refFolder !== folder) { c.refFolder = folder; store.saveConfig(c); }
+    const dest = uniqueDestination(path.join(folder, name));
+    fs.writeFileSync(dest, req.body);
+    res.json({ folder, item: { name: path.basename(dest), path: dest, type: VIDEO_EXT.has(ext) ? "video" : AUDIO_EXT.has(ext) ? "audio" : "image" } });
   });
 
   // Serve a media file for thumbnails / results. Only media inside the folders this tool uses, or a result it made.

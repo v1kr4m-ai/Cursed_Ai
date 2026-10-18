@@ -137,6 +137,22 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
     } catch (e: any) { notifyError(e.message, kind); }
   };
 
+  // Files dropped on the reference card are saved into the reference folder and fill the first free slot of their type.
+  const [refDrag, setRefDrag] = React.useState(false);
+  const dropRefs = async (files: File[]) => {
+    for (const f of files) {
+      try {
+        const d = await api<{ folder: string; item: MediaItem }>(`/api/tool/ref-upload?name=${encodeURIComponent(f.name)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: f });
+        setRefFolder(d.folder);
+        setMedia(m => [...m.filter(x => x.path !== d.item.path), d.item].sort((x, y) => x.name.localeCompare(y.name)));
+        setSlots(s => {
+          const i = s[d.item.type].findIndex(v => !v);
+          return i < 0 ? s : { ...s, [d.item.type]: s[d.item.type].map((v, j) => j === i ? d.item.path : v) };
+        });
+      } catch (e: any) { notifyError(`${f.name}: ${e.message}`, kind); }
+    }
+  };
+
   const setSlot = (type: "image" | "video" | "audio", i: number, p: string) => setSlots(s => ({ ...s, [type]: s[type].map((v, j) => j === i ? p : v) }));
 
   const missingRefs = wf ? (["image", "video", "audio"] as const).flatMap(t => slots[t].map((p, i) => ({ t, i, p, ok: wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"][i] })).filter(s => !s.p && !s.ok)) : [];
@@ -316,11 +332,16 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
 
           {/* Reference slots */}
           {(wf.refImageCount > 0 || wf.refVideoCount > 0 || wf.refAudioCount > 0) && (
-            <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-4">
+            <div
+              className={`glass p-5 rounded-[1.75rem] border-white/5 space-y-4 transition-all ${refDrag ? `ring-2 ${a.border}` : ""}`}
+              onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setRefDrag(true); } }}
+              onDragLeave={() => setRefDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setRefDrag(false); dropRefs([...e.dataTransfer.files]); }}
+            >
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-white">Reference media</p>
-                  <p className="text-[11px] text-zinc-500">{refFolder ? refFolder : "Pick a folder of images / videos to choose from."}</p>
+                  <p className="text-[11px] text-zinc-500">{refFolder ? refFolder : "Pick a folder, or drop files here."}{refFolder ? " - drop files here to add" : ""}</p>
                 </div>
                 <button onClick={() => setPicker("refs")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shrink-0"><FolderOpen size={14} /> {refFolder ? "Change" : "Choose folder"}</button>
               </div>
