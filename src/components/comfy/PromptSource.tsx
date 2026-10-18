@@ -3,7 +3,7 @@ import { FileText, Upload, ChevronDown, Search, Loader2, AlertTriangle } from "l
 import { EnhancePromptButton } from "../tools/EnhancePromptButton";
 import { ACCENT, Kind, PromptCandidate, PromptColumnInfo, PromptFileResult, api } from "./types";
 
-const FILE_TYPES = ".txt,.md,.docx,.xlsx,.pdf,.png,.jpg,.jpeg,.webp,.bmp";
+const FILE_TYPES = ".txt,.md,.csv,.tsv,.rtf,.doc,.docx,.docm,.odt,.xlsx,.xlsm,.pptx,.pptm,.pdf,.png,.jpg,.jpeg,.webp,.bmp";
 
 interface Props {
   kind: Kind;

@@ -7,8 +7,9 @@ import JSZip from "jszip";
 import { CellValue, ExtractedContent } from "./promptFinder";
 
 const TEXT_EXTENSIONS = new Set([".txt", ".md"]);
+const DELIMITED: Record<string, string> = { ".csv": ",", ".tsv": "	" };
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"]);
-export const PROMPT_FILE_EXTENSIONS = [".txt", ".md", ".docx", ".xlsx", ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp"];
+export const PROMPT_FILE_EXTENSIONS = [".txt", ".md", ".csv", ".tsv", ".rtf", ".doc", ".docx", ".docm", ".odt", ".xlsx", ".xlsm", ".pptx", ".pptm", ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp"];
 
 const xmlDecode = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&amp;/g, "&");
 
@@ -22,6 +23,65 @@ async function extractDocx(file: string): Promise<string> {
     [...p.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:tab\/>|<w:br\/>|<w:cr\/>/g)]
       .map(m => (m[0] === "<w:tab/>" ? "\t" : m[0] === "<w:br/>" || m[0] === "<w:cr/>" ? "\n" : xmlDecode(m[1] ?? "")))
       .join("")).join("\n");
+}
+
+/** Slides in order; every paragraph of every shape on its own line, a blank line between slides. */
+async function extractPptx(file: string): Promise<string> {
+  const zip = await JSZip.loadAsync(fs.readFileSync(file));
+  const slides = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => Number(a.match(/(\d+)\.xml$/)![1]) - Number(b.match(/(\d+)\.xml$/)![1]));
+  if (!slides.length) throw new Error("not a valid .pptx file");
+  const out: string[] = [];
+  for (const name of slides) {
+    const xml = await zip.file(name)!.async("string");
+    const paras = (xml.match(/<a:p>[\s\S]*?<\/a:p>|<a:p [^>]*>[\s\S]*?<\/a:p>/g) || [])
+      .map(p => [...p.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map(m => xmlDecode(m[1])).join("")).filter(t => t.trim());
+    if (paras.length) out.push(paras.join("\n"));
+  }
+  return out.join("\n\n");
+}
+
+/** OpenDocument text: the paragraphs and headings of content.xml. */
+async function extractOdt(file: string): Promise<string> {
+  const zip = await JSZip.loadAsync(fs.readFileSync(file));
+  const xml = await zip.file("content.xml")?.async("string");
+  if (!xml) throw new Error("not a valid .odt file");
+  return (xml.match(/<text:[ph][ >][\s\S]*?<\/text:[ph]>/g) || [])
+    .map(p => xmlDecode(p.replace(/<text:s\/>/g, " ").replace(/<text:line-break\/>/g, "\n").replace(/<[^>]+>/g, ""))).join("\n");
+}
+
+/** Old Word (.doc) through word-extractor. */
+async function extractDoc(file: string): Promise<string> {
+  const WordExtractor = (await import("word-extractor")).default as any;
+  const doc = await new WordExtractor().extract(file);
+  return String(doc.getBody());
+}
+
+/** RTF: drop control words and groups, keep the text (good enough for prompts). */
+function extractRtf(file: string): string {
+  const raw = fs.readFileSync(file, "latin1");
+  return raw
+    .replace(/\\'([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\(par|line)\b ?/g, "\n").replace(/\\tab\b ?/g, "\t")
+    .replace(/\{\\\*[^{}]*\}/g, "").replace(/\{\\(fonttbl|colortbl|stylesheet|info)[\s\S]*?\}\s*\}/g, "")
+    .replace(/\\[a-z]+-?\d* ?/gi, "").replace(/[{}]/g, "").replace(/\r/g, "").trim();
+}
+
+/** CSV / TSV as cells so the prompt column is found the same way as in a spreadsheet. */
+function extractDelimited(file: string, delimiter: string): CellValue[] {
+  const text = fs.readFileSync(file, "utf8").replace(/^﻿/, "");
+  const cells: CellValue[] = [];
+  let row = 1, col = 1, cur = "", quoted = false;
+  const push = () => { const t = cur.trim(); if (t) cells.push({ sheet: "", row, col, text: t }); cur = ""; };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else quoted = false; } else cur += ch; }
+    else if (ch === '"') quoted = true;
+    else if (ch === delimiter) { push(); col++; }
+    else if (ch === "\n") { push(); row++; col = 1; }
+    else if (ch !== "\r") cur += ch;
+  }
+  push();
+  return cells;
 }
 
 async function extractPdf(file: string): Promise<string> {
@@ -75,8 +135,14 @@ export async function extractPromptFile(file: string): Promise<ExtractedContent>
   const ext = path.extname(file).toLowerCase();
   if (TEXT_EXTENSIONS.has(ext)) return { kind: "text", text: fs.readFileSync(file, "utf8") };
   if (ext === ".pdf") return { kind: "text", text: await extractPdf(file) };
-  if (ext === ".docx") return { kind: "text", text: await extractDocx(file) };
-  if (ext === ".xlsx") return { kind: "cells", cells: await extractXlsx(file) };
+  if (ext === ".docx" || ext === ".docm") return { kind: "text", text: await extractDocx(file) };
+  if (ext === ".doc") return { kind: "text", text: await extractDoc(file) };
+  if (ext === ".odt") return { kind: "text", text: await extractOdt(file) };
+  if (ext === ".rtf") return { kind: "text", text: extractRtf(file) };
+  if (ext === ".pptx" || ext === ".pptm") return { kind: "text", text: await extractPptx(file) };
+  if (ext === ".xlsx" || ext === ".xlsm") return { kind: "cells", cells: await extractXlsx(file) };
+  if (ext === ".xls") throw new Error("Old .xls workbooks are not supported - save it as .xlsx (or .csv) first.");
+  if (DELIMITED[ext]) return { kind: "cells", cells: extractDelimited(file, DELIMITED[ext]) };
   if (IMAGE_EXTENSIONS.has(ext)) return { kind: "text", text: await extractImageOcr(file) };
   throw new Error(`unsupported file extension: ${ext}`);
 }

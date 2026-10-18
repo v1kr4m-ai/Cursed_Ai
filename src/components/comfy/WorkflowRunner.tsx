@@ -5,6 +5,8 @@ import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
 import { PromptSource } from "./PromptSource";
 import { Converter } from "./Converter";
+import { QueueList } from "./shared";
+import { GalleryHistory } from "../tools/GalleryHistory";
 import { ACCENT, HistoryItem, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, nativeFiles, nativeFolder, postJson } from "./types";
 
 const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
@@ -24,7 +26,7 @@ function Media({ path, className }: { path: string; className?: string }) {
  * Runs saved ComfyUI workflows for one tab (images or video). Workflows come from a folder of .json files; the prompt,
  * reference slots and main settings are worked out from each graph, so nothing has to be wired by hand.
  */
-export function WorkflowRunner({ kind, modelId, toolbar }: { kind: Kind; modelId?: string; toolbar?: React.ReactNode }) {
+export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: Kind; modelId?: string; toolbar?: React.ReactNode; showHistory?: boolean }) {
   const a = ACCENT[kind];
   const ring = `focus:ring-1 ${a.ring}`;
   const [st, setSt] = React.useState<ToolState | null>(null);
@@ -469,6 +471,12 @@ export function WorkflowRunner({ kind, modelId, toolbar }: { kind: Kind; modelId
 
         {/* ───────── Canvas ───────── */}
         <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">
+          {showHistory ? (
+            <>
+            <div className="rounded-3xl border border-white/5 bg-black/20 p-4 lg:flex-1 lg:overflow-y-auto"><GalleryHistory kind={kind} refreshKey={history.length} /></div>
+            <QueueList kind={kind} rows={active.map(r => ({ id: r.runId, label: r.workflow, status: r.status, detail: r.progress ? `${r.progress[0]}/${r.progress[1]}` : undefined, pausable: !!r.pausable, cancellable: r.cancellable }))} onPause={pauseJob} onResume={resumeJob} onCancel={cancelOther} onRemove={dropJob} />
+            </>
+          ) : (<>
           <div className="relative min-h-[300px] lg:min-h-0 lg:flex-1 rounded-3xl border border-white/5 bg-black/30 overflow-hidden flex items-center justify-center">
             <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
             {busy ? (
@@ -502,30 +510,12 @@ export function WorkflowRunner({ kind, modelId, toolbar }: { kind: Kind; modelId
             </div>
           )}
 
-          {/* Job queue */}
-          {active.length > 0 && (
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3 space-y-1.5">
-              <p className={label + " !mb-1"}>Queue · {active.length}</p>
-              {active.map(r => (
-                <div key={r.runId} className="flex items-center justify-between gap-3 text-xs text-zinc-400">
-                  <span className="truncate"><span className={r.status === "running" ? a.text : r.status === "paused" ? "text-amber-400" : "text-zinc-500"}>{r.status}</span> · {r.workflow}{r.ahead !== null ? ` (${r.ahead} ahead)` : ""}{r.progress ? ` · ${r.progress[0]}/${r.progress[1]}` : ""}</span>
-                  <span className="flex gap-1 shrink-0">
-                    {r.status === "paused" ? (
-                      <>
-                        <button onClick={() => resumeJob(r.runId)} title="Resume (goes to the end of the queue)" className={`${iconBtn} !p-1.5 !text-emerald-400`}><RotateCw size={13} /></button>
-                        <button onClick={() => dropJob(r.runId)} title="Remove" className={`${iconBtn} !p-1.5 hover:!text-red-400`}><X size={13} /></button>
-                      </>
-                    ) : (
-                      <>
-                        {r.pausable && <button onClick={() => pauseJob(r.runId)} title="Pause (take it out of the queue)" className={`${iconBtn} !p-1.5 !text-amber-400`}><Pause size={13} /></button>}
-                        {r.cancellable && <button onClick={() => cancelOther(r.runId)} title="Cancel" className={`${iconBtn} !p-1.5 hover:!text-red-400`}><X size={13} /></button>}
-                      </>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Job queue - always visible */}
+          <QueueList
+            kind={kind}
+            rows={active.map(r => ({ id: r.runId, label: r.workflow + (r.ahead !== null ? ` (${r.ahead} ahead)` : ""), status: r.status, detail: r.progress ? `${r.progress[0]}/${r.progress[1]}` : undefined, pausable: !!r.pausable, cancellable: r.cancellable }))}
+            onPause={pauseJob} onResume={resumeJob} onCancel={cancelOther} onRemove={dropJob}
+          />
 
           {/* Filmstrip */}
           {history.length > 0 && (
@@ -540,6 +530,7 @@ export function WorkflowRunner({ kind, modelId, toolbar }: { kind: Kind; modelId
               </div>
             </div>
           )}
+          </>)}
         </div>
       </div>
 

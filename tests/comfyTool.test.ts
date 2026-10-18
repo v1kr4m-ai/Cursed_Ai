@@ -56,3 +56,16 @@ describe("convertUiWorkflow", () => {
     expect(r.apiWorkflow["1"].inputs.steps).toBe(20);
   });
 });
+
+describe("extractUpload", () => {
+  it("reads prompts out of a csv and a pptx", async () => {
+    const { extractUpload } = await import("../comfyTool/extract");
+    const JSZip = (await import("jszip")).default;
+    const csv = findPrompt(await extractUpload("p.csv", Buffer.from('id,prompt\n1,"a castle, at dusk"\n2,a dragon\n')));
+    expect(csv.candidates.map(c => c.text)).toEqual(["a castle, at dusk", "a dragon"]);
+    const z = new JSZip();
+    z.file("ppt/slides/slide1.xml", "<p:sld><a:p><a:r><a:t>Prompt: a red kite</a:t></a:r></a:p></p:sld>");
+    const pptx = findPrompt(await extractUpload("p.pptx", await z.generateAsync({ type: "nodebuffer" })));
+    expect(pptx.prompt).toBe("a red kite");
+  });
+});
