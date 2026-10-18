@@ -1,6 +1,7 @@
 import { registerHub, modelDirs } from "./hub";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
+import { registerComfyTool } from "./comfyTool/routes";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -879,7 +880,7 @@ async function startServer() {
     const kind = req.query.kind === "video" ? "video" : "image";
     const dir = galleryDir(kind);
     const items = fs.readdirSync(dir)
-      .filter(f => /\.(png|jpg|jpeg|webp|mp4)$/i.test(f))
+      .filter(f => (kind === "video" ? /\.(mp4|webm)$/i : /\.(png|jpg|jpeg|webp|gif)$/i).test(f))
       .map(f => ({ file: f, url: `/api/gallery/file/${kind}/${encodeURIComponent(f)}`, createdAt: fs.statSync(path.join(dir, f)).mtimeMs }))
       .sort((a, b) => b.createdAt - a.createdAt);
     res.json({ dir, items });
@@ -1415,6 +1416,14 @@ async function startServer() {
         job.error = error.message;
       }
     })();
+  });
+
+  // Workflow runner: run the user's own ComfyUI workflows (Image and Video tabs, "Workflows" mode).
+  registerComfyTool(app, {
+    dataDir: process.cwd(),
+    getComfyUrl: () => COMFYUI_URL,
+    getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
+    galleryDirs: { image: galleryDir("image"), video: galleryDir("video") },
   });
 
   // Vite middleware for development

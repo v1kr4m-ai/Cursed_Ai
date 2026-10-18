@@ -3,6 +3,8 @@ import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { GalleryHistory } from "./GalleryHistory";
+import { WorkflowRunner } from "../comfy/WorkflowRunner";
+import { ModeSwitch, useLocalMode } from "../comfy/ModeSwitch";
 import { notify, notifyError } from "../../lib/notify";
 import { ProgressBar } from "../layout/ProgressBar";
 import { friendlyError } from "../../services/errors";
@@ -18,6 +20,8 @@ const SIZE_PRESETS = [
 
 export function ImageGeneratorView() {
   const [source, setSource] = React.useState<Source>("cloud");
+  const [localMode, setLocalMode] = useLocalMode("image");
+  const wfMode = source === "local" && localMode === "workflows";
   const [prompt, setPrompt] = React.useState("");
   const [negativePrompt, setNegativePrompt] = React.useState("");
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -138,7 +142,17 @@ export function ImageGeneratorView() {
           </p>
         </header>
 
-        <div className="glass p-6 rounded-[2rem] border-white/5 mb-8 shrink-0 space-y-4">
+        {source === "local" && (
+          <div className={`glass p-5 rounded-[2rem] border-white/5 shrink-0 space-y-4 ${wfMode ? "mb-6" : "mb-4"}`}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <ModeSwitch kind="image" mode={localMode} onChange={setLocalMode} />
+              <span className="text-[11px] text-zinc-500">{wfMode ? "Run your saved ComfyUI workflows" : "One-click generation with the built-in workflow"}</span>
+            </div>
+            {wfMode && <ComfyStatus onReady={loadCheckpoints} />}
+          </div>
+        )}
+
+        <div className={`glass p-6 rounded-[2rem] border-white/5 mb-8 shrink-0 space-y-4${wfMode ? " hidden" : ""}`}>
           {source === "local" && <ComfyStatus onReady={loadCheckpoints} />}
           {source === "local" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -239,6 +253,7 @@ export function ImageGeneratorView() {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-10">
+          {wfMode && <WorkflowRunner kind="image" />}
           <GalleryHistory kind="image" refreshKey={refreshKey} />
         </div>
       </div>
