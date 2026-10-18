@@ -27,7 +27,9 @@ import {
   Loader2,
   Folder,
   Pencil,
-  Trash2
+  Trash2,
+  Upload,
+  Download
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppSettings } from "../../types";
 
 import { AIService } from "../../services/aiService";
-import { notifyError } from "../../lib/notify";
+import { notify, notifyError } from "../../lib/notify";
 import { FolderPickerDialog } from "./FolderPickerDialog";
 import { MicTest } from "./MicTest";
 import { AppearanceSettings } from "./AppearanceSettings";
@@ -52,6 +54,29 @@ export function MemoryView() {
   const [newMemory, setNewMemory] = React.useState("");
   const [isAdding, setIsAdding] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const importRef = React.useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = React.useState(false);
+  const exportMemories = () => {
+    const blob = new Blob([JSON.stringify(memories, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cursed-memory-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const importMemories = async (file?: File) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const data = JSON.parse(await file.text());
+      const entries = Array.isArray(data) ? data : data?.entries;
+      if (!Array.isArray(entries)) throw new Error("That file is not a memory export (expected a JSON list).");
+      const r = await AIService.importMemories(entries);
+      notify({ message: `Imported ${r.added} note(s)${r.skipped ? `, skipped ${r.skipped} duplicate/empty` : ""}`, tab: "memory" });
+      fetchMemories();
+    } catch (e: any) { notifyError(e.message, "memory"); }
+    finally { setImporting(false); if (importRef.current) importRef.current.value = ""; }
+  };
   const [editing, setEditing] = React.useState<number | null>(null);
   const [draft, setDraft] = React.useState("");
 
@@ -118,6 +143,7 @@ export function MemoryView() {
 
         <div className="glass rounded-[2rem] overflow-hidden flex flex-col flex-1 shadow-2xl shadow-black/40 border-white/5">
            <div className="p-5 border-b border-white/5 flex items-center gap-4 bg-white/3">
+             <input ref={importRef} type="file" accept=".json,application/json" hidden onChange={(e) => importMemories(e.target.files?.[0])} />
              <Search size={18} className="text-zinc-500" />
              <input
               value={search}
@@ -125,6 +151,8 @@ export function MemoryView() {
               placeholder="Search vector space..."
               className="bg-transparent border-none focus:ring-0 text-sm text-zinc-100 w-full placeholder:text-zinc-700 font-medium"
              />
+             <button onClick={() => importRef.current?.click()} disabled={importing} title="Import notes from a JSON file" className="shrink-0 flex items-center gap-1.5 text-[11px] font-bold text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg disabled:opacity-40">{importing ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Import</button>
+             <button onClick={exportMemories} disabled={memories.length === 0} title="Save all notes to a JSON file" className="shrink-0 flex items-center gap-1.5 text-[11px] font-bold text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg disabled:opacity-40"><Download size={12} /> Export</button>
            </div>
            <ScrollArea className="flex-1">
              <div className="divide-y divide-white/5">

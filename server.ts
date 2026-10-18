@@ -565,6 +565,31 @@ async function startServer() {
     res.json(memoryStore.map(({ text, timestamp }) => ({ text, timestamp })));
   });
 
+  // API Route: Import notes from a JSON file ([{text, timestamp?}] or ["text", ...]); embeds each, skips ones already stored
+  app.post("/api/memory/import", async (req, res) => {
+    const raw = Array.isArray(req.body?.entries) ? req.body.entries : null;
+    if (!raw) return res.status(400).json({ error: "Expected { entries: [...] }" });
+    try {
+      const e = await ensureEmbedder();
+      const have = new Set(memoryStore.map(x => x.text.trim().toLowerCase()));
+      let added = 0, skipped = 0;
+      for (const item of raw.slice(0, 5000)) {
+        const text = String(typeof item === "string" ? item : item?.text || "").trim();
+        if (!text || have.has(text.toLowerCase())) { skipped++; continue; }
+        const output = await e(text, { pooling: "mean", normalize: true });
+        let ts = Number(item?.timestamp) || Date.now();
+        while (memoryStore.some(x => x.timestamp === ts)) ts++;
+        memoryStore.push({ text, vector: Array.from(output.data) as number[], timestamp: ts });
+        have.add(text.toLowerCase());
+        added++;
+      }
+      saveMemory();
+      res.json({ added, skipped, count: memoryStore.length });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // API Route: Delete one memory (identified by its timestamp)
   app.delete("/api/memory/:ts", (req, res) => {
     const ts = Number(req.params.ts);

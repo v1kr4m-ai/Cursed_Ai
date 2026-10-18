@@ -73,6 +73,13 @@ export class AIService {
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed to edit memory");
   }
 
+  static async importMemories(entries: unknown[]): Promise<{ added: number; skipped: number }> {
+    const r = await fetch("/api/memory/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entries }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Import failed");
+    return d;
+  }
+
   static async getMemories() {
     try {
       const response = await fetch("/api/memory");
