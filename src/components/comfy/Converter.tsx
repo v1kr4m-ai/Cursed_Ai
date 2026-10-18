@@ -7,7 +7,7 @@ import { ACCENT, Kind, nativeFolder, postJson } from "./types";
 interface Row { name: string; status: string; detail: string }
 
 /** Batch-converts UI-format workflow files to API format into another folder (originals are never touched). */
-export function Converter({ kind, source }: { kind: Kind; source: string }) {
+export function Converter({ kind, source, bare }: { kind: Kind; source: string; bare?: boolean }) {
   const a = ACCENT[kind];
   const [open, setOpen] = React.useState(false);
   const [dest, setDest] = React.useState("");
@@ -27,7 +27,7 @@ export function Converter({ kind, source }: { kind: Kind; source: string }) {
   };
 
   return (
-    <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-4">
+    <div className={bare ? "space-y-3" : "glass p-5 rounded-[1.75rem] border-white/5 space-y-4"}>
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between text-left">
         <span><span className="text-sm font-bold text-white block">Convert workflows to API format</span><span className="text-[11px] text-zinc-500">Batch-convert the folder's UI workflows into a second folder. Originals stay untouched.</span></span>
         <ChevronDown size={14} className={`text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />

@@ -6,6 +6,7 @@ import { GeminiKeyButton } from "./GeminiKeyButton";
 import { EnhancePromptButton } from "./EnhancePromptButton";
 import { GalleryHistory } from "./GalleryHistory";
 import { WorkflowRunner } from "../comfy/WorkflowRunner";
+import { StudioToolbar } from "../comfy/StudioToolbar";
 import { ModeSwitch, useLocalMode } from "../comfy/ModeSwitch";
 import { notify, notifyError } from "../../lib/notify";
 import { ProgressBar } from "../layout/ProgressBar";
@@ -114,6 +115,21 @@ export function ImageGeneratorView({ modelId }: { modelId?: string }) {
       setIsGenerating(false);
     }
   };
+
+  // Offline workflows get their own full-height studio layout.
+  if (wfMode) {
+    return (
+      <div className="flex-1 bg-transparent p-4 h-full overflow-hidden">
+        <div className="max-w-[1600px] mx-auto h-full">
+          <WorkflowRunner
+            kind="image"
+            modelId={modelId}
+            toolbar={<StudioToolbar kind="image" icon={<ImagePlus className="text-pink-500" size={24} />} title="Image Studio" onCloud={() => setSource("cloud")} mode={localMode} onMode={setLocalMode} />}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
@@ -257,7 +273,6 @@ export function ImageGeneratorView({ modelId }: { modelId?: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-10">
-          {wfMode && <WorkflowRunner kind="image" modelId={modelId} />}
           <GalleryHistory kind="image" refreshKey={refreshKey} />
         </div>
       </div>

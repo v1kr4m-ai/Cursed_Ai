@@ -11,6 +11,8 @@ interface Props {
   prompt: string;
   onPrompt: (text: string) => void;
   needsPrompt: boolean;
+  /** Inside a collapsible panel: no card chrome or heading. */
+  bare?: boolean;
   /** Every prompt found in the file (spreadsheet column / document headings), for running them all. */
   onCandidates?: (texts: string[]) => void;
 }
@@ -20,7 +22,7 @@ interface Props {
  * prompt is found for you. Spreadsheets list every prompt (the column is guessed and can be switched); documents with
  * several "Prompt" headings list each one. You can always edit the text by hand.
  */
-export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates }: Props) {
+export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates, bare }: Props) {
   const a = ACCENT[kind];
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = React.useState("");
@@ -79,22 +81,25 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
 
   return (
     <div
-      className={`glass p-5 rounded-[1.75rem] border-white/5 space-y-4 transition-all ${dragging ? `ring-2 ${a.border}` : ""}`}
+      className={`${bare ? "rounded-xl" : "glass p-5 rounded-[1.75rem] border-white/5"} space-y-3 transition-all ${dragging ? `ring-2 ${a.border}` : ""}`}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) readFile(f); }}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-white">Prompt</p>
-          <p className="text-[11px] text-zinc-500">Type it, or drop a file and the prompt is pulled out of it.</p>
+      <input ref={fileRef} type="file" accept={FILE_TYPES} hidden onChange={(e) => e.target.files?.[0] && readFile(e.target.files[0])} />
+      {!bare && (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-white">Prompt</p>
+            <p className="text-[11px] text-zinc-500">Type it, or drop a file and the prompt is pulled out of it.</p>
+          </div>
+          
+          <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shrink-0">
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Choose file
+          </button>
         </div>
-        <input ref={fileRef} type="file" accept={FILE_TYPES} hidden onChange={(e) => e.target.files?.[0] && readFile(e.target.files[0])} />
-        <button onClick={() => fileRef.current?.click()} disabled={busy} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shrink-0">
-          {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Choose file
-        </button>
-      </div>
-
+  
+        )}
       {fileName && !error && (
         <p className="text-[11px] text-zinc-500 flex items-center gap-1.5"><FileText size={12} /> {fileName}{candidates.length > 0 ? ` - ${candidates.length} prompts found` : ""}</p>
       )}
@@ -133,7 +138,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
       )}
 
       <div>
-        <div className="flex items-center justify-between mb-2"><label className={label + " !mb-0"}>Prompt text</label><EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></div>
+        <div className="flex items-center justify-between mb-1"><label className={label + " !mb-0"}>Prompt text</label><span className="inline-flex items-center gap-1.5">{bare && <button onClick={() => fileRef.current?.click()} disabled={busy} title="Pull the prompt out of a file (txt, md, docx, xlsx, pdf, image)" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors disabled:opacity-40">{busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}</button>}<EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></span></div>
         <textarea
           value={prompt}
           onChange={(e) => onPrompt(e.target.value)}

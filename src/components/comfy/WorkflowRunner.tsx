@@ -1,5 +1,5 @@
 import React from "react";
-import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
+import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2 } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
@@ -24,7 +24,7 @@ function Media({ path, className }: { path: string; className?: string }) {
  * Runs saved ComfyUI workflows for one tab (images or video). Workflows come from a folder of .json files; the prompt,
  * reference slots and main settings are worked out from each graph, so nothing has to be wired by hand.
  */
-export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string }) {
+export function WorkflowRunner({ kind, modelId, toolbar }: { kind: Kind; modelId?: string; toolbar?: React.ReactNode }) {
   const a = ACCENT[kind];
   const ring = `focus:ring-1 ${a.ring}`;
   const [st, setSt] = React.useState<ToolState | null>(null);
@@ -58,6 +58,8 @@ export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string
   const [active, setActive] = React.useState<RunRow[]>([]);
   const esRef = React.useRef<EventSource | null>(null);
   const pausedRef = React.useRef<string | null>(null);
+  const [viewPath, setViewPath] = React.useState<string | null>(null);
+  const [activeSetup, setActiveSetup] = React.useState<string | null>(null);
   // Saved setups: a named snapshot of workflow + prompt + settings + references + destination. Kept in this browser.
   interface Setup { name: string; workflow: string; prompt: string; fieldValues: Record<string, any>; randomSeed: boolean; dest: string; fileName: string; slots: Record<"image" | "video" | "audio", string[]> }
   const setupKey = `cursed.comfySetups.${kind}`;
@@ -193,12 +195,12 @@ export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string
       const e = JSON.parse(m.data);
       switch (e.type) {
         case "submitted": setStatus("Queued in ComfyUI"); break;
-        case "status": setStatus(e.message); break;
+        case "status": setStatus(/^submitted/i.test(e.message) ? "Waiting for ComfyUI" : e.message); break;
         case "queue": setQueueNote(e.remaining > 1 ? `${e.remaining - 1} job(s) ahead` : ""); break;
         case "progress": setStatus("Generating"); setProgress([e.value, e.max]); setQueueNote(""); break;
         case "preview": setPreview(`data:image/jpeg;base64,${e.image_b64}`); break;
         case "log": break;
-        case "done": setResult(e.path); setProgress(null); notify({ message: "Workflow finished", tab: kind }); finish(); break;
+        case "done": setResult(e.path); setViewPath(e.path); setProgress(null); notify({ message: "Workflow finished", tab: kind }); finish(); break;
         case "failed": setRunError(e.message); notifyError(e.message, kind); finish(); break;
         case "cancelled": setStatus("Cancelled"); setRunError(pausedRef.current === id ? "Paused - resume it under Jobs." : "Cancelled"); finish(); break;
       }
@@ -245,11 +247,13 @@ export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string
     if (!name) return;
     const snap: Setup = { name, workflow: wf.path, prompt, fieldValues, randomSeed, dest, fileName, slots };
     persistSetups([snap, ...setups.filter(x => x.name !== name)]);
+    setActiveSetup(name);
     notify({ message: `Saved setup "${name}"`, tab: kind });
   };
   const loadSetup = (name: string) => {
     const x = setups.find(v => v.name === name);
     if (!x) return;
+    setActiveSetup(name);
     if (!workflows.some(w => w.path === x.workflow)) { notifyError("That setup's workflow is not in the current folder.", kind); return; }
     if (x.workflow === selected) { setPrompt(x.prompt); setFieldValues(x.fieldValues); setRandomSeed(x.randomSeed); setDest(x.dest); setFileName(x.fileName); setSlots(x.slots); }
     else { setPendingSetup(x); setSelected(x.workflow); }
@@ -278,260 +282,266 @@ export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string
   };
   const reveal = (p: string) => postJson("/api/tool/reveal", { path: p }).catch((e) => notifyError(e.message, kind));
 
-  const shown = workflows.filter(w => !filter || w.name.toLowerCase().includes(filter.toLowerCase()));
+  // A converted copy in a sub-folder (e.g. API_FORMAT/x) is hidden when the original x is listed too - they run the same.
+  const names = new Set(workflows.map(w => w.name));
+  const shown = workflows.filter(w => !(w.name.includes("/") && names.has(w.name.slice(w.name.lastIndexOf("/") + 1))))
+    .filter(w => !filter || w.name.toLowerCase().includes(filter.toLowerCase()));
   const pct = progress ? (progress[0] / Math.max(1, progress[1])) * 100 : null;
 
+  // What the stage shows: the live job, else the picked / newest result.
+  const stagePath = !busy ? (viewPath || result || history[0]?.path || null) : null;
+  const stageItem = stagePath ? history.find(h => h.path === stagePath) : undefined;
+  const refCount = wf ? wf.refImageCount + wf.refVideoCount + wf.refAudioCount : 0;
+  const refFilled = (["image", "video", "audio"] as const).reduce((n, t) => n + slots[t].filter(Boolean).length, 0);
+  const iconBtn = "p-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors disabled:opacity-40";
+  const field = `w-full bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none ${ring} placeholder:text-zinc-700`;
+
   return (
-    <div className="space-y-5">
-      {/* Workflow folder + picker */}
-      <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-white">Workflow</p>
-            <p className="text-[11px] text-zinc-500">{folder ? `${workflows.length} ${kind} workflows in this folder` : "Pick the folder where your ComfyUI workflows are saved."}</p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            {folder && <button onClick={() => loadWorkflows(folder, selected)} disabled={loading} title="Reload" className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 transition-colors"><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>}
-            <button onClick={() => chooseFolder("workflows")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors"><FolderOpen size={14} /> {folder ? "Change folder" : "Choose folder"}</button>
-          </div>
-        </div>
-        {folder && <p className="text-[11px] text-zinc-600 truncate" title={folder}>{folder}</p>}
-        {loadError && <p className="text-[11px] text-red-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {loadError}</p>}
-        {st && !st.comfyReachable && <p className="text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={12} /> ComfyUI is not reachable - start it before running. Workflows saved in UI format can only be converted while it runs.</p>}
+    <div className="h-full flex flex-col gap-3 min-h-0">
+      {toolbar}
 
-        {workflows.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {workflows.length > 8 && <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter..." className={`${input} ${ring} sm:w-40`} />}
-            <div className="relative flex-1 min-w-[220px]">
-              <select value={selected} onChange={e => setSelected(e.target.value)} className={`${input} ${ring} appearance-none pr-9 cursor-pointer`}>
-                {shown.map(w => <option key={w.path} value={w.path} className="bg-zinc-900">{w.name}{w.isRunnable ? "" : "  (cannot run)"}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-            </div>
-          </div>
-        )}
-        {workflows.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Bookmark size={13} className={a.text} />
-            <select value="" onChange={e => e.target.value && loadSetup(e.target.value)} className={`bg-white/5 border-none rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none ${ring} cursor-pointer`}>
-              <option value="" className="bg-zinc-900">{setups.length ? "Saved setups..." : "No saved setups yet"}</option>
-              {setups.map(x => <option key={x.name} value={x.name} className="bg-zinc-900">{x.name}</option>)}
-            </select>
-            <button onClick={saveSetup} disabled={!wf} className="text-xs font-bold text-zinc-300 bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl disabled:opacity-40 transition-colors">Save current</button>
-            {setups.length > 0 && <select value="" onChange={e => e.target.value && deleteSetup(e.target.value)} className="bg-white/5 border-none rounded-xl px-3 py-2 text-xs text-zinc-500 focus:outline-none cursor-pointer"><option value="" className="bg-zinc-900">Delete...</option>{setups.map(x => <option key={x.name} value={x.name} className="bg-zinc-900">{x.name}</option>)}</select>}
-          </div>
-        )}
-        {folder && !loading && workflows.length === 0 && !loadError && (
-          <p className="text-[11px] text-zinc-500">No {kind} workflows here.{counts.image || counts.video ? ` This folder has ${counts.image || 0} image / ${counts.video || 0} video workflows.` : ""}</p>
-        )}
-
-        {wf && (
-          <div className="space-y-3">
-            {!wf.isRunnable && <p className="text-[11px] text-red-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>Cannot run: {wf.missing.join("; ")}</span></p>}
-            {wf.warnings.map((w, i) => <p key={i} className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>{w}</span></p>)}
-            {(wf.needsAssignment.length > 0 || wf.promptCandidates.length > 1 || wf.outputCandidates.length > 1) && (
-              <div className="grid sm:grid-cols-2 gap-3">
-                {wf.promptCandidates.length > 0 && (
-                  <div>
-                    <label className={label}>Prompt goes into</label>
-                    <select value={wf.promptNodeId || ""} onChange={e => saveRoles(e.target.value, wf.outputNodeId || "")} className={`${input} ${ring}`}>
-                      {!wf.promptNodeId && <option value="" className="bg-zinc-900">Choose a node...</option>}
-                      {wf.promptCandidates.map(c => <option key={c.id} value={c.id} className="bg-zinc-900">{c.label}</option>)}
-                    </select>
-                  </div>
-                )}
-                {wf.outputCandidates.length > 0 && (
-                  <div>
-                    <label className={label}>Result comes from</label>
-                    <select value={wf.outputNodeId || ""} onChange={e => saveRoles(wf.promptNodeId || "", e.target.value)} className={`${input} ${ring}`}>
-                      {!wf.outputNodeId && <option value="" className="bg-zinc-900">Choose a node...</option>}
-                      {wf.outputCandidates.map(c => <option key={c.id} value={c.id} className="bg-zinc-900">{c.label}</option>)}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {wf && wf.isRunnable && (
-        <>
-          <PromptSource kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} />
-
-          {/* Reference slots */}
-          {(wf.refImageCount > 0 || wf.refVideoCount > 0 || wf.refAudioCount > 0) && (
-            <div
-              className={`glass p-5 rounded-[1.75rem] border-white/5 space-y-4 transition-all ${refDrag ? `ring-2 ${a.border}` : ""}`}
-              onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setRefDrag(true); } }}
-              onDragLeave={() => setRefDrag(false)}
-              onDrop={(e) => { e.preventDefault(); setRefDrag(false); dropRefs([...e.dataTransfer.files]); }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-white">Reference media</p>
-                  <p className="text-[11px] text-zinc-500">{refFolder ? refFolder : "Pick a folder, or drop files here."}{refFolder ? " - drop files here to add" : ""}</p>
+      <div className="flex-1 min-h-0 grid gap-4 lg:grid-cols-[minmax(340px,420px)_1fr] overflow-y-auto lg:overflow-hidden">
+        {/* ───────── Controls ───────── */}
+        <div className="glass rounded-3xl border-white/5 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-white/5">
+            {/* Workflow */}
+            <Section title="Workflow" icon={<Layers size={14} />} accent={a.text} badge={wf ? wf.name : undefined} defaultOpen>
+              <div className="flex gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <select value={selected} onChange={e => setSelected(e.target.value)} disabled={!workflows.length} className={`${field} appearance-none pr-8 cursor-pointer truncate`}>
+                    {!workflows.length && <option value="">{loading ? "Loading..." : "No workflows"}</option>}
+                    {shown.map(w => <option key={w.path} value={w.path} className="bg-zinc-900">{w.name}{w.isRunnable ? "" : "  (cannot run)"}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
                 </div>
-                <div className="flex gap-2 shrink-0"><input ref={fileInputRef} type="file" multiple hidden accept="image/*,video/*,audio/*" onChange={(e) => { dropRefs([...(e.target.files || [])]); e.target.value = ""; }} /><button onClick={chooseRefFiles} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors"><ImageIcon size={14} /> Choose files</button><button onClick={() => chooseFolder("refs")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shrink-0"><FolderOpen size={14} /> {refFolder ? "Library folder" : "Choose folder"}</button></div>
+                {folder && <button onClick={() => loadWorkflows(folder, selected)} disabled={loading} title="Reload the folder" className={iconBtn}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>}
+                <button onClick={() => chooseFolder("workflows")} title={folder ? `Change folder (${folder})` : "Choose the workflow folder"} className={iconBtn}><FolderOpen size={14} /></button>
               </div>
-              {(["image", "video", "audio"] as const).map(t => {
-                const labels = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Labels` as "refImageLabels"];
-                const bypass = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"];
-                const pool = media.filter(m => m.type === t);
-                return slots[t].map((p, i) => (
-                  <div key={t + i} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className={label + " !mb-0"}>{labels[i] || `${t} ${i + 1}`}{bypass[i] ? " (optional)" : ""}</label>
-                      {p && <button onClick={() => setSlot(t, i, "")} className="text-[11px] text-zinc-500 hover:text-white flex items-center gap-1"><X size={11} /> clear</button>}
-                    </div>
-                    {p && !pool.some(m => m.path === p) && (
-                      <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                        {t === "image" && <img src={fileUrl(p)} alt="" className={`w-12 h-12 rounded-lg object-cover border-2 ${a.border}`} />}
-                        <span className="truncate">{p.split(/[\\/]/).pop()}</span>
-                      </div>
-                    )}
-                    {pool.length === 0 ? (
-                      <p className="text-[11px] text-zinc-600">{media.length ? `No ${t}s in that folder.` : "Choose a folder above."}</p>
-                    ) : (
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {pool.map(m => (
-                          <button key={m.path} onClick={() => setSlot(t, i, m.path)} title={m.name} className={`relative shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${p === m.path ? a.border + " scale-95" : "border-transparent opacity-70 hover:opacity-100"}`}>
-                            {t === "image" ? <img src={fileUrl(m.path)} alt={m.name} loading="lazy" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5 flex items-center justify-center text-zinc-500">{t === "video" ? <Film size={18} /> : <ImageIcon size={18} />}</div>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {!p && !bypass[i] && <p className="text-[11px] text-amber-400">Required - pick one.</p>}
-                  </div>
-                ));
-              })}
-            </div>
-          )}
+              {workflows.length > 8 && <input value={filter} onChange={e => setFilter(e.target.value)} placeholder={`Filter ${workflows.length} workflows...`} className={field} />}
+              {!folder && <p className="text-[11px] text-zinc-500">Pick the folder where your ComfyUI workflows are saved.</p>}
+              {folder && !loading && workflows.length === 0 && !loadError && <p className="text-[11px] text-zinc-500">No {kind} workflows here.{counts.image || counts.video ? ` This folder has ${counts.image || 0} image / ${counts.video || 0} video workflows.` : ""}</p>}
+              {loadError && <p className="text-[11px] text-red-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {loadError}</p>}
+              {st && !st.comfyReachable && <p className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> ComfyUI is not reachable - start it before running.</p>}
+              {wf && !wf.isRunnable && <p className="text-[11px] text-red-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>Cannot run: {wf.missing.join("; ")}</span></p>}
+              {wf?.warnings.map((w, i) => <p key={i} className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>{w}</span></p>)}
+              {wf && (wf.needsAssignment.length > 0 || !wf.promptNodeId && wf.needsPrompt || !wf.outputNodeId) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {wf.promptCandidates.length > 0 && (
+                    <div><label className={label}>Prompt goes into</label>
+                      <select value={wf.promptNodeId || ""} onChange={e => saveRoles(e.target.value, wf.outputNodeId || "")} className={field}>
+                        {!wf.promptNodeId && <option value="" className="bg-zinc-900">Choose...</option>}
+                        {wf.promptCandidates.map(c => <option key={c.id} value={c.id} className="bg-zinc-900">{c.label}</option>)}
+                      </select></div>
+                  )}
+                  {wf.outputCandidates.length > 0 && (
+                    <div><label className={label}>Result from</label>
+                      <select value={wf.outputNodeId || ""} onChange={e => saveRoles(wf.promptNodeId || "", e.target.value)} className={field}>
+                        {!wf.outputNodeId && <option value="" className="bg-zinc-900">Choose...</option>}
+                        {wf.outputCandidates.map(c => <option key={c.id} value={c.id} className="bg-zinc-900">{c.label}</option>)}
+                      </select></div>
+                  )}
+                </div>
+              )}
+              {workflows.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Bookmark size={13} className={a.text} />
+                  <select value="" onChange={e => e.target.value && loadSetup(e.target.value)} className={`${field} !py-1.5 flex-1 cursor-pointer`}>
+                    <option value="" className="bg-zinc-900">{activeSetup ? `Setup: ${activeSetup}` : setups.length ? "Load a saved setup..." : "No saved setups yet"}</option>
+                    {setups.map(x => <option key={x.name} value={x.name} className="bg-zinc-900">{x.name}</option>)}
+                  </select>
+                  <button onClick={saveSetup} disabled={!wf} title="Save the current workflow, prompt and settings as a setup" className={iconBtn}><Save size={14} /></button>
+                  {activeSetup && <button onClick={() => { deleteSetup(activeSetup); setActiveSetup(null); }} title={`Delete setup "${activeSetup}"`} className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>}
+                </div>
+              )}
+            </Section>
 
-          {/* Settings */}
-          {wf.fields.length > 0 && (
-            <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-4">
-              <p className="text-sm font-bold text-white">Settings</p>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {wf.fields.map(f => {
-                  const v = f.id in fieldValues ? fieldValues[f.id] : f.value;
-                  const set = (x: any) => setFieldValues(s => ({ ...s, [f.id]: x }));
-                  return (
-                    <div key={f.id} className={f.kind === "text" ? "sm:col-span-2" : ""}>
-                      <label className={label}>{f.label}</label>
-                      {f.kind === "select" && f.options ? (
-                        <select value={String(v)} onChange={e => set(e.target.value)} className={`${input} ${ring}`}>{f.options.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}</select>
-                      ) : f.kind === "bool" ? (
-                        <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={!!v} onChange={e => set(e.target.checked)} /> {v ? "On" : "Off"}</label>
-                      ) : f.kind === "int" || f.kind === "float" ? (
-                        <input type="number" value={v ?? ""} step={f.kind === "int" ? 1 : "any"} onChange={e => set(e.target.value === "" ? "" : Number(e.target.value))} className={`${input} ${ring}`} />
-                      ) : f.kind === "text" ? (
-                        <textarea value={v ?? ""} rows={2} onChange={e => set(e.target.value)} className={`${input} ${ring} resize-y`} />
-                      ) : (
-                        <input value={v ?? ""} onChange={e => set(e.target.value)} className={`${input} ${ring}`} />
+            {wf && wf.isRunnable && (
+              <>
+                {/* Prompt */}
+                <Section title="Prompt" icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
+                  <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} />
+                </Section>
+
+                {/* References */}
+                {refCount > 0 && (
+                  <Section title="References" icon={<ImageIcon size={14} />} accent={a.text} badge={`${refFilled}/${refCount}`} defaultOpen>
+                    <div
+                      className={`space-y-3 rounded-xl transition-all ${refDrag ? `ring-2 ${a.border} p-2` : ""}`}
+                      onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setRefDrag(true); } }}
+                      onDragLeave={() => setRefDrag(false)}
+                      onDrop={(e) => { e.preventDefault(); setRefDrag(false); dropRefs([...e.dataTransfer.files]); }}
+                    >
+                      <input ref={fileInputRef} type="file" multiple hidden accept="image/*,video/*,audio/*" onChange={(e) => { dropRefs([...(e.target.files || [])]); e.target.value = ""; }} />
+                      {(["image", "video", "audio"] as const).map(t => {
+                        const labels = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Labels` as "refImageLabels"];
+                        const bypass = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"];
+                        return slots[t].map((p, i) => (
+                          <div key={t + i} className="flex items-center gap-3">
+                            <button onClick={chooseRefFiles} title="Choose a file" className={`relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border-2 border-dashed transition-colors flex items-center justify-center ${p ? "border-transparent" : "border-white/15 hover:border-white/30 text-zinc-600"}`}>
+                              {p ? (t === "image" ? <img src={fileUrl(p)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5 flex items-center justify-center text-zinc-400">{t === "video" ? <Film size={20} /> : <ImageIcon size={20} />}</div>) : <Plus size={18} />}
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] font-semibold text-zinc-200 truncate">{labels[i] || `${t} ${i + 1}`}{bypass[i] ? <span className="text-zinc-600 font-normal"> · optional</span> : ""}</p>
+                              <p className={`text-[11px] truncate ${!p && !bypass[i] ? "text-amber-400" : "text-zinc-500"}`}>{p ? p.split(/[\\/]/).pop() : bypass[i] ? "Skipped for this run" : "Required - choose or drop a file"}</p>
+                            </div>
+                            {p && <button onClick={() => setSlot(t, i, "")} title="Clear" className={iconBtn}><X size={13} /></button>}
+                          </div>
+                        ));
+                      })}
+                      {media.length > 0 && (
+                        <div>
+                          <p className={label}>Library{refFolder ? "" : ""} <button onClick={() => chooseFolder("refs")} className="ml-1 normal-case tracking-normal text-zinc-500 hover:text-zinc-300 font-medium">change folder</button></p>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1">
+                            {media.map(m => (
+                              <button key={m.path} onClick={() => addRefItems([m])} title={`${m.name} - click to use`} className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-white/5 opacity-70 hover:opacity-100 transition-opacity">
+                                {m.type === "image" ? <img src={fileUrl(m.path)} alt={m.name} loading="lazy" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-zinc-500">{m.type === "video" ? <Film size={16} /> : <ImageIcon size={16} />}</div>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       )}
+                      {!media.length && <button onClick={() => chooseFolder("refs")} className="text-[11px] text-zinc-500 hover:text-zinc-300">Choose a library folder for quick picking...</button>}
                     </div>
-                  );
-                })}
+                  </Section>
+                )}
+
+                {/* Settings */}
+                {wf.fields.length > 0 && (
+                  <Section title="Settings" icon={<SlidersHorizontal size={14} />} accent={a.text} badge={`${wf.fields.length}`}>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                      {wf.fields.map(f => {
+                        const v = f.id in fieldValues ? fieldValues[f.id] : f.value;
+                        const set = (x: any) => setFieldValues(s => ({ ...s, [f.id]: x }));
+                        return (
+                          <div key={f.id} className={f.kind === "text" || (f.kind === "select" && String(v).length > 22) ? "col-span-2" : ""}>
+                            <label className={label + " !mb-1"}>{f.label}</label>
+                            {f.kind === "select" && f.options ? (
+                              <select value={String(v)} onChange={e => set(e.target.value)} className={field}>{f.options.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}</select>
+                            ) : f.kind === "bool" ? (
+                              <label className="flex items-center gap-2 text-[13px] text-zinc-300 py-1.5"><input type="checkbox" checked={!!v} onChange={e => set(e.target.checked)} /> {v ? "On" : "Off"}</label>
+                            ) : f.kind === "int" || f.kind === "float" ? (
+                              <input type="number" value={v ?? ""} step={f.kind === "int" ? 1 : "any"} onChange={e => set(e.target.value === "" ? "" : Number(e.target.value))} className={field} />
+                            ) : f.kind === "text" ? (
+                              <textarea value={v ?? ""} rows={2} onChange={e => set(e.target.value)} className={`${field} resize-y`} />
+                            ) : (
+                              <input value={v ?? ""} onChange={e => set(e.target.value)} className={field} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer pt-1"><input type="checkbox" checked={randomSeed} onChange={e => setRandomSeed(e.target.checked)} /> <Dices size={14} /> New random seed every run</label>
+                  </Section>
+                )}
+
+                {/* Output */}
+                <Section title="Output" icon={<FolderOpen size={14} />} accent={a.text} badge={fileName || undefined}>
+                  <div><label className={label + " !mb-1"}>Save to</label>
+                    <div className="flex gap-2">
+                      <input value={dest} onChange={e => setDest(e.target.value)} placeholder={st?.defaultDestination || "outputs"} className={field} />
+                      <button onClick={() => chooseFolder("dest")} className={iconBtn} title="Browse"><FolderOpen size={14} /></button>
+                    </div></div>
+                  <div><label className={label + " !mb-1"}>File name (optional)</label>
+                    <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="Automatic" className={field} /></div>
+                </Section>
+              </>
+            )}
+
+            {folder && (
+              <Section title="Tools" icon={<Wand2 size={14} />} accent={a.text}>
+                <Converter bare kind={kind} source={folder} />
+              </Section>
+            )}
+          </div>
+
+          {/* Action bar */}
+          <div className="shrink-0 border-t border-white/5 p-4 space-y-2 bg-black/20">
+            <div className="flex gap-2">
+              <button onClick={run} disabled={!canRun} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-black/30`}>
+                {busy ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} className="fill-current" />} {busy ? "Generating..." : "Generate"}
+              </button>
+              {batch.length > 1 && !busy && <button onClick={runAll} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="px-4 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors whitespace-nowrap">{queuing ? "Queuing..." : `Run all ${batch.length}`}</button>}
+              {busy && <button onClick={cancel} title="Cancel this job" className="px-4 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-colors"><Square size={14} className="fill-current" /></button>}
+            </div>
+            {wf?.isRunnable && !busy && (wf.needsPrompt && !prompt.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""}.</p> : null)}
+          </div>
+        </div>
+
+        {/* ───────── Canvas ───────── */}
+        <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">
+          <div className="relative min-h-[300px] lg:min-h-0 lg:flex-1 rounded-3xl border border-white/5 bg-black/30 overflow-hidden flex items-center justify-center">
+            <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
+            {busy ? (
+              <div className="relative w-full h-full flex flex-col items-center justify-center p-6 gap-5">
+                {preview ? <img src={preview} alt="Live preview" className="max-h-[70%] max-w-full rounded-xl border border-white/10 shadow-2xl shadow-black/60" /> : <div className="flex flex-col items-center gap-3 text-zinc-500"><Loader2 size={34} className={`animate-spin ${a.text}`} /></div>}
+                <div className="w-full max-w-md space-y-1.5">
+                  <ProgressBar value={pct} label={status || "Working"} color={a.bar} />
+                  {queueNote && <p className="text-[11px] text-zinc-500 text-center">{queueNote}</p>}
+                </div>
               </div>
-              <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer"><input type="checkbox" checked={randomSeed} onChange={e => setRandomSeed(e.target.checked)} /> <Dices size={14} /> New random seed every run</label>
+            ) : stagePath ? (
+              <Media path={stagePath} className="relative max-w-full max-h-full object-contain" />
+            ) : (
+              <div className="relative text-center space-y-2 p-8">
+                <div className={`mx-auto w-14 h-14 rounded-2xl ${a.soft} border flex items-center justify-center`}>{kind === "video" ? <Film size={24} className={a.text} /> : <ImageIcon size={24} className={a.text} />}</div>
+                <p className="text-sm font-bold text-zinc-300">Your {kind} appears here</p>
+                <p className="text-xs text-zinc-600 max-w-xs">Choose a workflow, write a prompt and press Generate. Live previews show while it renders.</p>
+              </div>
+            )}
+            {runError && !busy && <div className="absolute inset-x-4 bottom-4 text-[12px] text-red-300 bg-red-950/70 border border-red-500/30 rounded-xl px-4 py-2.5 flex items-start gap-2 backdrop-blur"><AlertTriangle size={14} className="mt-0.5 shrink-0" /> <span>{runError}</span></div>}
+          </div>
+
+          {/* Result actions */}
+          {stagePath && !busy && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] text-zinc-500 truncate flex-1 min-w-[140px]" title={stageItem?.prompt}>{stageItem ? `${stageItem.workflow} · ${stageItem.prompt || "no prompt"}` : stagePath.split(/[\\/]/).pop()}</p>
+              {stageItem?.prompt && <button onClick={() => reusePrompt(stageItem)} title="Reuse this prompt" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><CornerUpLeft size={13} /> Prompt</button>}
+              {isImage(stagePath) && wf && wf.refImageCount > 0 && <button onClick={() => useAsReference(stagePath)} title="Use as reference image" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><ImageIcon size={13} /> Reference</button>}
+              <button onClick={() => reveal(stagePath)} title="Show in folder" className={iconBtn}><ExternalLink size={14} /></button>
+              <button onClick={() => removeResult(stagePath)} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>
             </div>
           )}
 
-          {/* Output + run */}
-          <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-4">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label className={label}>Save to</label>
-                <div className="flex gap-2">
-                  <input value={dest} onChange={e => setDest(e.target.value)} placeholder={st?.defaultDestination || "outputs"} className={`${input} ${ring}`} />
-                  <button onClick={() => chooseFolder("dest")} className="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors" title="Browse"><FolderOpen size={14} /></button>
+          {/* Job queue */}
+          {active.length > 0 && (
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3 space-y-1.5">
+              <p className={label + " !mb-1"}>Queue · {active.length}</p>
+              {active.map(r => (
+                <div key={r.runId} className="flex items-center justify-between gap-3 text-xs text-zinc-400">
+                  <span className="truncate"><span className={r.status === "running" ? a.text : r.status === "paused" ? "text-amber-400" : "text-zinc-500"}>{r.status}</span> · {r.workflow}{r.ahead !== null ? ` (${r.ahead} ahead)` : ""}{r.progress ? ` · ${r.progress[0]}/${r.progress[1]}` : ""}</span>
+                  <span className="flex gap-1 shrink-0">
+                    {r.status === "paused" ? (
+                      <>
+                        <button onClick={() => resumeJob(r.runId)} title="Resume (goes to the end of the queue)" className={`${iconBtn} !p-1.5 !text-emerald-400`}><RotateCw size={13} /></button>
+                        <button onClick={() => dropJob(r.runId)} title="Remove" className={`${iconBtn} !p-1.5 hover:!text-red-400`}><X size={13} /></button>
+                      </>
+                    ) : (
+                      <>
+                        {r.pausable && <button onClick={() => pauseJob(r.runId)} title="Pause (take it out of the queue)" className={`${iconBtn} !p-1.5 !text-amber-400`}><Pause size={13} /></button>}
+                        {r.cancellable && <button onClick={() => cancelOther(r.runId)} title="Cancel" className={`${iconBtn} !p-1.5 hover:!text-red-400`}><X size={13} /></button>}
+                      </>
+                    )}
+                  </span>
                 </div>
-              </div>
-              <div>
-                <label className={label}>File name (optional)</label>
-                <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="Automatic" className={`${input} ${ring}`} />
-              </div>
+              ))}
             </div>
-            <div className="flex gap-3">
-              <button onClick={run} disabled={!canRun} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed`}>
-                {busy ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} {busy ? "Running..." : "Generate"}
-              </button>
-              {batch.length > 1 && !busy && <button onClick={runAll} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="px-5 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-sm disabled:opacity-40 transition-colors">{queuing ? "Queuing..." : `Run all ${batch.length}`}</button>}
-              {busy && <button onClick={cancel} className="px-5 rounded-2xl bg-red-600/80 hover:bg-red-500 text-white font-bold text-sm flex items-center gap-2 transition-colors"><Square size={14} /> Cancel</button>}
-            </div>
-            {wf.needsPrompt && !prompt.trim() && !busy && <p className="text-[11px] text-zinc-600">Enter a prompt to enable Generate.</p>}
-            {busy && (
-              <div className="space-y-3">
-                <ProgressBar value={pct} label={status || "Working"} color={a.bar} />
-                {queueNote && <p className="text-[11px] text-zinc-500">{queueNote}</p>}
-                {preview && <img src={preview} alt="Live preview" className="max-h-64 rounded-xl border border-white/10" />}
-              </div>
-            )}
-            {runError && !busy && <p className="text-[11px] text-red-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>{runError}</span></p>}
-            {result && !busy && (
-              <div className="space-y-2">
-                <Media path={result} className="max-h-96 rounded-xl border border-white/10" />
-                <div className="flex gap-3 text-[11px]">
-                  <button onClick={() => reveal(result)} className={`${a.text} hover:underline flex items-center gap-1`}><ExternalLink size={11} /> Show in folder</button>
-                  <button onClick={() => removeResult(result)} className="text-zinc-500 hover:text-red-400 flex items-center gap-1"><Trash2 size={11} /> Delete</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+          )}
 
-      {/* Job queue */}
-      {active.length > 0 && (
-        <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-2">
-          <p className="text-sm font-bold text-white">Jobs</p>
-          {active.map(r => (
-            <div key={r.runId} className="flex items-center justify-between gap-3 text-xs text-zinc-400">
-              <span className="truncate">{r.workflow} - {r.status}{r.ahead !== null ? ` (${r.ahead} ahead)` : ""}{r.progress ? ` ${r.progress[0]}/${r.progress[1]}` : ""}</span>
-              <span className="flex gap-1.5 shrink-0">
-                {r.status === "paused" ? (
-                  <>
-                    <button onClick={() => resumeJob(r.runId)} title="Resume (goes to the end of the queue)" className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-400"><RotateCw size={13} /></button>
-                    <button onClick={() => dropJob(r.runId)} title="Remove" className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400"><X size={13} /></button>
-                  </>
-                ) : (
-                  <>
-                    {r.pausable && <button onClick={() => pauseJob(r.runId)} title="Pause (take it out of the queue)" className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-amber-400"><Pause size={13} /></button>}
-                    {r.cancellable && <button onClick={() => cancelOther(r.runId)} title="Cancel" className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400"><X size={13} /></button>}
-                  </>
-                )}
-              </span>
+          {/* Filmstrip */}
+          {history.length > 0 && (
+            <div>
+              <p className={label}>Recent</p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {history.slice(0, 24).map(h => (
+                  <button key={h.path} onClick={() => setViewPath(h.path)} title={h.prompt || h.workflow} className={`shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${stagePath === h.path ? a.border : "border-transparent opacity-70 hover:opacity-100"}`}>
+                    {isVideo(h.path) ? <div className="w-full h-full bg-white/5 flex items-center justify-center text-zinc-400"><Film size={18} /></div> : <img src={fileUrl(h.path)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                  </button>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
         </div>
-      )}
-
-      {/* Recent results */}
-      {history.length > 0 && (
-        <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-3">
-          <p className="text-sm font-bold text-white">Recent workflow results</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {history.slice(0, 12).map(h => (
-              <div key={h.path} className="group relative rounded-xl overflow-hidden bg-white/5">
-                <Media path={h.path} className="w-full aspect-square object-cover" />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-[10px] font-bold text-white truncate">{h.workflow}</p>
-                  <p className="text-[10px] text-zinc-400 truncate">{h.prompt}</p>
-                  <div className="flex gap-3 mt-1">
-                    {h.prompt && <button onClick={() => reusePrompt(h)} title="Reuse prompt" className="text-zinc-300 hover:text-white"><CornerUpLeft size={12} /></button>}
-                    {isImage(h.path) && wf && wf.refImageCount > 0 && <button onClick={() => useAsReference(h.path)} title="Use as reference image" className="text-zinc-300 hover:text-white"><ImageIcon size={12} /></button>}
-                    <button onClick={() => reveal(h.path)} title="Show in folder" className="text-zinc-300 hover:text-white"><ExternalLink size={12} /></button>
-                    <button onClick={() => removeResult(h.path)} title="Delete" className="text-zinc-300 hover:text-red-400"><Trash2 size={12} /></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {folder && <Converter kind={kind} source={folder} />}
+      </div>
 
       <FolderPickerDialog
         open={picker !== null}
@@ -546,5 +556,21 @@ export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string
         }}
       />
     </div>
+  );
+}
+
+/** One collapsible block of the control panel: icon + title on the left, a short summary on the right. */
+function Section({ title, icon, accent, badge, defaultOpen = false, children }: { title: string; icon: React.ReactNode; accent: string; badge?: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <section>
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-white/[0.03] transition-colors text-left">
+        <span className={accent}>{icon}</span>
+        <span className="text-[11px] font-black uppercase tracking-[0.18em] text-zinc-300">{title}</span>
+        {badge && <span className="ml-auto max-w-[55%] truncate text-[11px] text-zinc-500 font-medium">{badge}</span>}
+        <ChevronDown size={14} className={`text-zinc-600 transition-transform shrink-0 ${badge ? "" : "ml-auto"} ${open ? "" : "-rotate-90"}`} />
+      </button>
+      {open && <div className="px-4 pb-4 space-y-3">{children}</div>}
+    </section>
   );
 }

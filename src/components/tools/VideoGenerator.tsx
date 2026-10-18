@@ -7,6 +7,7 @@ import { EnhancePromptButton } from "./EnhancePromptButton";
 import { VideoJob } from "../../types";
 import { GalleryHistory } from "./GalleryHistory";
 import { WorkflowRunner } from "../comfy/WorkflowRunner";
+import { StudioToolbar } from "../comfy/StudioToolbar";
 import { ModeSwitch, useLocalMode } from "../comfy/ModeSwitch";
 import { notify, notifyError } from "../../lib/notify";
 import { ProgressBar } from "../layout/ProgressBar";
@@ -135,6 +136,21 @@ export function VideoGeneratorView({ modelId }: { modelId?: string }) {
       setIsSubmitting(false);
     }
   };
+
+  // Offline workflows get their own full-height studio layout.
+  if (wfMode) {
+    return (
+      <div className="flex-1 bg-transparent p-4 h-full overflow-hidden">
+        <div className="max-w-[1600px] mx-auto h-full">
+          <WorkflowRunner
+            kind="video"
+            modelId={modelId}
+            toolbar={<StudioToolbar kind="video" icon={<Clapperboard className="text-orange-500" size={24} />} title="Video Studio" onCloud={() => setSource("cloud")} mode={localMode} onMode={setLocalMode} />}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-transparent p-6 h-full overflow-hidden">
@@ -278,7 +294,6 @@ export function VideoGeneratorView({ modelId }: { modelId?: string }) {
               {job.status === "pending" && <ProgressBar value={source === "local" ? (progress[job.id]?.percent ?? null) : null} label={source === "local" ? (progress[job.id]?.label || "Starting...") : "Generating with Veo - this can take a few minutes"} color="bg-orange-500" />}
             </div>
           ))}
-          {wfMode && <WorkflowRunner kind="video" modelId={modelId} />}
           <GalleryHistory kind="video" refreshKey={refreshKey} />
         </div>
       </div>
