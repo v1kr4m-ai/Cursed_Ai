@@ -388,7 +388,20 @@ export default function App() {
               />
             )}
             {activeTab === "vision" && (
-              <VisionView models={models} selectedModelId={selectedModelId} onOpenModels={() => setActiveTab("models")} />
+              <VisionView
+                models={models}
+                selectedModelId={selectedModelId}
+                onOpenModels={() => setActiveTab("models")}
+                onContinueInChat={(messages, modelId) => {
+                  const now = Date.now();
+                  const first = messages.find(m => m.role === "user")?.content || "Image";
+                  const chat: Chat = { id: now.toString(), title: ("Image: " + first).slice(0, 48), messages, createdAt: now, updatedAt: now, modelId };
+                  setChats(prev => [chat, ...prev]);
+                  setSelectedModelId(modelId);
+                  setActiveChatId(chat.id);
+                  setActiveTab("chat");
+                }}
+              />
             )}
           </main>
           {settings.voiceEnabled && (

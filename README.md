@@ -23,7 +23,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Engine** | Real telemetry (tokens/sec, RAM, active model), performance modes, unload |
 | **Image** | Cloud (Gemini/Imagen) **or** local ComfyUI: txt2img and img2img with a reference image, checkpoint dropdown, size presets - or switch Local to **Workflows** to run your own saved ComfyUI workflows (see below). Results are saved to `outputs/` and shown as a history: click to enlarge, click away to collapse, delete or open file location |
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image), or Local -> **Workflows** for your own video workflows; saved to `outputs/` with the same history (delete, open file location) |
-| **Vision** | Pick an image, choose any installed model flagged Vision (llava, llama3.2-vision, qwen-vl... - detected from Ollama's own capability report) and ask about it |
+| **Vision** | Pick an image, choose any installed model flagged Vision (llava, llama3.2-vision, qwen-vl... - detected from Ollama's own capability report) and ask about it. **Keep the conversation going**: ask follow-ups about the same image, then **Continue in Chat** moves the whole exchange (image included) into a new chat so you can carry on there |
 | **Console** | Live stream of the server's real log output (sits just above Settings in the sidebar) |
 | **Settings** | Sampling params, voice engine (browser vs. local Whisper), **model locations** (see below), the download folder, threads/context size |
 
