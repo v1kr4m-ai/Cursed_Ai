@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
+import { Bookmark, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
@@ -57,6 +57,12 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
   const [history, setHistory] = React.useState<HistoryItem[]>([]);
   const [active, setActive] = React.useState<RunRow[]>([]);
   const esRef = React.useRef<EventSource | null>(null);
+  // Saved setups: a named snapshot of workflow + prompt + settings + references + destination. Kept in this browser.
+  interface Setup { name: string; workflow: string; prompt: string; fieldValues: Record<string, any>; randomSeed: boolean; dest: string; fileName: string; slots: Record<"image" | "video" | "audio", string[]> }
+  const setupKey = `cursed.comfySetups.${kind}`;
+  const [setups, setSetups] = React.useState<Setup[]>(() => { try { return JSON.parse(localStorage.getItem(setupKey) || "[]"); } catch { return []; } });
+  const [pendingSetup, setPendingSetup] = React.useState<Setup | null>(null);
+  const persistSetups = (list: Setup[]) => { setSetups(list); try { localStorage.setItem(setupKey, JSON.stringify(list)); } catch { /* private window */ } };
   const [batch, setBatch] = React.useState<string[]>([]);
   const [queuing, setQueuing] = React.useState(false);
 
@@ -96,6 +102,14 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
     setSlots({ image: Array(wf.refImageCount).fill(""), video: Array(wf.refVideoCount).fill(""), audio: Array(wf.refAudioCount).fill("") });
     postJson("/api/tool/state", { kind, lastWorkflow: wf.path }).catch(() => {});
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A setup picked from the list: switch workflow first (which resets the inputs), then fill them in.
+  React.useEffect(() => {
+    if (!pendingSetup || selected !== pendingSetup.workflow) return;
+    setPrompt(pendingSetup.prompt); setFieldValues(pendingSetup.fieldValues); setRandomSeed(pendingSetup.randomSeed);
+    setDest(pendingSetup.dest); setFileName(pendingSetup.fileName); setSlots(pendingSetup.slots);
+    setPendingSetup(null);
+  }, [pendingSetup, selected, wf]);
 
   // Other jobs (also ones from a previous page load) waiting in ComfyUI.
   React.useEffect(() => {
@@ -183,6 +197,24 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
     finally { setQueuing(false); }
   };
 
+  const saveSetup = () => {
+    if (!wf) return;
+    let name: string | undefined;
+    try { name = window.prompt("Name this setup", wf.name)?.trim(); } catch { name = wf.name; }
+    if (!name) return;
+    const snap: Setup = { name, workflow: wf.path, prompt, fieldValues, randomSeed, dest, fileName, slots };
+    persistSetups([snap, ...setups.filter(x => x.name !== name)]);
+    notify({ message: `Saved setup "${name}"`, tab: kind });
+  };
+  const loadSetup = (name: string) => {
+    const x = setups.find(v => v.name === name);
+    if (!x) return;
+    if (!workflows.some(w => w.path === x.workflow)) { notifyError("That setup's workflow is not in the current folder.", kind); return; }
+    if (x.workflow === selected) { setPrompt(x.prompt); setFieldValues(x.fieldValues); setRandomSeed(x.randomSeed); setDest(x.dest); setFileName(x.fileName); setSlots(x.slots); }
+    else { setPendingSetup(x); setSelected(x.workflow); }
+  };
+  const deleteSetup = (name: string) => persistSetups(setups.filter(x => x.name !== name));
+
   const cancel = async () => { if (runId) await postJson(`/api/tool/cancel/${runId}`, {}).catch(() => {}); };
   const cancelOther = (id: string) => postJson(`/api/tool/cancel/${id}`, {}).catch(() => {});
 
@@ -223,6 +255,17 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
               </select>
               <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             </div>
+          </div>
+        )}
+        {workflows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Bookmark size={13} className={a.text} />
+            <select value="" onChange={e => e.target.value && loadSetup(e.target.value)} className={`bg-white/5 border-none rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none ${ring} cursor-pointer`}>
+              <option value="" className="bg-zinc-900">{setups.length ? "Saved setups..." : "No saved setups yet"}</option>
+              {setups.map(x => <option key={x.name} value={x.name} className="bg-zinc-900">{x.name}</option>)}
+            </select>
+            <button onClick={saveSetup} disabled={!wf} className="text-xs font-bold text-zinc-300 bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl disabled:opacity-40 transition-colors">Save current</button>
+            {setups.length > 0 && <select value="" onChange={e => e.target.value && deleteSetup(e.target.value)} className="bg-white/5 border-none rounded-xl px-3 py-2 text-xs text-zinc-500 focus:outline-none cursor-pointer"><option value="" className="bg-zinc-900">Delete...</option>{setups.map(x => <option key={x.name} value={x.name} className="bg-zinc-900">{x.name}</option>)}</select>}
           </div>
         )}
         {folder && !loading && workflows.length === 0 && !loadError && (
