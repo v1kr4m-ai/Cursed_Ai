@@ -9,6 +9,8 @@ interface Props {
   prompt: string;
   onPrompt: (text: string) => void;
   needsPrompt: boolean;
+  /** Every prompt found in the file (spreadsheet column / document headings), for running them all. */
+  onCandidates?: (texts: string[]) => void;
 }
 
 /**
@@ -16,7 +18,7 @@ interface Props {
  * prompt is found for you. Spreadsheets list every prompt (the column is guessed and can be switched); documents with
  * several "Prompt" headings list each one. You can always edit the text by hand.
  */
-export function PromptSource({ kind, prompt, onPrompt, needsPrompt }: Props) {
+export function PromptSource({ kind, prompt, onPrompt, needsPrompt, onCandidates }: Props) {
   const a = ACCENT[kind];
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = React.useState("");
@@ -46,6 +48,7 @@ export function PromptSource({ kind, prompt, onPrompt, needsPrompt }: Props) {
     setColumns(r.columns);
     const cands = r.columns.length ? r.columns[0].candidates : r.candidates;
     setCandidates(cands);
+    onCandidates?.(cands.map(c => c.text));
     setColIdx(0);
     setPicked(cands.length ? 0 : -1);
     onPrompt(r.extractedPrompt);
@@ -64,6 +67,7 @@ export function PromptSource({ kind, prompt, onPrompt, needsPrompt }: Props) {
     setColIdx(idx);
     const cands = columns[idx].candidates;
     setCandidates(cands);
+    onCandidates?.(cands.map(c => c.text));
     setPicked(cands.length ? 0 : -1);
     if (cands.length) onPrompt(cands[0].text);
   };

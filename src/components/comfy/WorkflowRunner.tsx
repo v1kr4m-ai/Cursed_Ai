@@ -57,6 +57,8 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
   const [history, setHistory] = React.useState<HistoryItem[]>([]);
   const [active, setActive] = React.useState<RunRow[]>([]);
   const esRef = React.useRef<EventSource | null>(null);
+  const [batch, setBatch] = React.useState<string[]>([]);
+  const [queuing, setQueuing] = React.useState(false);
 
   const wf = workflows.find(w => w.path === selected) || null;
   const busy = !!runId;
@@ -101,6 +103,9 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
     return () => clearInterval(t);
   }, [kind]);
 
+  const activeCount = active.length;
+  React.useEffect(() => { loadHistory(); }, [activeCount, loadHistory]);
+
   React.useEffect(() => () => esRef.current?.close(), []);
 
   const saveRoles = async (promptNodeId: string, outputNodeId: string) => {
@@ -121,6 +126,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
   const setSlot = (type: "image" | "video" | "audio", i: number, p: string) => setSlots(s => ({ ...s, [type]: s[type].map((v, j) => j === i ? p : v) }));
 
   const missingRefs = wf ? (["image", "video", "audio"] as const).flatMap(t => slots[t].map((p, i) => ({ t, i, p, ok: wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"][i] })).filter(s => !s.p && !s.ok)) : [];
+  const canRunBase = !!wf && wf.isRunnable && missingRefs.length === 0 && wf.needsAssignment.length === 0;
   const canRun = !!wf && wf.isRunnable && !busy && (!wf.needsPrompt || prompt.trim().length > 0) && missingRefs.length === 0 && wf.needsAssignment.length === 0;
 
   const watch = (id: string) => {
@@ -158,6 +164,23 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
       setRunId(id); watch(id);
       postJson("/api/tool/state", { kind, destination: dest, outputFilename: fileName }).catch(() => {});
     } catch (e: any) { setRunError(e.message); notifyError(e.message, kind); setStatus(""); }
+  };
+
+  // Queue every prompt found in the file. ComfyUI runs them one after another; they show up under "Running jobs" and in the results.
+  const runAll = async () => {
+    if (!wf || batch.length < 2) return;
+    setQueuing(true); setRunError(null);
+    try {
+      for (const text of batch) {
+        await postJson("/api/tool/run", {
+          kind, workflowPath: wf.path, promptText: text, fieldValues, randomizeSeed: true,
+          refImagePaths: slots.image, refVideoPaths: slots.video, refAudioPaths: slots.audio,
+          outputFolder: dest, outputFilename: "",
+        });
+      }
+      notify({ message: `Queued ${batch.length} prompts`, tab: kind });
+    } catch (e: any) { setRunError(e.message); notifyError(e.message, kind); }
+    finally { setQueuing(false); }
   };
 
   const cancel = async () => { if (runId) await postJson(`/api/tool/cancel/${runId}`, {}).catch(() => {}); };
@@ -238,7 +261,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
 
       {wf && wf.isRunnable && (
         <>
-          <PromptSource kind={kind} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} />
+          <PromptSource kind={kind} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} />
 
           {/* Reference slots */}
           {(wf.refImageCount > 0 || wf.refVideoCount > 0 || wf.refAudioCount > 0) && (
@@ -327,6 +350,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
               <button onClick={run} disabled={!canRun} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed`}>
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} {busy ? "Running..." : "Generate"}
               </button>
+              {batch.length > 1 && !busy && <button onClick={runAll} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="px-5 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-sm disabled:opacity-40 transition-colors">{queuing ? "Queuing..." : `Run all ${batch.length}`}</button>}
               {busy && <button onClick={cancel} className="px-5 rounded-2xl bg-red-600/80 hover:bg-red-500 text-white font-bold text-sm flex items-center gap-2 transition-colors"><Square size={14} /> Cancel</button>}
             </div>
             {wf.needsPrompt && !prompt.trim() && !busy && <p className="text-[11px] text-zinc-600">Enter a prompt to enable Generate.</p>}
