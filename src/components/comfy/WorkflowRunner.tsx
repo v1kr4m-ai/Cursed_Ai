@@ -5,7 +5,7 @@ import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
 import { PromptSource } from "./PromptSource";
 import { Converter } from "./Converter";
-import { ACCENT, HistoryItem, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, postJson } from "./types";
+import { ACCENT, HistoryItem, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, nativeFiles, nativeFolder, postJson } from "./types";
 
 const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
 const input = "w-full bg-white/5 border-none rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 placeholder:text-zinc-700";
@@ -153,6 +153,30 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
     }
   };
 
+  // Windows' own dialogs first; the in-app folder browser only if that is unavailable (non-Windows).
+  const chooseFolder = async (which: "workflows" | "refs" | "dest") => {
+    const initial = which === "workflows" ? folder : which === "refs" ? refFolder : dest;
+    const p = await nativeFolder(initial);
+    if (p === undefined) { setPicker(which); return; }
+    if (p === null) return;
+    if (which === "workflows") loadWorkflows(p); else if (which === "refs") loadRefs(p); else setDest(p);
+  };
+  const chooseRefFiles = async () => {
+    const items = await nativeFiles(refFolder);
+    if (items === null) { fileInputRef.current?.click(); return; }
+    addRefItems(items);
+  };
+  const addRefItems = (items: MediaItem[]) => {
+    if (!items.length) return;
+    setMedia(m => [...m.filter(x => !items.some(i => i.path === x.path)), ...items]);
+    setSlots(s => {
+      const next = { image: [...s.image], video: [...s.video], audio: [...s.audio] };
+      for (const it of items) { const i = next[it.type].findIndex(v => !v); if (i >= 0) next[it.type][i] = it.path; }
+      return next;
+    });
+  };
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const setSlot = (type: "image" | "video" | "audio", i: number, p: string) => setSlots(s => ({ ...s, [type]: s[type].map((v, j) => j === i ? p : v) }));
 
   const missingRefs = wf ? (["image", "video", "audio"] as const).flatMap(t => slots[t].map((p, i) => ({ t, i, p, ok: wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"][i] })).filter(s => !s.p && !s.ok)) : [];
@@ -263,7 +287,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
           </div>
           <div className="flex gap-2 shrink-0">
             {folder && <button onClick={() => loadWorkflows(folder, selected)} disabled={loading} title="Reload" className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 transition-colors"><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>}
-            <button onClick={() => setPicker("workflows")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors"><FolderOpen size={14} /> {folder ? "Change folder" : "Choose folder"}</button>
+            <button onClick={() => chooseFolder("workflows")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors"><FolderOpen size={14} /> {folder ? "Change folder" : "Choose folder"}</button>
           </div>
         </div>
         {folder && <p className="text-[11px] text-zinc-600 truncate" title={folder}>{folder}</p>}
@@ -343,7 +367,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
                   <p className="text-sm font-bold text-white">Reference media</p>
                   <p className="text-[11px] text-zinc-500">{refFolder ? refFolder : "Pick a folder, or drop files here."}{refFolder ? " - drop files here to add" : ""}</p>
                 </div>
-                <button onClick={() => setPicker("refs")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shrink-0"><FolderOpen size={14} /> {refFolder ? "Change" : "Choose folder"}</button>
+                <div className="flex gap-2 shrink-0"><input ref={fileInputRef} type="file" multiple hidden accept="image/*,video/*,audio/*" onChange={(e) => { dropRefs([...(e.target.files || [])]); e.target.value = ""; }} /><button onClick={chooseRefFiles} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors"><ImageIcon size={14} /> Choose files</button><button onClick={() => chooseFolder("refs")} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors shrink-0"><FolderOpen size={14} /> {refFolder ? "Library folder" : "Choose folder"}</button></div>
               </div>
               {(["image", "video", "audio"] as const).map(t => {
                 const labels = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Labels` as "refImageLabels"];
@@ -416,7 +440,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
                 <label className={label}>Save to</label>
                 <div className="flex gap-2">
                   <input value={dest} onChange={e => setDest(e.target.value)} placeholder={st?.defaultDestination || "outputs"} className={`${input} ${ring}`} />
-                  <button onClick={() => setPicker("dest")} className="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors" title="Browse"><FolderOpen size={14} /></button>
+                  <button onClick={() => chooseFolder("dest")} className="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors" title="Browse"><FolderOpen size={14} /></button>
                 </div>
               </div>
               <div>

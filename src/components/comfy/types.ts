@@ -53,3 +53,12 @@ export async function api<T = any>(url: string, init?: RequestInit): Promise<T> 
 }
 
 export const postJson = (url: string, body: unknown) => api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+/** Windows' own folder dialog, via the local server. Returns the path, null if cancelled, undefined if unavailable (use the in-app picker). */
+export async function nativeFolder(initial?: string): Promise<string | null | undefined> {
+  try { return (await postJson("/api/tool/native-pick", { mode: "folder", initial })).path; } catch { return undefined; }
+}
+/** Windows' own multi-file dialog. Returns null if unavailable. */
+export async function nativeFiles(initial?: string): Promise<MediaItem[] | null> {
+  try { return (await postJson("/api/tool/native-pick", { mode: "files", initial })).items; } catch { return null; }
+}

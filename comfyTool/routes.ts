@@ -184,6 +184,36 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     res.json({ folder, item: { name: path.basename(dest), path: dest, type: VIDEO_EXT.has(ext) ? "video" : AUDIO_EXT.has(ext) ? "audio" : "image" } });
   });
 
+  // Windows' own file / folder dialogs (the app and the browser run on the same PC). Picked locations become readable for thumbnails.
+  const pickedDirs = new Set<string>();
+  app.post("/api/tool/native-pick", (req, res) => {
+    if (process.platform !== "win32") return res.status(501).json({ error: "native dialog only on Windows" });
+    const mode = req.body?.mode === "folder" ? "folder" : "files";
+    const initial = typeof req.body?.initial === "string" && fs.existsSync(req.body.initial) ? req.body.initial : "";
+    const script = [
+      "Add-Type -AssemblyName System.Windows.Forms",
+      "[System.Windows.Forms.Application]::EnableVisualStyles()",
+      "$o = New-Object System.Windows.Forms.Form; $o.TopMost = $true; $o.ShowInTaskbar = $false; $o.StartPosition = 'CenterScreen'; $o.Size = New-Object System.Drawing.Size(0,0); $o.Show()",
+      mode === "folder"
+        ? "$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.ShowNewFolderButton = $true; if ($env:PICK_INITIAL) { $d.SelectedPath = $env:PICK_INITIAL }; if ($d.ShowDialog($o) -eq 'OK') { [Console]::Out.Write($d.SelectedPath) }"
+        : "$d = New-Object System.Windows.Forms.OpenFileDialog; $d.Multiselect = $true; $d.Filter = 'Images, video and audio|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.flac;*.ogg;*.m4a|All files|*.*'; if ($env:PICK_INITIAL) { $d.InitialDirectory = $env:PICK_INITIAL }; if ($d.ShowDialog($o) -eq 'OK') { [Console]::Out.Write(($d.FileNames -join [char]10)) }",
+      "$o.Close()",
+    ].join("; ");
+    const ps = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", script], { env: { ...process.env, PICK_INITIAL: initial }, windowsHide: false });
+    let out = "";
+    ps.stdout.on("data", d => { out += d.toString("utf8"); });
+    ps.on("error", e => res.status(500).json({ error: e.message }));
+    ps.on("close", () => {
+      const paths = out.split(String.fromCharCode(10)).map(x => x.trim()).filter(Boolean);
+      for (const p of paths) pickedDirs.add(mode === "folder" ? p : path.dirname(p));
+      if (mode === "folder") return res.json({ path: paths[0] || null });
+      res.json({
+        paths,
+        items: paths.map(p => { const ext = path.extname(p).toLowerCase(); return { name: path.basename(p), path: p, type: VIDEO_EXT.has(ext) ? "video" : AUDIO_EXT.has(ext) ? "audio" : "image" }; }),
+      });
+    });
+  });
+
   // Serve a media file for thumbnails / results. Only media inside the folders this tool uses, or a result it made.
   const underDir = (file: string, dir: string) => !!dir && (path.resolve(file) + path.sep).toLowerCase().startsWith((path.resolve(dir) + path.sep).toLowerCase());
   app.get("/api/tool/file", (req, res) => {
@@ -192,7 +222,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     const c = store.loadConfig();
     const allowed = MIME[ext] && fs.existsSync(file) && fs.statSync(file).isFile() && (
       store.isKnown(file) || underDir(file, c.refFolder) || underDir(file, c.destination.image) || underDir(file, c.destination.video) ||
-      underDir(file, opts.galleryDirs.image) || underDir(file, opts.galleryDirs.video));
+      underDir(file, opts.galleryDirs.image) || underDir(file, opts.galleryDirs.video) || [...pickedDirs].some(d => underDir(file, d)));
     if (!allowed) return res.status(404).end();
     res.type(MIME[ext]);
     res.sendFile(path.resolve(file));

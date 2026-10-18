@@ -2,7 +2,7 @@ import React from "react";
 import { FolderOpen, Loader2, Wand2, ChevronDown } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { notifyError, notify } from "../../lib/notify";
-import { ACCENT, Kind, postJson } from "./types";
+import { ACCENT, Kind, nativeFolder, postJson } from "./types";
 
 interface Row { name: string; status: string; detail: string }
 
@@ -37,7 +37,7 @@ export function Converter({ kind, source }: { kind: Kind; source: string }) {
           <p className="text-[11px] text-zinc-600 truncate" title={source}>From: {source}</p>
           <div className="flex gap-2">
             <input value={dest} onChange={e => setDest(e.target.value)} placeholder="Destination folder (must differ from source)" className="flex-1 bg-white/5 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none placeholder:text-zinc-700" />
-            <button onClick={() => setPicker(true)} className="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300" title="Browse"><FolderOpen size={14} /></button>
+            <button onClick={async () => { const p = await nativeFolder(dest || source); if (p === undefined) setPicker(true); else if (p) setDest(p); }} className="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300" title="Browse"><FolderOpen size={14} /></button>
             <button onClick={run} disabled={busy || !dest.trim()} className={`flex items-center gap-2 ${a.solid} text-white text-xs font-bold px-4 rounded-xl disabled:opacity-40`}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />} Convert</button>
           </div>
           {rows.length > 0 && (
