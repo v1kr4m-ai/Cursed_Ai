@@ -3,6 +3,7 @@ import { Clapperboard, Loader2, AlertTriangle, Globe, Clock, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { GeminiKeyButton } from "./GeminiKeyButton";
+import { EnhancePromptButton } from "./EnhancePromptButton";
 import { VideoJob } from "../../types";
 import { GalleryHistory } from "./GalleryHistory";
 import { WorkflowRunner } from "../comfy/WorkflowRunner";
@@ -19,7 +20,7 @@ const SIZE_PRESETS = [
   { label: "640×640 (square)", width: 640, height: 640 },
 ];
 
-export function VideoGeneratorView() {
+export function VideoGeneratorView({ modelId }: { modelId?: string }) {
   const [source, setSource] = React.useState<Source>("cloud");
   const [localMode, setLocalMode] = useLocalMode("video");
   const wfMode = source === "local" && localMode === "workflows";
@@ -241,6 +242,7 @@ export function VideoGeneratorView() {
                 placeholder="A neon hologram of a cat driving at top speed..."
                 className="flex-1 bg-white/5 border-none rounded-2xl px-6 py-3 text-white focus:outline-none focus:ring-1 focus:ring-orange-500 transition-all font-medium placeholder:text-zinc-700"
               />
+              <EnhancePromptButton kind="video" prompt={prompt} onPrompt={setPrompt} modelId={modelId} tab="video" />
             </div>
           )}
 
@@ -276,7 +278,7 @@ export function VideoGeneratorView() {
               {job.status === "pending" && <ProgressBar value={source === "local" ? (progress[job.id]?.percent ?? null) : null} label={source === "local" ? (progress[job.id]?.label || "Starting...") : "Generating with Veo - this can take a few minutes"} color="bg-orange-500" />}
             </div>
           ))}
-          {wfMode && <WorkflowRunner kind="video" />}
+          {wfMode && <WorkflowRunner kind="video" modelId={modelId} />}
           <GalleryHistory kind="video" refreshKey={refreshKey} />
         </div>
       </div>

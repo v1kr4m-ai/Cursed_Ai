@@ -379,8 +379,8 @@ export default function App() {
             {activeTab === "engine" && <EngineView />}
             {activeTab === "console" && <ConsoleView />}
             {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
-            <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView /></div>
-            <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView /></div>
+            <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
+            <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
             {activeTab === "settings" && (
               <SettingsView 
                 settings={settings} 

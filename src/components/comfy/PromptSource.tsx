@@ -1,11 +1,13 @@
 import React from "react";
 import { FileText, Upload, ChevronDown, Search, Loader2, AlertTriangle } from "lucide-react";
+import { EnhancePromptButton } from "../tools/EnhancePromptButton";
 import { ACCENT, Kind, PromptCandidate, PromptColumnInfo, PromptFileResult, api } from "./types";
 
 const FILE_TYPES = ".txt,.md,.docx,.xlsx,.pdf,.png,.jpg,.jpeg,.webp,.bmp";
 
 interface Props {
   kind: Kind;
+  modelId?: string;
   prompt: string;
   onPrompt: (text: string) => void;
   needsPrompt: boolean;
@@ -18,7 +20,7 @@ interface Props {
  * prompt is found for you. Spreadsheets list every prompt (the column is guessed and can be switched); documents with
  * several "Prompt" headings list each one. You can always edit the text by hand.
  */
-export function PromptSource({ kind, prompt, onPrompt, needsPrompt, onCandidates }: Props) {
+export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates }: Props) {
   const a = ACCENT[kind];
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = React.useState("");
@@ -131,7 +133,7 @@ export function PromptSource({ kind, prompt, onPrompt, needsPrompt, onCandidates
       )}
 
       <div>
-        <label className={label}>Prompt text</label>
+        <div className="flex items-center justify-between mb-2"><label className={label + " !mb-0"}>Prompt text</label><EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></div>
         <textarea
           value={prompt}
           onChange={(e) => onPrompt(e.target.value)}

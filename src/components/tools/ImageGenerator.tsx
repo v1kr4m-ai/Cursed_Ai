@@ -3,6 +3,7 @@ import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, 
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
 import { GeminiKeyButton } from "./GeminiKeyButton";
+import { EnhancePromptButton } from "./EnhancePromptButton";
 import { GalleryHistory } from "./GalleryHistory";
 import { WorkflowRunner } from "../comfy/WorkflowRunner";
 import { ModeSwitch, useLocalMode } from "../comfy/ModeSwitch";
@@ -19,7 +20,7 @@ const SIZE_PRESETS = [
   { label: "1024×576 (wide)", width: 1024, height: 576 },
 ];
 
-export function ImageGeneratorView() {
+export function ImageGeneratorView({ modelId }: { modelId?: string }) {
   const [source, setSource] = React.useState<Source>("cloud");
   const [localMode, setLocalMode] = useLocalMode("image");
   const wfMode = source === "local" && localMode === "workflows";
@@ -221,6 +222,7 @@ export function ImageGeneratorView() {
               placeholder="A robot holding a red skateboard, studio lighting..."
               className="flex-1 bg-white/5 border-none rounded-2xl px-6 py-3 text-white focus:outline-none focus:ring-1 focus:ring-pink-500 transition-all font-medium placeholder:text-zinc-700"
             />
+            <EnhancePromptButton kind="image" prompt={prompt} onPrompt={setPrompt} modelId={modelId} tab="image" />
             {isGenerating ? (
               <Button
                 onClick={() => abortRef.current?.abort()}
@@ -255,7 +257,7 @@ export function ImageGeneratorView() {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-10">
-          {wfMode && <WorkflowRunner kind="image" />}
+          {wfMode && <WorkflowRunner kind="image" modelId={modelId} />}
           <GalleryHistory kind="image" refreshKey={refreshKey} />
         </div>
       </div>

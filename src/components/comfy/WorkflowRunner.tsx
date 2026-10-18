@@ -24,7 +24,7 @@ function Media({ path, className }: { path: string; className?: string }) {
  * Runs saved ComfyUI workflows for one tab (images or video). Workflows come from a folder of .json files; the prompt,
  * reference slots and main settings are worked out from each graph, so nothing has to be wired by hand.
  */
-export function WorkflowRunner({ kind }: { kind: Kind }) {
+export function WorkflowRunner({ kind, modelId }: { kind: Kind; modelId?: string }) {
   const a = ACCENT[kind];
   const ring = `focus:ring-1 ${a.ring}`;
   const [st, setSt] = React.useState<ToolState | null>(null);
@@ -357,7 +357,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
 
       {wf && wf.isRunnable && (
         <>
-          <PromptSource kind={kind} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} />
+          <PromptSource kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} />
 
           {/* Reference slots */}
           {(wf.refImageCount > 0 || wf.refVideoCount > 0 || wf.refAudioCount > 0) && (
