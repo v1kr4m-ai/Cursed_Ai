@@ -2,6 +2,7 @@ import React from "react";
 import { Folder, FolderOpen, ChevronUp, Loader2, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { nativeFolder } from "../comfy/types";
 
 interface Entry {
   name: string;
@@ -18,10 +19,8 @@ interface FolderPickerDialogProps {
 }
 
 /**
- * A real filesystem folder browser, backed by /api/browse-directory. A plain
- * web page has no native OS folder-picker that can hand back a real
- * absolute path, so this is the actual way to click through disk instead of
- * typing a path by hand.
+ * Opens the normal Windows folder dialog (through the local server) and hands back the real path. Only if that is
+ * unavailable (not Windows) does it fall back to an in-app folder browser backed by /api/browse-directory.
  */
 export function FolderPickerDialog({ open, onOpenChange, initialPath, onSelect, title = "Choose Models Folder" }: FolderPickerDialogProps) {
   const [currentPath, setCurrentPath] = React.useState("");
@@ -29,6 +28,7 @@ export function FolderPickerDialog({ open, onOpenChange, initialPath, onSelect, 
   const [entries, setEntries] = React.useState<Entry[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [fallback, setFallback] = React.useState(false);
 
   const browse = React.useCallback(async (targetPath: string) => {
     setIsLoading(true);
@@ -48,11 +48,20 @@ export function FolderPickerDialog({ open, onOpenChange, initialPath, onSelect, 
   }, []);
 
   React.useEffect(() => {
-    if (open) browse(initialPath || "");
-  }, [open, browse, initialPath]);
+    if (!open) { setFallback(false); return; }
+    let live = true;
+    nativeFolder(initialPath).then(p => {
+      if (!live) return;
+      if (p === undefined) { setFallback(true); browse(initialPath || ""); return; }
+      onOpenChange(false);
+      if (p) onSelect(p);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open && fallback} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
