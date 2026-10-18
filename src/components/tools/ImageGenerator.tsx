@@ -2,6 +2,7 @@ import React from "react";
 import { ImagePlus, Loader2, Download, AlertTriangle, Globe, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
+import { GeminiKeyButton } from "./GeminiKeyButton";
 import { GalleryHistory } from "./GalleryHistory";
 import { WorkflowRunner } from "../comfy/WorkflowRunner";
 import { ModeSwitch, useLocalMode } from "../comfy/ModeSwitch";
@@ -134,6 +135,7 @@ export function ImageGeneratorView() {
             >
               <HardDrive size={12} /> Local (ComfyUI)
             </button>
+            {source === "cloud" && <GeminiKeyButton tab="image" accent="pink" />}
           </div>
           <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-3">
             {source === "cloud"

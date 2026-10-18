@@ -32,7 +32,7 @@ export interface HistoryItem { path: string; workflow: string; prompt: string; k
 
 export interface RunRow {
   runId: string; kind: Kind; workflow: string; prompt: string; status: string; ahead: number | null; created: number;
-  progress: [number, number] | null; result: string | null; error: string | null; cancellable: boolean;
+  progress: [number, number] | null; result: string | null; error: string | null; cancellable: boolean; pausable?: boolean;
 }
 
 /** Colours per tab: Image is pink, Video is orange (same palette as the rest of the Image / Video pages). */

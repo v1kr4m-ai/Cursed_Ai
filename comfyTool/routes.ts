@@ -38,7 +38,10 @@ interface RunState {
   kind: Kind;
   prompt: string;
   created: number;
-  status: "starting" | "queued" | "running" | "done" | "failed" | "cancelled";
+  status: "starting" | "queued" | "running" | "done" | "failed" | "cancelled" | "paused";
+  /** The request this run was started from, kept so a paused job can be resumed. */
+  body: Json;
+  paused: boolean;
   progress: [number, number] | null;
   result: string | null;
   error: string | null;
@@ -46,6 +49,7 @@ interface RunState {
 }
 
 const ACTIVE = ["starting", "queued", "running"];
+const LISTED = [...ACTIVE, "paused"];
 
 export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   const store = createStore(opts.dataDir);
@@ -233,6 +237,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   const wake = (state: RunState) => { for (const w of [...state.waiters]) w(); };
 
   function push(state: RunState, e: RunEvent) {
+    if (e.type === "cancelled" && state.paused) { state.status = "paused"; state.events.push(e); wake(state); return; }
     if (e.type === "submitted") state.status = "queued";
     else if (e.type === "progress") { state.status = "running"; state.progress = [e.value, e.max]; }
     else if (e.type === "done") { state.status = "done"; state.result = e.path; }
@@ -246,18 +251,15 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     wake(state);
   }
 
-  app.post("/api/tool/run", async (req, res) => {
-    const b = req.body || {};
-    if (!isKind(b.kind) || typeof b.workflowPath !== "string") return res.status(400).json({ error: "kind and workflowPath are required" });
+  function startRun(b: Json): string {
     const kind: Kind = b.kind;
     const runId = crypto.randomUUID().replace(/-/g, "");
     const state: RunState = {
       events: [], finished: false, lastPreview: null, promptId: null, abort: new AbortController(), kind,
       workflow: path.basename(b.workflowPath, path.extname(b.workflowPath)), prompt: String(b.promptText || "").split(/\s+/).filter(Boolean).join(" "),
-      created: Date.now(), status: "starting", progress: null, result: null, error: null, waiters: new Set(),
+      created: Date.now(), status: "starting", progress: null, result: null, error: null, waiters: new Set(), body: b, paused: false,
     };
     runs.set(runId, state);
-    res.json({ runId });
 
     (async () => {
       try {
@@ -288,6 +290,39 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
         wake(state);
       }
     })();
+    return runId;
+  }
+
+  app.post("/api/tool/run", (req, res) => {
+    const b = req.body || {};
+    if (!isKind(b.kind) || typeof b.workflowPath !== "string") return res.status(400).json({ error: "kind and workflowPath are required" });
+    res.json({ runId: startRun(b) });
+  });
+
+  // Pause = take a job that is still waiting out of ComfyUI's queue and keep it here; resume puts it back at the end.
+  // (ComfyUI cannot pause a job that is already generating - only cancel it.)
+  app.post("/api/tool/pause/:id", async (req, res) => {
+    const state = runs.get(req.params.id);
+    if (!state) return res.status(404).json({ error: "unknown run" });
+    if (state.finished || state.status === "running") return res.status(409).json({ error: "A job that is already generating cannot be paused - cancel it instead." });
+    state.paused = true;
+    if (state.promptId) { try { await cancelPrompt(opts.getComfyUrl(), state.promptId); } catch { /* ComfyUI unreachable */ } }
+    state.abort.abort();
+    res.json({ paused: true });
+  });
+
+  app.post("/api/tool/resume/:id", (req, res) => {
+    const state = runs.get(req.params.id);
+    if (!state || state.status !== "paused") return res.status(404).json({ error: "no paused job with that id" });
+    runs.delete(req.params.id);
+    res.json({ runId: startRun(state.body) });
+  });
+
+  // Drop a paused job for good.
+  app.delete("/api/tool/runs/:id", (req, res) => {
+    const state = runs.get(req.params.id);
+    if (state && state.status === "paused") runs.delete(req.params.id);
+    res.json({ removed: true });
   });
 
   app.post("/api/tool/cancel/:id", async (req, res) => {
@@ -337,9 +372,9 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
         if (runningIds.has(s.promptId)) status = "running";
         else if (pendingIds.includes(s.promptId)) { status = "queued"; ahead = pendingIds.indexOf(s.promptId) + runningIds.size; }
       }
-      return { runId, kind: s.kind, workflow: s.workflow, prompt: s.prompt.slice(0, 140), status, ahead, created: s.created, progress: s.progress && status === "running" ? s.progress : null, result: s.result, error: s.error, cancellable: ACTIVE.includes(status) };
+      return { runId, kind: s.kind, workflow: s.workflow, prompt: s.prompt.slice(0, 140), status, ahead, created: s.created, progress: s.progress && status === "running" ? s.progress : null, result: s.result, error: s.error, cancellable: ACTIVE.includes(status), pausable: status === "queued" || status === "starting" };
     }).sort((a, b) => b.created - a.created);
-    res.json({ comfyReachable: reachable, active: rows.filter(r => ACTIVE.includes(r.status)), finished: rows.filter(r => !ACTIVE.includes(r.status)).slice(0, 8) });
+    res.json({ comfyReachable: reachable, active: rows.filter(r => LISTED.includes(r.status)), finished: rows.filter(r => !LISTED.includes(r.status)).slice(0, 8) });
   });
 
   // --- results ---

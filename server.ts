@@ -145,9 +145,9 @@ async function startServer() {
   let genAI: GoogleGenAI | null = null;
   function getGenAI(): GoogleGenAI {
     if (!genAI) {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = geminiKey();
       if (!apiKey) {
-        throw new Error("GEMINI_API_KEY not set — add it to .env.local to use image/video generation.");
+        throw new Error("No Gemini API key - click the key icon on this page and paste yours (or set GEMINI_API_KEY).");
       }
       genAI = new GoogleGenAI({ apiKey });
     }
@@ -185,7 +185,7 @@ async function startServer() {
   // Config persistence (currently just modelsDir) — a real, user-editable
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
-  interface ServerConfig { modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
+  interface ServerConfig { geminiKey?: string; modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -194,6 +194,25 @@ async function startServer() {
       console.error("[Config] Failed to load config.json", e);
     }
   }
+  // The Gemini key comes from the environment, or from the key icon in the app (kept in config.json, which is gitignored).
+  function geminiKey(): string | undefined { return process.env.GEMINI_API_KEY || serverConfig.geminiKey || undefined; }
+  app.get("/api/gemini-key", (_req, res) => {
+    res.json({ set: !!geminiKey(), source: process.env.GEMINI_API_KEY ? "env" : serverConfig.geminiKey ? "saved" : null });
+  });
+  app.post("/api/gemini-key", (req, res) => {
+    const key = String(req.body?.key || "").trim();
+    if (key.length < 20 || key.includes(" ")) return res.status(400).json({ error: "That does not look like a Gemini API key." });
+    serverConfig.geminiKey = key;
+    genAI = null;
+    saveConfig();
+    res.json({ set: true, source: process.env.GEMINI_API_KEY ? "env" : "saved" });
+  });
+  app.delete("/api/gemini-key", (_req, res) => {
+    delete serverConfig.geminiKey;
+    genAI = null;
+    saveConfig();
+    res.json({ set: !!process.env.GEMINI_API_KEY, source: process.env.GEMINI_API_KEY ? "env" : null });
+  });
   function saveConfig() {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(serverConfig, null, 2));
   }

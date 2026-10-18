@@ -1,5 +1,5 @@
 import React from "react";
-import { Bookmark, CornerUpLeft, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
+import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
@@ -57,6 +57,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
   const [history, setHistory] = React.useState<HistoryItem[]>([]);
   const [active, setActive] = React.useState<RunRow[]>([]);
   const esRef = React.useRef<EventSource | null>(null);
+  const pausedRef = React.useRef<string | null>(null);
   // Saved setups: a named snapshot of workflow + prompt + settings + references + destination. Kept in this browser.
   interface Setup { name: string; workflow: string; prompt: string; fieldValues: Record<string, any>; randomSeed: boolean; dest: string; fileName: string; slots: Record<"image" | "video" | "audio", string[]> }
   const setupKey = `cursed.comfySetups.${kind}`;
@@ -199,7 +200,7 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
         case "log": break;
         case "done": setResult(e.path); setProgress(null); notify({ message: "Workflow finished", tab: kind }); finish(); break;
         case "failed": setRunError(e.message); notifyError(e.message, kind); finish(); break;
-        case "cancelled": setStatus("Cancelled"); setRunError("Cancelled"); finish(); break;
+        case "cancelled": setStatus("Cancelled"); setRunError(pausedRef.current === id ? "Paused - resume it under Jobs." : "Cancelled"); finish(); break;
       }
     };
     es.onerror = () => { /* EventSource retries by itself with Last-Event-ID; the server closes cleanly when the run ends */ if (es.readyState === EventSource.CLOSED) finish(); };
@@ -256,7 +257,11 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
   const deleteSetup = (name: string) => persistSetups(setups.filter(x => x.name !== name));
 
   const cancel = async () => { if (runId) await postJson(`/api/tool/cancel/${runId}`, {}).catch(() => {}); };
-  const cancelOther = (id: string) => postJson(`/api/tool/cancel/${id}`, {}).catch(() => {});
+  const refreshJobs = () => api<{ active: RunRow[] }>(`/api/tool/runs?kind=${kind}`).then(d => setActive(d.active)).catch(() => {});
+  const cancelOther = (id: string) => postJson(`/api/tool/cancel/${id}`, {}).then(refreshJobs).catch(() => {});
+  const pauseJob = (id: string) => { pausedRef.current = id; postJson(`/api/tool/pause/${id}`, {}).then(refreshJobs).catch((e) => notifyError(e.message, kind)); };
+  const resumeJob = (id: string) => postJson(`/api/tool/resume/${id}`, {}).then(refreshJobs).catch((e) => notifyError(e.message, kind));
+  const dropJob = (id: string) => api(`/api/tool/runs/${id}`, { method: "DELETE" }).then(refreshJobs).catch(() => {});
 
   const removeResult = async (p: string) => {
     await postJson("/api/tool/delete-output", { path: p }).catch((e) => notifyError(e.message, kind));
@@ -477,14 +482,26 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
         </>
       )}
 
-      {/* Jobs from elsewhere */}
-      {active.filter(r => r.runId !== runId).length > 0 && (
+      {/* Job queue */}
+      {active.length > 0 && (
         <div className="glass p-5 rounded-[1.75rem] border-white/5 space-y-2">
-          <p className="text-sm font-bold text-white">Running jobs</p>
-          {active.filter(r => r.runId !== runId).map(r => (
+          <p className="text-sm font-bold text-white">Jobs</p>
+          {active.map(r => (
             <div key={r.runId} className="flex items-center justify-between gap-3 text-xs text-zinc-400">
               <span className="truncate">{r.workflow} - {r.status}{r.ahead !== null ? ` (${r.ahead} ahead)` : ""}{r.progress ? ` ${r.progress[0]}/${r.progress[1]}` : ""}</span>
-              {r.cancellable && <button onClick={() => cancelOther(r.runId)} className="text-red-400 hover:text-red-300 shrink-0">Cancel</button>}
+              <span className="flex gap-1.5 shrink-0">
+                {r.status === "paused" ? (
+                  <>
+                    <button onClick={() => resumeJob(r.runId)} title="Resume (goes to the end of the queue)" className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-400"><RotateCw size={13} /></button>
+                    <button onClick={() => dropJob(r.runId)} title="Remove" className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400"><X size={13} /></button>
+                  </>
+                ) : (
+                  <>
+                    {r.pausable && <button onClick={() => pauseJob(r.runId)} title="Pause (take it out of the queue)" className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-amber-400"><Pause size={13} /></button>}
+                    {r.cancellable && <button onClick={() => cancelOther(r.runId)} title="Cancel" className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400"><X size={13} /></button>}
+                  </>
+                )}
+              </span>
             </div>
           ))}
         </div>

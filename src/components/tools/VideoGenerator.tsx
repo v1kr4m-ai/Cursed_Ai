@@ -2,6 +2,7 @@ import React from "react";
 import { Clapperboard, Loader2, AlertTriangle, Globe, Clock, HardDrive, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ComfyStatus } from "./ComfyStatus";
+import { GeminiKeyButton } from "./GeminiKeyButton";
 import { VideoJob } from "../../types";
 import { GalleryHistory } from "./GalleryHistory";
 import { WorkflowRunner } from "../comfy/WorkflowRunner";
@@ -155,6 +156,7 @@ export function VideoGeneratorView() {
             >
               <HardDrive size={12} /> Local (ComfyUI/LTX-Video)
             </button>
+            {source === "cloud" && <GeminiKeyButton tab="video" accent="orange" />}
           </div>
           <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mt-3">
             {source === "cloud"
