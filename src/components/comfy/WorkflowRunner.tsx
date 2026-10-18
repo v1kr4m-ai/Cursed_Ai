@@ -1,5 +1,5 @@
 import React from "react";
-import { Bookmark, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
+import { Bookmark, CornerUpLeft, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
@@ -223,6 +223,14 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
     if (result === p) setResult(null);
     loadHistory();
   };
+  // Reuse a past result: its prompt goes back in the box; an image can also become the next reference.
+  const reusePrompt = (h: HistoryItem) => { setPrompt(h.prompt); notify({ message: "Prompt restored", tab: kind }); };
+  const useAsReference = (p: string) => {
+    const i = slots.image.findIndex(v => !v);
+    if (i < 0) { notifyError("No free reference image slot in this workflow.", kind); return; }
+    setSlot("image", i, p);
+    notify({ message: "Added as reference image", tab: kind });
+  };
   const reveal = (p: string) => postJson("/api/tool/reveal", { path: p }).catch((e) => notifyError(e.message, kind));
 
   const shown = workflows.filter(w => !filter || w.name.toLowerCase().includes(filter.toLowerCase()));
@@ -326,6 +334,12 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
                       <label className={label + " !mb-0"}>{labels[i] || `${t} ${i + 1}`}{bypass[i] ? " (optional)" : ""}</label>
                       {p && <button onClick={() => setSlot(t, i, "")} className="text-[11px] text-zinc-500 hover:text-white flex items-center gap-1"><X size={11} /> clear</button>}
                     </div>
+                    {p && !pool.some(m => m.path === p) && (
+                      <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                        {t === "image" && <img src={fileUrl(p)} alt="" className={`w-12 h-12 rounded-lg object-cover border-2 ${a.border}`} />}
+                        <span className="truncate">{p.split(/[\\/]/).pop()}</span>
+                      </div>
+                    )}
                     {pool.length === 0 ? (
                       <p className="text-[11px] text-zinc-600">{media.length ? `No ${t}s in that folder.` : "Choose a folder above."}</p>
                     ) : (
@@ -443,6 +457,8 @@ export function WorkflowRunner({ kind }: { kind: Kind }) {
                   <p className="text-[10px] font-bold text-white truncate">{h.workflow}</p>
                   <p className="text-[10px] text-zinc-400 truncate">{h.prompt}</p>
                   <div className="flex gap-3 mt-1">
+                    {h.prompt && <button onClick={() => reusePrompt(h)} title="Reuse prompt" className="text-zinc-300 hover:text-white"><CornerUpLeft size={12} /></button>}
+                    {isImage(h.path) && wf && wf.refImageCount > 0 && <button onClick={() => useAsReference(h.path)} title="Use as reference image" className="text-zinc-300 hover:text-white"><ImageIcon size={12} /></button>}
                     <button onClick={() => reveal(h.path)} title="Show in folder" className="text-zinc-300 hover:text-white"><ExternalLink size={12} /></button>
                     <button onClick={() => removeResult(h.path)} title="Delete" className="text-zinc-300 hover:text-red-400"><Trash2 size={12} /></button>
                   </div>
