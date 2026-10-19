@@ -89,6 +89,10 @@ async function startServer() {
   let performanceMode: PerformanceMode = "BALANCED";
   let userThreads: number | undefined;
   let userContextSize: number | undefined;
+  // Engine settings from the Engine tab (kept in config.json). Threads / context size also come from the Settings tab.
+  const ENGINE_DEFAULTS: EngineSettings = { gpuLayers: "auto", flashAttention: false, batchSize: null, useMmap: true, useMlock: false, keepAliveMinutes: 0, threads: null, contextSize: null };
+  let engineSettings: EngineSettings = { ...ENGINE_DEFAULTS };
+  let lastEngineUse = Date.now();
 
   // Real telemetry from the last / current generation (replaces the fabricated
   // "native" stats the UI used to expect from a mobile-only backend).
@@ -185,7 +189,8 @@ async function startServer() {
   // Config persistence (currently just modelsDir) — a real, user-editable
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
-  interface ServerConfig { geminiKey?: string; modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
+  interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null }
+  interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -195,6 +200,9 @@ async function startServer() {
     }
   }
   // The Gemini key comes from the environment, or from the key icon in the app (kept in config.json, which is gitignored).
+  engineSettings = { ...ENGINE_DEFAULTS, ...(serverConfig.engine || {}) };
+  if (engineSettings.threads) userThreads = engineSettings.threads;
+  if (engineSettings.contextSize) userContextSize = engineSettings.contextSize;
   function geminiKey(): string | undefined { return process.env.GEMINI_API_KEY || serverConfig.geminiKey || undefined; }
   app.get("/api/gemini-key", (_req, res) => {
     res.json({ set: !!geminiKey(), source: process.env.GEMINI_API_KEY ? "env" : serverConfig.geminiKey ? "saved" : null });
@@ -269,6 +277,24 @@ async function startServer() {
     return found;
   }
 
+  // How the llama.cpp context is created: the performance profile, overridden by whatever was set in the Engine tab.
+  function contextOptions() {
+    const profile = PERFORMANCE_PROFILES[performanceMode];
+    const flash = engineSettings.flashAttention && modelInstance?.flashAttentionSupported !== false;
+    return {
+      threads: userThreads ?? profile.threads,
+      batchSize: engineSettings.batchSize ?? profile.batchSize,
+      contextSize: userContextSize ?? ("auto" as const),
+      ...(flash ? { flashAttention: true } : {}),
+    };
+  }
+  async function unloadEngine() {
+    const c = context, m = modelInstance;
+    modelInstance = null; context = null; session = null; activeModelName = null;
+    try { await c?.dispose(); } catch { /* already gone */ }
+    try { await m?.dispose(); } catch { /* already gone */ }
+  }
+
   async function loadModel(modelName: string) {
     const l = await ensureLlama();
     const modelPath = resolveModelPath(modelName);
@@ -279,12 +305,8 @@ async function startServer() {
 
     const profile = PERFORMANCE_PROFILES[performanceMode];
     console.log(`[Llama] Loading model: ${modelPath} (threads=${userThreads ?? profile.threads}, batchSize=${profile.batchSize})`);
-    modelInstance = await l.loadModel({ modelPath });
-    context = await modelInstance.createContext({
-      threads: userThreads ?? profile.threads,
-      batchSize: profile.batchSize,
-      contextSize: userContextSize ?? "auto",
-    });
+    modelInstance = await l.loadModel({ modelPath, gpuLayers: engineSettings.gpuLayers, useMmap: engineSettings.useMmap, useMlock: engineSettings.useMlock });
+    context = await modelInstance.createContext(contextOptions());
     session = new LlamaChatSession({
       contextSequence: context.getSequence()
     });
@@ -296,12 +318,8 @@ async function startServer() {
   // immediately instead of waiting for the next model switch.
   async function applyEngineConfigNow() {
     if (!activeModelName || !modelInstance) return;
-    const profile = PERFORMANCE_PROFILES[performanceMode];
-    context = await modelInstance.createContext({
-      threads: userThreads ?? profile.threads,
-      batchSize: profile.batchSize,
-      contextSize: userContextSize ?? "auto",
-    });
+    try { await context?.dispose(); } catch { /* already gone */ }
+    context = await modelInstance.createContext(contextOptions());
     session = new LlamaChatSession({
       contextSequence: context.getSequence()
     });
@@ -508,6 +526,7 @@ async function startServer() {
 
     try {
       isInferenceRunning = true;
+      lastEngineUse = Date.now();
       const ext = /^(ollama|lmstudio):(.+)$/.exec(modelName || "");
       if (ext) {
         console.log(`[External] Chat via ${ext[1]}: ${ext[2]}`);
@@ -578,6 +597,7 @@ async function startServer() {
       res.end();
     } finally {
       isInferenceRunning = false;
+      lastEngineUse = Date.now();
     }
   });
 
@@ -672,13 +692,54 @@ async function startServer() {
   });
 
   // API Route: Unload the active model to free RAM
-  app.post("/api/engine/unload", (req, res) => {
-    modelInstance = null;
-    context = null;
-    session = null;
-    activeModelName = null;
+  app.post("/api/engine/unload", async (req, res) => {
+    await unloadEngine();
     res.json({ status: "success" });
   });
+
+  // API Routes: Engine settings (Engine tab) - what the engine runs on, with the limits this PC reports.
+  const saveEngineSettings = () => { serverConfig.engine = engineSettings; saveConfig(); };
+  app.get("/api/engine/settings", async (req, res) => {
+    let gpuNames: string[] = [];
+    try { gpuNames = llama ? await llama.getGpuDeviceNames() : []; } catch { /* no GPU info */ }
+    res.json({
+      settings: { ...engineSettings, threads: userThreads ?? null, contextSize: userContextSize ?? null },
+      defaults: { threads: PERFORMANCE_PROFILES[performanceMode].threads, batchSize: PERFORMANCE_PROFILES[performanceMode].batchSize },
+      hardware: { cores: os.cpus().length, ramGb: Math.round(os.totalmem() / 1024 ** 3), gpu: llama ? (llama.gpu || "cpu") : null, gpuNames },
+      model: modelInstance ? { name: activeModelName, gpuLayers: modelInstance.gpuLayers, flashAttentionSupported: modelInstance.flashAttentionSupported, contextSize: context?.contextSize ?? null } : null,
+    });
+  });
+  app.post("/api/engine/settings", async (req, res) => {
+    const b = req.body || {};
+    const before = { gpuLayers: engineSettings.gpuLayers, useMmap: engineSettings.useMmap, useMlock: engineSettings.useMlock };
+    const num = (v: any, lo: number, hi: number) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Math.round(Number(v)))) : null);
+    if (b.gpuLayers === "auto" || b.gpuLayers === "max") engineSettings.gpuLayers = b.gpuLayers;
+    else if (b.gpuLayers !== undefined) { const n = num(b.gpuLayers, 0, 999); if (n !== null) engineSettings.gpuLayers = n; }
+    if (typeof b.flashAttention === "boolean") engineSettings.flashAttention = b.flashAttention;
+    if (typeof b.useMmap === "boolean") engineSettings.useMmap = b.useMmap;
+    if (typeof b.useMlock === "boolean") engineSettings.useMlock = b.useMlock;
+    if (b.batchSize === null) engineSettings.batchSize = null; else if (b.batchSize !== undefined) engineSettings.batchSize = num(b.batchSize, 16, 4096);
+    if (b.keepAliveMinutes !== undefined) engineSettings.keepAliveMinutes = num(b.keepAliveMinutes, 0, 1440) ?? 0;
+    if (b.threads === null) { userThreads = undefined; engineSettings.threads = null; } else if (b.threads !== undefined) { const n = num(b.threads, 1, 256); if (n !== null) { userThreads = n; engineSettings.threads = n; } }
+    if (b.contextSize === null) { userContextSize = undefined; engineSettings.contextSize = null; } else if (b.contextSize !== undefined) { const n = num(b.contextSize, 256, 262144); if (n !== null) { userContextSize = n; engineSettings.contextSize = n; } }
+    saveEngineSettings();
+    try {
+      // The model itself is reloaded (next message) when how it is loaded changes; the rest applies in place.
+      if (before.gpuLayers !== engineSettings.gpuLayers || before.useMmap !== engineSettings.useMmap || before.useMlock !== engineSettings.useMlock) await unloadEngine();
+      else await applyEngineConfigNow();
+      res.json({ status: "success" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  // Keep-alive: unload the model after it has been idle for the chosen time, to give the memory back.
+  setInterval(() => {
+    const min = engineSettings.keepAliveMinutes;
+    if (min > 0 && modelInstance && !isInferenceRunning && Date.now() - lastEngineUse > min * 60_000) {
+      console.log(`[Llama] Idle for ${min} min - unloading the model.`);
+      unloadEngine();
+    }
+  }, 30_000).unref();
 
   // API Route: Performance mode — actually changes llama.cpp thread/batch
   // config, applied immediately if a model is already loaded.
@@ -699,8 +760,9 @@ async function startServer() {
   // API Route: Advanced engine config (threads / context size) from the Settings tab.
   app.post("/api/engine-config", async (req, res) => {
     const { threads, kvCacheSize } = req.body;
-    if (typeof threads === "number") userThreads = threads;
-    if (typeof kvCacheSize === "number") userContextSize = kvCacheSize;
+    if (typeof threads === "number") { userThreads = threads; engineSettings.threads = threads; }
+    if (typeof kvCacheSize === "number") { userContextSize = kvCacheSize; engineSettings.contextSize = kvCacheSize; }
+    saveEngineSettings();
     try {
       await applyEngineConfigNow();
       res.json({ status: "success", threads: userThreads, contextSize: userContextSize });
@@ -730,7 +792,7 @@ async function startServer() {
         tps: lastGenerationTps,
         totalTokens: totalTokensGenerated,
         threads: userThreads ?? PERFORMANCE_PROFILES[performanceMode].threads,
-        batch: PERFORMANCE_PROFILES[performanceMode].batchSize,
+        batch: engineSettings.batchSize ?? PERFORMANCE_PROFILES[performanceMode].batchSize,
       },
       performanceMode,
       localAddress: `http://${getLocalNetworkAddress()}:${PORT}/api/*`,
