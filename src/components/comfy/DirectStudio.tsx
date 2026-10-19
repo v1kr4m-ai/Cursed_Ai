@@ -25,7 +25,7 @@ const SIZES = {
 interface Job {
   id: string; prompt: string; negative: string; status: "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
   percent: number | null; label: string; url?: string; file?: string; error?: string;
-  checkpoint: string; width: number; height: number; image: string | null;
+  checkpoint: string; width: number; height: number; image: string | null; frames?: number; fps?: number;
 }
 interface View { url: string; file?: string; prompt?: string }
 interface GalleryItem { file: string; url: string; createdAt: number }
@@ -57,6 +57,10 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
   const [refImage, setRefImage] = React.useState<string | null>(null);
   const [jobs, setJobs] = React.useState<Job[]>([]);
   const [count, setCount] = React.useState(1);
+  // Quick video: clip length. LTX-Video wants 8n+1 frames at 25 fps.
+  const [seconds, setSeconds] = React.useState(4);
+  const FPS = 25;
+  const framesFor = (sec: number) => Math.max(1, Math.round((sec * FPS - 1) / 8)) * 8 + 1;
   const [view, setView] = React.useState<View | null>(null);
   const [lastError, setLastError] = React.useState<string | null>(null);
   const [gallery, setGallery] = React.useState<GalleryItem[]>([]);
@@ -109,7 +113,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     // video: start a job on the server, then follow it until it finishes
     const start = engine === "cloud"
       ? body({ prompt: job.prompt })
-      : body({ prompt: job.prompt, negativePrompt: job.negative || undefined, image: job.image, checkpoint: job.checkpoint, width: job.width, height: job.height });
+      : body({ prompt: job.prompt, negativePrompt: job.negative || undefined, image: job.image, checkpoint: job.checkpoint, width: job.width, height: job.height, frames: job.frames, fps: job.fps });
     const r = await fetch(engine === "cloud" ? "/api/video/generate" : "/api/comfyui/video/generate", start);
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Failed to start generation");
@@ -142,7 +146,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     execute(next, ctl.signal).then(res => {
       patch(next.id, { status: "done", url: res.url, file: res.file });
       // Keep the prompt with its picture in the library.
-      if (res.file) fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, mode: engine, prompt: next.prompt, negative: next.negative, galleryFile: res.file, params: engine === "quick" ? { size: `${next.width}×${next.height}`, checkpoint: next.checkpoint } : {} }) }).catch(() => {}).finally(() => setRefreshKey(k => k + 1));
+      if (res.file) fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, mode: engine, prompt: next.prompt, negative: next.negative, galleryFile: res.file, params: engine === "quick" ? { size: `${next.width}×${next.height}`, checkpoint: next.checkpoint, ...(next.frames ? { frames: next.frames, fps: next.fps, seconds: Math.round((next.frames / (next.fps || FPS)) * 10) / 10 } : {}) } : {} }) }).catch(() => {}).finally(() => setRefreshKey(k => k + 1));
       setView({ url: res.url, file: res.file, prompt: next.prompt });
       setRefreshKey(k => k + 1);
       notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${next.prompt.slice(0, 60)}`, tab: kind, thumb: kind === "image" ? res.url : undefined });
@@ -161,6 +165,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     const fresh: Job[] = prompts.filter(p => p.trim()).flatMap(p => Array(count).fill(p) as string[]).map((p, i) => ({
       id: `${Date.now()}-${i}`, prompt: p.trim(), negative, status: "queued", percent: null, label: "Waiting",
       checkpoint, width: size.width, height: size.height, image: engine === "quick" ? refImage : null,
+      ...(kind === "video" && engine === "quick" ? { frames: framesFor(seconds), fps: FPS } : {}),
     }));
     if (!fresh.length) return;
     setJobs(js => [...fresh.reverse(), ...js]);
@@ -232,6 +237,16 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
               {sizes.map((s, i) => <option key={s.label} value={i} className="bg-zinc-900">{s.label}</option>)}
             </select>
           </div>
+          {kind === "video" && (
+            <div>
+              <label className={label + " !mb-1"}>Duration</label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1"><input type="number" min={1} max={20} step={0.5} value={seconds} onChange={e => setSeconds(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} className={`${field} pr-8`} aria-label="Seconds" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">s</span></div>
+                <span className="text-[11px] text-zinc-500 whitespace-nowrap">{framesFor(seconds)} frames · {FPS} fps</span>
+              </div>
+              <p className="text-[11px] text-zinc-600 mt-1">Longer clips need more memory and time.</p>
+            </div>
+          )}
         </Section>
       ) : (
         <Section title="Model" icon={<Layers size={14} />} accent={a.text} badge={kind === "image" ? "Imagen 4" : "Veo 2"} defaultOpen>
