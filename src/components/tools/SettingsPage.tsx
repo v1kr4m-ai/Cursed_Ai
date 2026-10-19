@@ -184,6 +184,7 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
     { id: "voice", cat: "voice", title: "Voice", keywords: "voice microphone whisper speech assistant dictation tts speed", node: (
       <Group title="Voice & microphone">
         <Row title="Voice features" note="Dictation and the Cursed_Pirate assistant."><Switch on={settings.voiceEnabled} onChange={v => set({ voiceEnabled: v })} /></Row>
+        <Row title="Let the assistant open the studios" note={'Say "create an image of a red fox", "make a video of waves" or "open the video generator" and Cursed_Pirate opens the studio with your prompt; "generate it" starts it.'}><Switch on={settings.assistantStudio} onChange={v => set({ assistantStudio: v })} /></Row>
         {settings.voiceEnabled && (
           <>
             <Row title="Speech recognition" stack note={settings.voiceEngine === "whisper" ? "Always the local Whisper model: every browser, fully offline (first use downloads ~40 MB)." : settings.voiceEngine === "browser" ? "The browser's built-in recognizer (Chrome / Edge, needs internet); Whisper is the fallback." : "Automatic: the browser's live recognizer when it is available and online, otherwise offline Whisper."}>

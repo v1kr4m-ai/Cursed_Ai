@@ -17,6 +17,11 @@ export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) 
   const setSource = (s: Source) => { setSourceState(s); try { localStorage.setItem(`cursed.source.${kind}`, s); } catch { /* private window */ } };
   const [mode, setMode] = useLocalMode(kind);
   const [showHistory, setShowHistory] = React.useState(false);
+  React.useEffect(() => {
+    const onReq = (e: Event) => { if ((e as CustomEvent).detail?.kind === kind) setShowHistory(false); };
+    window.addEventListener("cursed:studio", onReq);
+    return () => window.removeEventListener("cursed:studio", onReq);
+  }, [kind]);
   const icon = kind === "image" ? <ImagePlus className="text-pink-500" size={24} /> : <Clapperboard className="text-orange-500" size={24} />;
   const toolbar = (
     <StudioToolbar kind={kind} icon={icon} title={kind === "image" ? "Image Studio" : "Video Studio"} source={source} onSource={setSource} mode={mode} onMode={setMode} showHistory={showHistory} onHistory={() => setShowHistory(h => !h)} />

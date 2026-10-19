@@ -121,6 +121,8 @@ export interface AppSettings {
   defaultInstances: number;
   imageSizeIdx: number;
   videoSeconds: number;
+  /** Let the voice assistant open the Image / Video studios when asked to create something. */
+  assistantStudio: boolean;
 }
 
 export interface LogLine {

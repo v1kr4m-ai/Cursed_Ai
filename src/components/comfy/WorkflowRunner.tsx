@@ -4,6 +4,8 @@ import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
 import { PromptSource } from "./PromptSource";
+import { takePending } from "../../lib/studioBridge";
+import type { StudioRequest } from "../../services/studioIntent";
 import { PreviousResults } from "./PreviousResults";
 import { ShareMenu } from "./ShareMenu";
 import { Converter } from "./Converter";
@@ -316,6 +318,19 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
     onCloseHistory?.();
     notify({ message: w ? "Prompt and settings restored" : "Prompt restored (its workflow is not in this folder)", tab: kind });
   };
+
+
+  // The voice assistant (or anything else) can hand this studio a prompt and ask it to start.
+  const [autoGen, setAutoGen] = React.useState(0);
+  React.useEffect(() => {
+    const apply = (r: StudioRequest) => { if (r.kind !== kind) return; if (r.prompt) setPrompt(r.prompt); if (r.generate) setAutoGen(n => n + 1); };
+    const waiting = takePending(kind);
+    if (waiting) apply(waiting);
+    const onReq = (e: Event) => { apply((e as CustomEvent<StudioRequest>).detail); takePending(kind); };
+    window.addEventListener("cursed:studio", onReq);
+    return () => window.removeEventListener("cursed:studio", onReq);
+  }, [kind]);
+  React.useEffect(() => { if (autoGen > 0) submit([prompt]); }, [autoGen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveSetup = () => {
     if (!wf) return;

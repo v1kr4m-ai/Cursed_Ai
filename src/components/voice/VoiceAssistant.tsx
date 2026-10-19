@@ -10,12 +10,15 @@ import { MicModeButton } from "./MicModeButton";
 import { notify } from "../../lib/notify";
 import { notifyError } from "../../lib/notify";
 import { makeUtterance } from "../../services/tts";
+import { parseStudioCommand, StudioKind, StudioRequest } from "../../services/studioIntent";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
   onNewMessage: (msg: Message) => void;
   settings: AppSettings;
   onSetVoiceEngine?: (pref: "auto" | "browser" | "whisper") => void;
+  /** Open an Image / Video studio (the assistant was asked to create something). */
+  onOpenStudio?: (req: StudioRequest) => void;
 }
 
 type VoiceState = "off" | "listening" | "thinking" | "speaking";
@@ -34,7 +37,10 @@ const ERROR_TEXT: Record<string, string> = {
  * Without a usable browser recognizer (other browsers, or no internet) it switches to the local Whisper model:
  * still hands-free - it listens until you stop talking, transcribes on this PC, then replies - fully offline.
  */
-export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoiceEngine }: VoiceAssistantProps) {
+export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoiceEngine, onOpenStudio }: VoiceAssistantProps) {
+  const onOpenStudioRef = useRef(onOpenStudio);
+  onOpenStudioRef.current = onOpenStudio;
+  const lastStudioRef = useRef<{ kind: StudioKind; at: number } | null>(null);
   const [browserFailed, setBrowserFailed] = useState(false);
   const usingWhisper = resolveEngine(settings.voiceEngine, browserFailed) === "whisper";
   const [level, setLevel] = useState(0);              // microphone loudness while listening offline
@@ -165,6 +171,25 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     setLive("");
     setReply("");
     setVoiceState("thinking");
+
+    // "Create an image of ..." / "open the video generator" / "generate it": open the studio instead of asking the model.
+    const studio = settingsRef.current.assistantStudio !== false && onOpenStudioRef.current ? parseStudioCommand(text, lastStudioRef.current) : null;
+    if (studio) {
+      lastStudioRef.current = { kind: studio.request.kind, at: Date.now() };
+      onOpenStudioRef.current?.(studio.request);
+      const sp0 = speechRef.current;
+      sp0.pending = 0; sp0.ended = false; sp0.skipped = false; sp0.done = () => {};
+      enqueueSpeech(studio.reply);
+      const aMsg0: Message = { id: (Date.now() + 1).toString(), role: MessageRole.ASSISTANT, content: studio.reply, timestamp: Date.now() };
+      historyRef.current = [...historyRef.current, aMsg0];
+      setHistory(historyRef.current);
+      onNewMessageRef.current(aMsg0);
+      setReply("");
+      sp0.done = () => { if (activeRef.current) startListening(); };
+      sp0.ended = true;
+      if (sp0.pending <= 0) sp0.done();
+      return;
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { readSavedSettings, saveSettings, savedSetting } from "./lib/settingsStore";
+import { requestStudio } from "./lib/studioBridge";
 import { Eye } from "lucide-react";
 import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -113,6 +114,7 @@ function defaultSettings(): AppSettings {
     defaultInstances: 1,
     imageSizeIdx: 2,
     videoSeconds: 4,
+    assistantStudio: true,
   };
 }
 
@@ -502,6 +504,7 @@ export default function App() {
               selectedModel={selectedModel}
               settings={settings}
               onSetVoiceEngine={setVoiceEngine}
+              onOpenStudio={(req) => { setActiveTab(req.kind); requestStudio(req); }}
               onNewMessage={(msg) => {
                 if (activeChat) {
                   updateChat({

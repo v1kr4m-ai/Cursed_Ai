@@ -4,6 +4,8 @@ import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { notify, notifyError } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
 import { PromptSource } from "./PromptSource";
+import { takePending } from "../../lib/studioBridge";
+import type { StudioRequest } from "../../services/studioIntent";
 import { PreviousResults } from "./PreviousResults";
 import { savedSetting } from "../../lib/settingsStore";
 import { ShareMenu } from "./ShareMenu";
@@ -185,6 +187,18 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     if (fresh.length > 1 || running) notify({ message: `Added ${fresh.length} job${fresh.length > 1 ? "s" : ""} to the queue`, tab: kind });
   };
   const generate = () => { if (prompt.trim()) enqueue([prompt]); };
+  // The voice assistant (or anything else) can hand this studio a prompt and ask it to start.
+  const [autoGen, setAutoGen] = React.useState(0);
+  React.useEffect(() => {
+    const apply = (r: StudioRequest) => { if (r.kind !== kind) return; if (r.prompt) setPrompt(r.prompt); if (r.generate) setAutoGen(n => n + 1); };
+    const waiting = takePending(kind);
+    if (waiting) apply(waiting);
+    const onReq = (e: Event) => { apply((e as CustomEvent<StudioRequest>).detail); takePending(kind); };
+    window.addEventListener("cursed:studio", onReq);
+    return () => window.removeEventListener("cursed:studio", onReq);
+  }, [kind]);
+  React.useEffect(() => { if (autoGen > 0) generate(); }, [autoGen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const runAll = () => enqueue(batch);
 
   const pause = (id: string) => patch(id, { status: "paused" });
