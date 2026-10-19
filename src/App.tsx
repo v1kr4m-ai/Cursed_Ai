@@ -83,6 +83,27 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("cursed.chats", JSON.stringify(chats)); } catch { /* storage full/blocked */ }
   }, [chats]);
+  // Chats also live on the server (chats.json): merge them in once at start, then keep the file up to date.
+  const [chatsSynced, setChatsSynced] = useState(false);
+  useEffect(() => {
+    fetch("/api/chats").then(r => r.json()).then((server: Chat[]) => {
+      setChats(local => {
+        const byId = new Map<string, Chat>();
+        for (const c of [...(Array.isArray(server) ? server : []), ...local]) {
+          if (!c?.id || !c.messages?.length) continue;
+          const have = byId.get(c.id);
+          if (!have || (c.updatedAt || 0) > (have.updatedAt || 0)) byId.set(c.id, c);
+        }
+        return [...byId.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      });
+      setChatsSynced(true);
+    }).catch(() => { /* server not reachable: keep working from this browser's copy */ });
+  }, []);
+  useEffect(() => {
+    if (!chatsSynced) return;
+    const t = setTimeout(() => { fetch("/api/chats", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chats }) }).catch(() => {}); }, 1500);
+    return () => clearTimeout(t);
+  }, [chats, chatsSynced]);
   const [serverUp, setServerUp] = useState(true);
   // Heartbeat: shows a banner the moment the local server stops answering.
   useEffect(() => {

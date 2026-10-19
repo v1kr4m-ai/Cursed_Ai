@@ -40,3 +40,5 @@ comfy-tool-history.json
 prompts.db
 prompts.db-*
 app.log
+chats.json
+chats.json.*

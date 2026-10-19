@@ -357,6 +357,20 @@ async function startServer() {
     return out;
   }
 
+  // Chat history is kept on disk too (chats.json), so it follows you between the app window, a browser tab and a restart.
+  const CHATS_FILE = path.join(process.cwd(), "chats.json");
+  app.get("/api/chats", (_req, res) => {
+    try { res.json(fs.existsSync(CHATS_FILE) ? JSON.parse(fs.readFileSync(CHATS_FILE, "utf-8")) : []); } catch { res.json([]); }
+  });
+  app.put("/api/chats", (req, res) => {
+    const chats = req.body?.chats;
+    if (!Array.isArray(chats)) return res.status(400).json({ error: "chats must be a list" });
+    const tmp = CHATS_FILE + "." + process.pid + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(chats));
+    fs.renameSync(tmp, CHATS_FILE);
+    res.json({ saved: chats.length });
+  });
+
   // Desktop-app mode (Cursed_Ai.bat sets CURSED_APP): the page pings /api/health while it is open and says goodbye when the
   // window closes; with nobody left the server stops by itself, so no terminal or background process stays behind.
   let lastSeen = Date.now();
@@ -365,7 +379,7 @@ async function startServer() {
   app.post("/api/app/closing", (req, res) => {
     res.end();
     if (!process.env.CURSED_APP) return;
-    setTimeout(() => { if (Date.now() - lastSeen > 7000) { console.log("[App] Window closed - stopping the server."); process.exit(0); } }, 9000);
+    setTimeout(() => { if (Date.now() - lastSeen > 10000) { console.log("[App] Window closed - stopping the server."); process.exit(0); } }, 12000);
   });
   if (process.env.CURSED_APP) {
     setInterval(() => { if (everSeen && Date.now() - lastSeen > 4 * 60 * 1000) { console.log("[App] No window for 4 minutes - stopping the server."); process.exit(0); } }, 30000).unref();
@@ -1510,6 +1524,10 @@ async function startServer() {
     getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
     galleryDirs: { image: galleryDir("image"), video: galleryDir("video") },
   });
+
+  // An unknown /api route must answer 404 here. Without this the Vite middleware's dev proxy (/api -> localhost:3000, i.e. this very
+  // server) forwards it to itself again and again until the machine runs out of sockets.
+  app.use("/api", (_req, res) => res.status(404).json({ error: "Unknown API route - restart the app if you just updated it." }));
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
