@@ -37,3 +37,6 @@ AI_Hub_Cursed_Pirate/
 Pirate_AI_LLama_PC/
 comfy-tool.json
 comfy-tool-history.json
+prompts.db
+prompts.db-*
+app.log

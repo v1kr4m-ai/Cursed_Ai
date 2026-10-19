@@ -1,6 +1,6 @@
 export type Kind = "image" | "video";
 
-export interface WorkflowField { id: string; node: string; input: string; label: string; kind: string; value: any; options?: string[] }
+export interface WorkflowField { id: string; node: string; input: string; label: string; kind: string; value: any; options?: string[]; role?: "width" | "height" | "length" | "fps" | "size"; snap?: number }
 export interface NodeChoice { id: string; label: string }
 
 /** What the server works out about one workflow file (see comfyTool/registry.ts). */
@@ -48,7 +48,7 @@ export async function api<T = any>(url: string, init?: RequestInit): Promise<T> 
   const text = await resp.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
-  if (!resp.ok) throw new Error(data?.error || `Request failed (HTTP ${resp.status}). If you just updated the app, restart it.`);
+  if (!resp.ok) throw new Error(data?.error || (resp.status === 413 ? "That file is too large for the app to read." : `Request failed (HTTP ${resp.status}). If you just updated the app, restart it.`));
   return data as T;
 }
 

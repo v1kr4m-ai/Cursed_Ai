@@ -1,9 +1,10 @@
 import React from "react";
-import { AlertTriangle, CornerUpLeft, Cpu, ExternalLink, Film, ImageIcon, Loader2, Play, Plus, Trash2, Type, X, Layers } from "lucide-react";
-import { GalleryHistory } from "../tools/GalleryHistory";
+import { AlertTriangle, Minus, ListPlus, CornerUpLeft, Cpu, ExternalLink, Film, ImageIcon, Loader2, Play, Plus, Trash2, Type, X, Layers } from "lucide-react";
+import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { notify, notifyError } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
 import { PromptSource } from "./PromptSource";
+import { ShareMenu } from "./ShareMenu";
 import { MediaView, QueueList, QueueRow, Section, Stage, StudioFrame, fieldCls, iconBtn, isImagePath, label } from "./shared";
 import { ACCENT, Kind, api, fileUrl, nativeFiles, postJson } from "./types";
 
@@ -40,7 +41,7 @@ const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, r
  * controls on the left, canvas + queue + recent results on the right. Jobs wait in a queue that runs one at a time
  * and can be paused, resumed or cancelled.
  */
-export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { kind: Kind; engine: "cloud" | "quick"; modelId?: string; toolbar: React.ReactNode; showHistory: boolean }) {
+export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCloseHistory }: { kind: Kind; engine: "cloud" | "quick"; modelId?: string; toolbar: React.ReactNode; showHistory: boolean; onCloseHistory: () => void }) {
   const a = ACCENT[kind];
   const ring = `focus:ring-1 ${a.ring}`;
   const field = fieldCls(a.ring);
@@ -55,6 +56,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { 
   const [sizeIdx, setSizeIdx] = React.useState(kind === "image" ? 2 : 0);
   const [refImage, setRefImage] = React.useState<string | null>(null);
   const [jobs, setJobs] = React.useState<Job[]>([]);
+  const [count, setCount] = React.useState(1);
   const [view, setView] = React.useState<View | null>(null);
   const [lastError, setLastError] = React.useState<string | null>(null);
   const [gallery, setGallery] = React.useState<GalleryItem[]>([]);
@@ -139,28 +141,30 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { 
     setLastError(null);
     execute(next, ctl.signal).then(res => {
       patch(next.id, { status: "done", url: res.url, file: res.file });
+      // Keep the prompt with its picture in the library.
+      if (res.file) fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, mode: engine, prompt: next.prompt, negative: next.negative, galleryFile: res.file, params: engine === "quick" ? { size: `${next.width}×${next.height}`, checkpoint: next.checkpoint } : {} }) }).catch(() => {}).finally(() => setRefreshKey(k => k + 1));
       setView({ url: res.url, file: res.file, prompt: next.prompt });
       setRefreshKey(k => k + 1);
-      notify({ message: `${kind === "image" ? "Image" : "Video"} generated and saved to history`, tab: kind });
+      notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${next.prompt.slice(0, 60)}`, tab: kind, thumb: kind === "image" ? res.url : undefined });
     }).catch((e: any) => {
       if (e?.name === "AbortError") { patch(next.id, { status: "cancelled" }); return; }
       const m = friendlyError(e);
       patch(next.id, { status: "failed", error: m });
       setLastError(m);
-      notifyError(m, kind);
+      notifyError(`${kind === "image" ? "Image" : "Video"} failed: ${m}`, kind);
     }).finally(() => controllers.current.delete(next.id));
   }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const enqueue = (prompts: string[]) => {
     if (engine === "quick" && !checkpoint) { setLastError("No checkpoint selected"); notifyError("No checkpoint selected", kind); return; }
     const size = sizes[sizeIdx];
-    const fresh: Job[] = prompts.filter(p => p.trim()).map((p, i) => ({
+    const fresh: Job[] = prompts.filter(p => p.trim()).flatMap(p => Array(count).fill(p) as string[]).map((p, i) => ({
       id: `${Date.now()}-${i}`, prompt: p.trim(), negative, status: "queued", percent: null, label: "Waiting",
       checkpoint, width: size.width, height: size.height, image: engine === "quick" ? refImage : null,
     }));
     if (!fresh.length) return;
     setJobs(js => [...fresh.reverse(), ...js]);
-    if (fresh.length > 1) notify({ message: `Queued ${fresh.length} prompts`, tab: kind });
+    if (fresh.length > 1 || running) notify({ message: `Added ${fresh.length} job${fresh.length > 1 ? "s" : ""} to the queue`, tab: kind });
   };
   const generate = () => { if (prompt.trim()) enqueue([prompt]); };
   const runAll = () => enqueue(batch);
@@ -202,6 +206,9 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { 
     setView(null); setRefreshKey(k => k + 1);
   };
   const reveal = () => stageFile && postJson("/api/gallery/reveal", { kind, file: stageFile }).catch(e => notifyError(e.message, kind));
+
+  // "Use" in the prompt library: the prompt (and negative prompt) go back into the box.
+  const useEntry = (it: PromptItem) => { setPrompt(it.prompt); setNegative(it.negative || ""); onCloseHistory(); notify({ message: "Prompt restored - edit it or press Generate", tab: kind }); };
 
   const needsPrompt = !prompt.trim();
   const canGenerate = !needsPrompt && !(engine === "cloud" && hasKey === false);
@@ -270,9 +277,14 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { 
     <>
       <div className="flex gap-2">
         <button onClick={generate} disabled={!canGenerate} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-black/30`}>
-          {running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} className="fill-current" />} {running ? "Add to queue" : "Generate"}
+          {running ? <ListPlus size={16} /> : <Play size={16} className="fill-current" />} {running ? "Add to queue" : "Generate"}{count > 1 ? ` ×${count}` : ""}
         </button>
-        {batch.length > 1 && <button onClick={runAll} disabled={engine === "cloud" && hasKey === false} title="Queue every prompt found in the file" className="px-4 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors whitespace-nowrap">{`Run all ${batch.length}`}</button>}
+        <div className="flex items-center rounded-xl bg-white/5 border border-white/[0.06] overflow-hidden" title="How many times to run it">
+          <button onClick={() => setCount(c => Math.max(1, c - 1))} disabled={count <= 1} className="px-2.5 h-full text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"><Minus size={14} /></button>
+          <span className="w-8 text-center text-sm font-bold text-white tabular-nums">{count}</span>
+          <button onClick={() => setCount(c => Math.min(20, c + 1))} disabled={count >= 20} className="px-2.5 h-full text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"><Plus size={14} /></button>
+        </div>
+        {batch.length > 1 && <button onClick={runAll} disabled={engine === "cloud" && hasKey === false} title="Queue every prompt found in the file" className="px-4 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors whitespace-nowrap">{`Run all ${batch.length}${count > 1 ? ` ×${count}` : ""}`}</button>}
       </div>
       {needsPrompt && <p className="text-[11px] text-zinc-600 text-center">Write a prompt (or open a file) to enable Generate.</p>}
       {!needsPrompt && engine === "cloud" && hasKey === false && <p className="text-[11px] text-amber-400 text-center">Add your Gemini key (key icon, top bar) to generate.</p>}
@@ -281,7 +293,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { 
 
   const canvas = showHistory ? (
     <>
-      <div className="rounded-3xl border border-white/5 bg-black/20 p-4 lg:flex-1 lg:overflow-y-auto"><GalleryHistory kind={kind} refreshKey={refreshKey} /></div>
+      <HistoryPanel kind={kind} refreshKey={refreshKey} onUse={useEntry} />
       <QueueList kind={kind} rows={rows} onPause={pause} onResume={resume} onCancel={cancel} onRemove={remove} />
     </>
   ) : (
@@ -292,6 +304,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory }: { 
           <p className="text-[11px] text-zinc-500 truncate flex-1 min-w-[140px]" title={view?.prompt}>{view?.prompt || (stageFile ?? "")}</p>
           {view?.prompt && <button onClick={() => setPrompt(view.prompt!)} title="Reuse this prompt" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><CornerUpLeft size={13} /> Prompt</button>}
           {engine === "quick" && isImagePath(stageSrc) && <button onClick={() => useResultAsImage(stageSrc)} title={kind === "video" ? "Start the next clip from this image" : "Use as reference image"} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><ImageIcon size={13} /> {kind === "video" ? "Start frame" : "Reference"}</button>}
+          <ShareMenu kind={kind} url={stageSrc} caption={view?.prompt} onReveal={stageFile ? reveal : undefined} tab={kind} />
           {stageFile && <button onClick={reveal} title="Show in folder" className={iconBtn}><ExternalLink size={14} /></button>}
           {stageFile && <button onClick={removeResult} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>}
         </div>

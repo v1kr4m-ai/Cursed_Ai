@@ -1,19 +1,26 @@
 import React from "react";
-import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2 } from "lucide-react";
+import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2, Ruler, ArrowLeftRight, ListPlus, Minus } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
 import { PromptSource } from "./PromptSource";
+import { ShareMenu } from "./ShareMenu";
 import { Converter } from "./Converter";
 import { QueueList } from "./shared";
-import { GalleryHistory } from "../tools/GalleryHistory";
-import { ACCENT, HistoryItem, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, nativeFiles, nativeFolder, postJson } from "./types";
+import { SortMenu } from "./SortMenu";
+import { HistoryPanel, PromptItem } from "./HistoryPanel";
+import { ACCENT, HistoryItem, WorkflowField, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, nativeFiles, nativeFolder, postJson } from "./types";
 
 const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
 const input = "w-full bg-white/5 border-none rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 placeholder:text-zinc-700";
 const isVideo = (p: string) => /\.(mp4|webm|mov|mkv)$/i.test(p);
 const isImage = (p: string) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(p);
 
+const MAX_INSTANCES = 20;
+const SIZE_PRESETS: Record<Kind, [number, number, string?][]> = {
+  image: [[512, 512, "SD 1.5"], [768, 768], [1024, 1024, "SDXL / Flux"], [1152, 896], [896, 1152], [1344, 768, "16:9"], [768, 1344, "9:16"], [1536, 1024, "3:2"]],
+  video: [[512, 512], [768, 512, "LTX"], [512, 768], [704, 480], [832, 480, "Wan"], [480, 832], [1024, 576, "16:9"], [1280, 720, "HD"], [720, 1280, "9:16"]],
+};
 interface ToolState { workflowFolder: string; refFolder: string; destination: string; defaultDestination: string; outputFilename: string; lastWorkflow: string; comfyReachable: boolean }
 
 function Media({ path, className }: { path: string; className?: string }) {
@@ -26,7 +33,7 @@ function Media({ path, className }: { path: string; className?: string }) {
  * Runs saved ComfyUI workflows for one tab (images or video). Workflows come from a folder of .json files; the prompt,
  * reference slots and main settings are worked out from each graph, so nothing has to be wired by hand.
  */
-export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: Kind; modelId?: string; toolbar?: React.ReactNode; showHistory?: boolean }) {
+export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHistory }: { kind: Kind; modelId?: string; toolbar?: React.ReactNode; showHistory?: boolean; onCloseHistory?: () => void }) {
   const a = ACCENT[kind];
   const ring = `focus:ring-1 ${a.ring}`;
   const [st, setSt] = React.useState<ToolState | null>(null);
@@ -63,7 +70,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
   const [viewPath, setViewPath] = React.useState<string | null>(null);
   const [activeSetup, setActiveSetup] = React.useState<string | null>(null);
   // Saved setups: a named snapshot of workflow + prompt + settings + references + destination. Kept in this browser.
-  interface Setup { name: string; workflow: string; prompt: string; fieldValues: Record<string, any>; randomSeed: boolean; dest: string; fileName: string; slots: Record<"image" | "video" | "audio", string[]> }
+  interface Setup { name: string; workflow: string; prompt: string; fieldValues: Record<string, any>; randomSeed: boolean; dest: string; fileName: string; slots?: Record<"image" | "video" | "audio", string[]> }
   const setupKey = `cursed.comfySetups.${kind}`;
   const [setups, setSetups] = React.useState<Setup[]>(() => { try { return JSON.parse(localStorage.getItem(setupKey) || "[]"); } catch { return []; } });
   const [pendingSetup, setPendingSetup] = React.useState<Setup | null>(null);
@@ -105,6 +112,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
     if (!wf) return;
     setFieldValues({});
     setSlots({ image: Array(wf.refImageCount).fill(""), video: Array(wf.refVideoCount).fill(""), audio: Array(wf.refAudioCount).fill("") });
+    setSkip({ image: wf.refImageBypassable.map(Boolean), video: wf.refVideoBypassable.map(Boolean), audio: wf.refAudioBypassable.map(Boolean) });
     postJson("/api/tool/state", { kind, lastWorkflow: wf.path }).catch(() => {});
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,13 +120,27 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
   React.useEffect(() => {
     if (!pendingSetup || selected !== pendingSetup.workflow) return;
     setPrompt(pendingSetup.prompt); setFieldValues(pendingSetup.fieldValues); setRandomSeed(pendingSetup.randomSeed);
-    setDest(pendingSetup.dest); setFileName(pendingSetup.fileName); setSlots(pendingSetup.slots);
+    setDest(pendingSetup.dest); setFileName(pendingSetup.fileName); if (pendingSetup.slots) setSlots(pendingSetup.slots);
     setPendingSetup(null);
   }, [pendingSetup, selected, wf]);
 
-  // Other jobs (also ones from a previous page load) waiting in ComfyUI.
+  // Jobs waiting / running in ComfyUI (also ones from a previous page load); a popup for every one that finishes or fails.
+  const seenFinished = React.useRef<Set<string> | null>(null);
   React.useEffect(() => {
-    const t = setInterval(() => api<{ active: RunRow[] }>(`/api/tool/runs?kind=${kind}`).then(d => setActive(d.active)).catch(() => {}), 3000);
+    const poll = () => api<{ active: RunRow[]; finished: RunRow[] }>(`/api/tool/runs?kind=${kind}`).then(d => {
+      setActive(d.active);
+      if (seenFinished.current === null) { seenFinished.current = new Set(d.finished.map(r => r.runId)); return; }
+      for (const r of d.finished) {
+        if (seenFinished.current.has(r.runId)) continue;
+        seenFinished.current.add(r.runId);
+        if (notified.current.has(r.runId)) continue;
+        notified.current.add(r.runId);
+        if (r.status === "done") notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${r.workflow}`, tab: kind, thumb: r.result && isImage(r.result) ? fileUrl(r.result) : undefined });
+        else if (r.status === "failed") notifyError(`${r.workflow} failed: ${r.error || "unknown error"}`, kind);
+      }
+    }).catch(() => {});
+    poll();
+    const t = setInterval(poll, 3000);
     return () => clearInterval(t);
   }, [kind]);
 
@@ -184,9 +206,84 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
 
   const setSlot = (type: "image" | "video" | "audio", i: number, p: string) => setSlots(s => ({ ...s, [type]: s[type].map((v, j) => j === i ? p : v) }));
 
-  const missingRefs = wf ? (["image", "video", "audio"] as const).flatMap(t => slots[t].map((p, i) => ({ t, i, p, ok: wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"][i] })).filter(s => !s.p && !s.ok)) : [];
+  // Bypass flags for the optional reference slots (checked = the slot is skipped for the run).
+  const [skip, setSkip] = React.useState<Record<"image" | "video" | "audio", boolean[]>>({ image: [], video: [], audio: [] });
+  const [count, setCount] = React.useState(1);
+  const toggleSkip = (t: "image" | "video" | "audio", i: number, on: boolean) => {
+    setSkip(s => ({ ...s, [t]: s[t].map((v, j) => j === i ? on : v) }));
+    if (on) setSlot(t, i, "");
+  };
+  // Choosing a file un-bypasses its slot.
+  React.useEffect(() => {
+    setSkip(s => {
+      const next = { image: [...s.image], video: [...s.video], audio: [...s.audio] };
+      let changed = false;
+      for (const t of ["image", "video", "audio"] as const) slots[t].forEach((p, i) => { if (p && next[t][i]) { next[t][i] = false; changed = true; } });
+      return changed ? next : s;
+    });
+  }, [slots]);
+  const effSlots = { image: slots.image.map((p, i) => skip.image[i] ? "" : p), video: slots.video.map((p, i) => skip.video[i] ? "" : p), audio: slots.audio.map((p, i) => skip.audio[i] ? "" : p) };
+
+  // Size & duration: the width / height / length / fps inputs the workflow exposes.
+  const val = (f: WorkflowField) => (f.id in fieldValues ? fieldValues[f.id] : f.value);
+  const setField = (id: string, x: any) => setFieldValues(s => ({ ...s, [id]: x }));
+  const roleOf = (r: string) => (wf ? wf.fields.filter(f => f.role === r) : []);
+  const setRole = (r: string, x: any) => setFieldValues(s => { const n = { ...s }; for (const f of roleOf(r)) n[f.id] = x; return n; });
+  const sizeW = roleOf("width")[0], sizeH = roleOf("height")[0], lengthF = roleOf("length")[0], fpsF = roleOf("fps")[0];
+  const roleFields = roleOf("size");
+  const otherFields = wf ? wf.fields.filter(f => !f.role) : [];
+  const setSize = (w: number, h: number) => { if (w > 0) setRole("width", w); if (h > 0) setRole("height", h); };
+  const sizePresets = SIZE_PRESETS[kind];
+  const curW = sizeW ? Number(val(sizeW)) : 0, curH = sizeH ? Number(val(sizeH)) : 0;
+  const presetKey = sizePresets.some(([w, h]) => w === curW && h === curH) ? `${curW}x${curH}` : "custom";
+  const fps = (fpsF ? Number(val(fpsF)) : 0) || 24;
+  const frames = lengthF ? Number(val(lengthF)) || 0 : 0;
+  const seconds = frames / fps;
+  const setSeconds = (sec: number) => {
+    if (!lengthF || !(sec > 0)) return;
+    let n = Math.max(1, Math.round(sec * fps));
+    if (lengthF.snap) n = Math.max(1, Math.round((n - 1) / lengthF.snap)) * lengthF.snap + 1;
+    setRole("length", n);
+  };
+
+  // Sorting / searching the workflow list (the arrows icon next to the list).
+  const sortKey0 = (() => { try { return localStorage.getItem(`cursed.comfySort.${kind}`) || "name"; } catch { return "name"; } })();
+  const [sort, setSortState] = React.useState(sortKey0);
+  const setSort = (k: string) => { setSortState(k); try { localStorage.setItem(`cursed.comfySort.${kind}`, k); } catch { /* private window */ } };
+  const recentKey = `cursed.comfyRecent.${kind}`;
+  const readRecent = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(recentKey) || "{}"); } catch { return {}; } };
+  const markUsed = (path: string) => { const r = readRecent(); r[path] = Date.now(); try { localStorage.setItem(recentKey, JSON.stringify(r)); } catch { /* private window */ } };
+
+  // Run the prompt(s) `count` times each. The first goes on screen when nothing is running; everything else just joins the queue.
+  const notified = React.useRef(new Set<string>());
+  const submit = async (texts: string[]) => {
+    if (!wf || !canRunBase) return;
+    const list = texts.filter(t => t.trim() || !wf.needsPrompt);
+    if (!list.length) return;
+    const jobs = list.flatMap(t => Array(count).fill(t) as string[]);
+    const many = jobs.length > 1;
+    setQueuing(true); setRunError(null);
+    try {
+      let first = !busy;
+      for (const t of jobs) {
+        const { runId: id } = await postJson("/api/tool/run", {
+          kind, workflowPath: wf.path, promptText: t, fieldValues, randomizeSeed: randomSeed || many,
+          refImagePaths: effSlots.image, refVideoPaths: effSlots.video, refAudioPaths: effSlots.audio,
+          outputFolder: dest, outputFilename: many ? "" : fileName,
+        });
+        if (first) { setResult(null); setProgress(null); setPreview(null); setStatus("Starting"); setRunId(id); watch(id); first = false; }
+      }
+      markUsed(wf.path);
+      postJson("/api/tool/state", { kind, destination: dest, outputFilename: fileName }).catch(() => {});
+      if (many || busy) notify({ message: `Added ${jobs.length} job${jobs.length > 1 ? "s" : ""} to the queue`, tab: kind });
+    } catch (e: any) { setRunError(e.message); notifyError(e.message, kind); }
+    finally { setQueuing(false); }
+  };
+
+
+  const missingRefs = wf ? (["image", "video", "audio"] as const).flatMap(t => slots[t].map((p, i) => ({ t, i, p, bypass: !!wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"][i] })).filter(r => !r.p && (!r.bypass || !skip[t][r.i]))) : [];
   const canRunBase = !!wf && wf.isRunnable && missingRefs.length === 0 && wf.needsAssignment.length === 0;
-  const canRun = !!wf && wf.isRunnable && !busy && (!wf.needsPrompt || prompt.trim().length > 0) && missingRefs.length === 0 && wf.needsAssignment.length === 0;
+  const canRun = canRunBase && !queuing && (!wf!.needsPrompt || prompt.trim().length > 0);
 
   const watch = (id: string) => {
     esRef.current?.close();
@@ -202,44 +299,21 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
         case "progress": setStatus("Generating"); setProgress([e.value, e.max]); setQueueNote(""); break;
         case "preview": setPreview(`data:image/jpeg;base64,${e.image_b64}`); break;
         case "log": break;
-        case "done": setResult(e.path); setViewPath(e.path); setProgress(null); notify({ message: "Workflow finished", tab: kind }); finish(); break;
-        case "failed": setRunError(e.message); notifyError(e.message, kind); finish(); break;
+        case "done": notified.current.add(id); setResult(e.path); setViewPath(e.path); setProgress(null); notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${wf?.name || "workflow"}`, tab: kind, thumb: isImage(e.path) ? fileUrl(e.path) : undefined }); finish(); break;
+        case "failed": notified.current.add(id); setRunError(e.message); notifyError(`${wf?.name || "Workflow"} failed: ${e.message}`, kind); finish(); break;
         case "cancelled": setStatus("Cancelled"); setRunError(pausedRef.current === id ? "Paused - resume it under Jobs." : "Cancelled"); finish(); break;
       }
     };
     es.onerror = () => { /* EventSource retries by itself with Last-Event-ID; the server closes cleanly when the run ends */ if (es.readyState === EventSource.CLOSED) finish(); };
   };
 
-  const run = async () => {
-    if (!wf) return;
-    setRunError(null); setResult(null); setProgress(null); setPreview(null); setStatus("Starting");
-    try {
-      const body = {
-        kind, workflowPath: wf.path, promptText: prompt, fieldValues, randomizeSeed: randomSeed,
-        refImagePaths: slots.image, refVideoPaths: slots.video, refAudioPaths: slots.audio,
-        outputFolder: dest, outputFilename: fileName,
-      };
-      const { runId: id } = await postJson("/api/tool/run", body);
-      setRunId(id); watch(id);
-      postJson("/api/tool/state", { kind, destination: dest, outputFilename: fileName }).catch(() => {});
-    } catch (e: any) { setRunError(e.message); notifyError(e.message, kind); setStatus(""); }
-  };
-
-  // Queue every prompt found in the file. ComfyUI runs them one after another; they show up under "Running jobs" and in the results.
-  const runAll = async () => {
-    if (!wf || batch.length < 2) return;
-    setQueuing(true); setRunError(null);
-    try {
-      for (const text of batch) {
-        await postJson("/api/tool/run", {
-          kind, workflowPath: wf.path, promptText: text, fieldValues, randomizeSeed: true,
-          refImagePaths: slots.image, refVideoPaths: slots.video, refAudioPaths: slots.audio,
-          outputFolder: dest, outputFilename: "",
-        });
-      }
-      notify({ message: `Queued ${batch.length} prompts`, tab: kind });
-    } catch (e: any) { setRunError(e.message); notifyError(e.message, kind); }
-    finally { setQueuing(false); }
+  // "Use" in the prompt library: restore the prompt and, when the workflow is in this folder, select it with its settings.
+  const useEntry = (it: PromptItem) => {
+    const w = workflows.find(x => x.path.split("\\").join("/").endsWith(`/${it.workflow}.json`)) || workflows.find(x => x.name === it.workflow);
+    if (w && w.path !== selected) setPendingSetup({ name: "", workflow: w.path, prompt: it.prompt, fieldValues: it.params?.fieldValues || {}, randomSeed: true, dest, fileName: "" });
+    else { setPrompt(it.prompt); if (it.params?.fieldValues) setFieldValues(it.params.fieldValues); }
+    onCloseHistory?.();
+    notify({ message: w ? "Prompt and settings restored" : "Prompt restored (its workflow is not in this folder)", tab: kind });
   };
 
   const saveSetup = () => {
@@ -257,7 +331,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
     if (!x) return;
     setActiveSetup(name);
     if (!workflows.some(w => w.path === x.workflow)) { notifyError("That setup's workflow is not in the current folder.", kind); return; }
-    if (x.workflow === selected) { setPrompt(x.prompt); setFieldValues(x.fieldValues); setRandomSeed(x.randomSeed); setDest(x.dest); setFileName(x.fileName); setSlots(x.slots); }
+    if (x.workflow === selected) { setPrompt(x.prompt); setFieldValues(x.fieldValues); setRandomSeed(x.randomSeed); setDest(x.dest); setFileName(x.fileName); if (x.slots) setSlots(x.slots); }
     else { setPendingSetup(x); setSelected(x.workflow); }
   };
   const deleteSetup = (name: string) => persistSetups(setups.filter(x => x.name !== name));
@@ -286,8 +360,14 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
 
   // A converted copy in a sub-folder (e.g. API_FORMAT/x) is hidden when the original x is listed too - they run the same.
   const names = new Set(workflows.map(w => w.name));
+  const refTotal = (w: WorkflowInfo) => w.refImageCount + w.refVideoCount + w.refAudioCount;
+  const recentUse = readRecent();
   const shown = workflows.filter(w => !(w.name.includes("/") && names.has(w.name.slice(w.name.lastIndexOf("/") + 1))))
-    .filter(w => !filter || w.name.toLowerCase().includes(filter.toLowerCase()));
+    .filter(w => !filter || w.name.toLowerCase().includes(filter.toLowerCase()))
+    .sort((x, y) => (sort === "name-desc" ? y.name.localeCompare(x.name)
+      : sort === "recent" ? (recentUse[y.path] || 0) - (recentUse[x.path] || 0)
+      : sort === "ready" ? Number(y.isRunnable) - Number(x.isRunnable)
+      : sort === "refs" ? refTotal(x) - refTotal(y) : 0) || x.name.localeCompare(y.name));
   const pct = progress ? (progress[0] / Math.max(1, progress[1])) * 100 : null;
 
   // What the stage shows: the live job, else the picked / newest result.
@@ -316,10 +396,10 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
                   </select>
                   <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
                 </div>
+                {workflows.length > 1 && <SortMenu options={[{ key: "name", label: "Name A → Z" }, { key: "name-desc", label: "Name Z → A" }, { key: "recent", label: "Recently used" }, { key: "ready", label: "Ready to run first" }, { key: "refs", label: "Fewest references first" }]} sort={sort} onSort={setSort} search={filter} onSearch={setFilter} />}
                 {folder && <button onClick={() => loadWorkflows(folder, selected)} disabled={loading} title="Reload the folder" className={iconBtn}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>}
                 <button onClick={() => chooseFolder("workflows")} title={folder ? `Change folder (${folder})` : "Choose the workflow folder"} className={iconBtn}><FolderOpen size={14} /></button>
               </div>
-              {workflows.length > 8 && <input value={filter} onChange={e => setFilter(e.target.value)} placeholder={`Filter ${workflows.length} workflows...`} className={field} />}
               {!folder && <p className="text-[11px] text-zinc-500">Pick the folder where your ComfyUI workflows are saved.</p>}
               {folder && !loading && workflows.length === 0 && !loadError && <p className="text-[11px] text-zinc-500">No {kind} workflows here.{counts.image || counts.video ? ` This folder has ${counts.image || 0} image / ${counts.video || 0} video workflows.` : ""}</p>}
               {loadError && <p className="text-[11px] text-red-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {loadError}</p>}
@@ -377,22 +457,31 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
                       {(["image", "video", "audio"] as const).map(t => {
                         const labels = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Labels` as "refImageLabels"];
                         const bypass = wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"];
-                        return slots[t].map((p, i) => (
-                          <div key={t + i} className="flex items-center gap-3">
-                            <button onClick={chooseRefFiles} title="Choose a file" className={`relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border-2 border-dashed transition-colors flex items-center justify-center ${p ? "border-transparent" : "border-white/15 hover:border-white/30 text-zinc-600"}`}>
-                              {p ? (t === "image" ? <img src={fileUrl(p)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5 flex items-center justify-center text-zinc-400">{t === "video" ? <Film size={20} /> : <ImageIcon size={20} />}</div>) : <Plus size={18} />}
-                            </button>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[12px] font-semibold text-zinc-200 truncate">{labels[i] || `${t} ${i + 1}`}{bypass[i] ? <span className="text-zinc-600 font-normal"> · optional</span> : ""}</p>
-                              <p className={`text-[11px] truncate ${!p && !bypass[i] ? "text-amber-400" : "text-zinc-500"}`}>{p ? p.split(/[\\/]/).pop() : bypass[i] ? "Skipped for this run" : "Required - choose or drop a file"}</p>
+                        return slots[t].map((p, i) => {
+                          const skipped = !!bypass[i] && !!skip[t][i];
+                          const required = !bypass[i];
+                          return (
+                            <div key={t + i} className={`flex items-center gap-3 rounded-xl p-2 -mx-2 ${required && !p ? "bg-amber-500/[0.06]" : ""}`}>
+                              <button onClick={chooseRefFiles} disabled={skipped} title={skipped ? "Bypassed - untick Bypass to choose a file" : "Choose a file"} className={`relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border-2 border-dashed transition-colors flex items-center justify-center ${skipped ? "opacity-30 border-white/10" : p ? "border-transparent" : "border-white/15 hover:border-white/30 text-zinc-600"}`}>
+                                {p && !skipped ? (t === "image" ? <img src={fileUrl(p)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5 flex items-center justify-center text-zinc-400">{t === "video" ? <Film size={20} /> : <ImageIcon size={20} />}</div>) : <Plus size={18} />}
+                              </button>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-semibold text-zinc-200 truncate">{labels[i] || `${t} ${i + 1}`}{required ? <span className="ml-1.5 text-[9px] font-black uppercase tracking-widest text-amber-400">required</span> : <span className="ml-1.5 text-[9px] font-black uppercase tracking-widest text-zinc-500">optional</span>}</p>
+                                <p className={`text-[11px] truncate ${required && !p ? "text-amber-400" : "text-zinc-500"}`}>{skipped ? "Bypassed for this run" : p ? p.split(/[\\/]/).pop() : required ? "Choose or drop a file" : "No file chosen"}</p>
+                                {!required && (
+                                  <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-zinc-400 cursor-pointer select-none">
+                                    <input type="checkbox" checked={skipped} onChange={e => toggleSkip(t, i, e.target.checked)} /> Bypass (skip this reference)
+                                  </label>
+                                )}
+                              </div>
+                              {p && !skipped && <button onClick={() => setSlot(t, i, "")} title="Clear" className={iconBtn}><X size={13} /></button>}
                             </div>
-                            {p && <button onClick={() => setSlot(t, i, "")} title="Clear" className={iconBtn}><X size={13} /></button>}
-                          </div>
-                        ));
+                          );
+                        });
                       })}
                       {media.length > 0 && (
                         <div>
-                          <p className={label}>Library{refFolder ? "" : ""} <button onClick={() => chooseFolder("refs")} className="ml-1 normal-case tracking-normal text-zinc-500 hover:text-zinc-300 font-medium">change folder</button></p>
+                          <p className={label}>Library <button onClick={() => chooseFolder("refs")} className="ml-1 normal-case tracking-normal text-zinc-500 hover:text-zinc-300 font-medium">change folder</button></p>
                           <div className="flex gap-1.5 overflow-x-auto pb-1">
                             {media.map(m => (
                               <button key={m.path} onClick={() => addRefItems([m])} title={`${m.name} - click to use`} className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-white/5 opacity-70 hover:opacity-100 transition-opacity">
@@ -407,13 +496,52 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
                   </Section>
                 )}
 
+                {/* Size & duration */}
+                {(sizeW || sizeH || lengthF || roleFields.length > 0) && (
+                  <Section title={lengthF ? "Size & duration" : "Size"} icon={<Ruler size={14} />} accent={a.text} badge={sizeW && sizeH ? `${val(sizeW)}×${val(sizeH)}${lengthF ? ` · ${seconds.toFixed(1)}s` : ""}` : undefined} defaultOpen>
+                    {sizeW && sizeH && (
+                      <div className="space-y-2">
+                        <label className={label + " !mb-1"}>Picture size</label>
+                        <select value={presetKey} onChange={e => { if (e.target.value !== "custom") { const [w, h] = e.target.value.split("x").map(Number); setSize(w, h); } }} className={field}>
+                          {sizePresets.map(([w, h, n]) => <option key={`${w}x${h}`} value={`${w}x${h}`} className="bg-zinc-900">{w} × {h}{n ? `  (${n})` : ""}</option>)}
+                          {presetKey === "custom" && <option value="custom" className="bg-zinc-900">Custom</option>}
+                        </select>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={64} step={8} value={val(sizeW) ?? ""} onChange={e => setSize(Number(e.target.value), Number(val(sizeH)))} className={field} aria-label="Width" />
+                          <button onClick={() => setSize(Number(val(sizeH)), Number(val(sizeW)))} title="Swap width and height" className={iconBtn}><ArrowLeftRight size={14} /></button>
+                          <input type="number" min={64} step={8} value={val(sizeH) ?? ""} onChange={e => setSize(Number(val(sizeW)), Number(e.target.value))} className={field} aria-label="Height" />
+                        </div>
+                      </div>
+                    )}
+                    {roleFields.map(f => (
+                      <div key={f.id}>
+                        <label className={label + " !mb-1"}>{f.label}</label>
+                        {f.kind === "select" && f.options
+                          ? <select value={String(val(f))} onChange={e => setField(f.id, e.target.value)} className={field}>{f.options.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}</select>
+                          : <input type="number" step="any" value={val(f) ?? ""} onChange={e => setField(f.id, e.target.value === "" ? "" : Number(e.target.value))} className={field} />}
+                      </div>
+                    ))}
+                    {lengthF && (
+                      <div className="space-y-2">
+                        <label className={label + " !mb-1"}>Duration</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1"><input type="number" min={0.5} step={0.5} value={Number(seconds.toFixed(2))} onChange={e => setSeconds(Number(e.target.value))} className={`${field} pr-8`} aria-label="Seconds" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">s</span></div>
+                          <div className="relative flex-1"><input type="number" min={1} step={lengthF.snap || 1} value={val(lengthF) ?? ""} onChange={e => setField(lengthF.id, Number(e.target.value))} className={`${field} pr-14`} aria-label="Frames" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">frames</span></div>
+                          {fpsF && <div className="relative w-24"><input type="number" min={1} value={val(fpsF) ?? ""} onChange={e => setField(fpsF.id, Number(e.target.value))} className={`${field} pr-9`} aria-label="Frames per second" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">fps</span></div>}
+                        </div>
+                        <p className="text-[11px] text-zinc-600">{lengthF.snap ? `This model needs frames in steps of ${lengthF.snap} + 1 (it rounds for you). ` : ""}Longer clips need more memory and time.</p>
+                      </div>
+                    )}
+                  </Section>
+                )}
+
                 {/* Settings */}
-                {wf.fields.length > 0 && (
-                  <Section title="Settings" icon={<SlidersHorizontal size={14} />} accent={a.text} badge={`${wf.fields.length}`}>
+                {otherFields.length > 0 && (
+                  <Section title="Settings" icon={<SlidersHorizontal size={14} />} accent={a.text} badge={`${otherFields.length}`}>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-                      {wf.fields.map(f => {
-                        const v = f.id in fieldValues ? fieldValues[f.id] : f.value;
-                        const set = (x: any) => setFieldValues(s => ({ ...s, [f.id]: x }));
+                      {otherFields.map(f => {
+                        const v = val(f);
+                        const set = (x: any) => setField(f.id, x);
                         return (
                           <div key={f.id} className={f.kind === "text" || (f.kind === "select" && String(v).length > 22) ? "col-span-2" : ""}>
                             <label className={label + " !mb-1"}>{f.label}</label>
@@ -432,8 +560,11 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
                         );
                       })}
                     </div>
-                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer pt-1"><input type="checkbox" checked={randomSeed} onChange={e => setRandomSeed(e.target.checked)} /> <Dices size={14} /> New random seed every run</label>
+                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer pt-1"><input type="checkbox" checked={randomSeed || count > 1} disabled={count > 1} onChange={e => setRandomSeed(e.target.checked)} /> <Dices size={14} /> New random seed every run{count > 1 ? " (always on for several instances)" : ""}</label>
                   </Section>
+                )}
+                {otherFields.length === 0 && (
+                  <div className="px-4 py-3"><label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer"><input type="checkbox" checked={randomSeed || count > 1} disabled={count > 1} onChange={e => setRandomSeed(e.target.checked)} /> <Dices size={14} /> New random seed every run</label></div>
                 )}
 
                 {/* Output */}
@@ -459,13 +590,18 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
           {/* Action bar */}
           <div className="shrink-0 border-t border-white/5 p-4 space-y-2 bg-black/20">
             <div className="flex gap-2">
-              <button onClick={run} disabled={!canRun} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-black/30`}>
-                {busy ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} className="fill-current" />} {busy ? "Generating..." : "Generate"}
+              <button onClick={() => submit([prompt])} disabled={!canRun} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-black/30`}>
+                {busy ? <ListPlus size={16} /> : <Play size={16} className="fill-current" />} {busy ? "Add to queue" : "Generate"}{count > 1 ? ` ×${count}` : ""}
               </button>
-              {batch.length > 1 && !busy && <button onClick={runAll} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="px-4 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors whitespace-nowrap">{queuing ? "Queuing..." : `Run all ${batch.length}`}</button>}
-              {busy && <button onClick={cancel} title="Cancel this job" className="px-4 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-colors"><Square size={14} className="fill-current" /></button>}
+              <div className="flex items-center rounded-xl bg-white/5 border border-white/[0.06] overflow-hidden" title="How many times to run it (each with a new seed)">
+                <button onClick={() => setCount(c => Math.max(1, c - 1))} disabled={count <= 1} className="px-2.5 h-full text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"><Minus size={14} /></button>
+                <span className="w-8 text-center text-sm font-bold text-white tabular-nums">{count}</span>
+                <button onClick={() => setCount(c => Math.min(MAX_INSTANCES, c + 1))} disabled={count >= MAX_INSTANCES} className="px-2.5 h-full text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"><Plus size={14} /></button>
+              </div>
+              {busy && <button onClick={cancel} title="Cancel the running job" className="px-3.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-colors"><Square size={14} className="fill-current" /></button>}
             </div>
-            {wf?.isRunnable && !busy && (wf.needsPrompt && !prompt.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""}.</p> : null)}
+            {batch.length > 1 && <button onClick={() => submit(batch)} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors">{queuing ? "Queuing..." : `Run all ${batch.length} prompts${count > 1 ? ` ×${count}` : ""}`}</button>}
+            {wf?.isRunnable && (wf.needsPrompt && !prompt.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""} (or bypass optional ones).</p> : null)}
           </div>
         </div>
 
@@ -473,7 +609,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
         <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">
           {showHistory ? (
             <>
-            <div className="rounded-3xl border border-white/5 bg-black/20 p-4 lg:flex-1 lg:overflow-y-auto"><GalleryHistory kind={kind} refreshKey={history.length} /></div>
+            <HistoryPanel kind={kind} refreshKey={history.length} onUse={useEntry} />
             <QueueList kind={kind} rows={active.map(r => ({ id: r.runId, label: r.workflow, status: r.status, detail: r.progress ? `${r.progress[0]}/${r.progress[1]}` : undefined, pausable: !!r.pausable, cancellable: r.cancellable }))} onPause={pauseJob} onResume={resumeJob} onCancel={cancelOther} onRemove={dropJob} />
             </>
           ) : (<>
@@ -505,6 +641,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory }: { kind: 
               <p className="text-[11px] text-zinc-500 truncate flex-1 min-w-[140px]" title={stageItem?.prompt}>{stageItem ? `${stageItem.workflow} · ${stageItem.prompt || "no prompt"}` : stagePath.split(/[\\/]/).pop()}</p>
               {stageItem?.prompt && <button onClick={() => reusePrompt(stageItem)} title="Reuse this prompt" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><CornerUpLeft size={13} /> Prompt</button>}
               {isImage(stagePath) && wf && wf.refImageCount > 0 && <button onClick={() => useAsReference(stagePath)} title="Use as reference image" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><ImageIcon size={13} /> Reference</button>}
+              <ShareMenu kind={kind} url={(stagePath.startsWith("data:") || stagePath.startsWith("blob:") || stagePath.startsWith("/api/")) ? stagePath : fileUrl(stagePath)} caption={stageItem?.prompt} onReveal={() => reveal(stagePath)} tab={kind} />
               <button onClick={() => reveal(stagePath)} title="Show in folder" className={iconBtn}><ExternalLink size={14} /></button>
               <button onClick={() => removeResult(stagePath)} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>
             </div>

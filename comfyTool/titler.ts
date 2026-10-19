@@ -252,6 +252,23 @@ export function suggestTitles(graph: Json, outputHint?: string | null): TitleSug
 
 export interface WorkflowField {
   id: string; node: string; input: string; label: string; kind: string; value: any; options?: string[];
+  /** Set for the picture / clip size and length controls, which get a dedicated Size & duration block in the UI. */
+  role?: "width" | "height" | "length" | "fps" | "size";
+  /** Frame counts must be a multiple of this plus one (LTX 8, Wan / Hunyuan 4). */
+  snap?: number;
+}
+
+const SIZE_KEYS: Record<string, "width" | "height" | "length"> = { width: "width", height: "height", length: "length", num_frames: "length", video_frames: "length", frames_number: "length", frame_count: "length" };
+const FPS_KEYS = new Set(["fps", "frame_rate"]);
+// Nodes whose width / height / length really set the generated picture or clip (not a later resize step).
+const LATENT_SIZE_CLASS = /Latent|ToVideo|FirstLastFrame|CameraEmbedding/i;
+const FPS_CLASS = /CreateVideo|VideoCombine|LTXVConditioning|SaveAnimated|SaveVideo/i;
+const snapFor = (cls: string) => (/LTX/i.test(cls) ? 8 : /Wan|Hunyuan|Cosmos|Mochi/i.test(cls) ? 4 : undefined);
+function sizeRole(cls: string, key: string): WorkflowField["role"] | undefined {
+  if (SIZE_KEYS[key] && LATENT_SIZE_CLASS.test(cls)) return SIZE_KEYS[key];
+  if (FPS_KEYS.has(key) && FPS_CLASS.test(cls)) return "fps";
+  if (cls === "ResolutionSelector") return "size";
+  return undefined;
 }
 
 /**
@@ -261,13 +278,29 @@ export interface WorkflowField {
  */
 export function describeFields(graph: Json, promptId: string | null, negativeId: string | null, scope?: Set<string> | null, objectInfo?: Json | null): WorkflowField[] {
   const fields: WorkflowField[] = [];
-  const add = (nid: string, key: string, label: string, kind: string, options?: string[]) => {
-    if (fields.length < MAX_FIELDS) {
-      const f: WorkflowField = { id: `${nid}.${key}`, node: nid, input: key, label, kind, value: graph[nid].inputs[key] };
+  const add = (nid: string, key: string, label: string, kind: string, options?: string[], role?: WorkflowField["role"]) => {
+    const id = `${nid}.${key}`;
+    if (fields.some(x => x.id === id)) return;
+    // Size / length / fps controls are always shown, whatever the cap on the other settings.
+    if (role || fields.filter(x => !x.role).length < MAX_FIELDS) {
+      const f: WorkflowField = { id, node: nid, input: key, label, kind, value: graph[nid].inputs[key] };
       if (options) f.options = options;
+      if (role) { f.role = role; const sn = snapFor(String(graph[nid].class_type || "")); if (role === "length" && sn) f.snap = sn; }
       fields.push(f);
     }
   };
+
+  // Size and length first: any width / height / length input on a latent or image-to-video node feeding the output.
+  for (const nid of sortedIds(Object.keys(graph))) {
+    if (scope && !scope.has(nid)) continue;
+    const cls = String(graph[nid].class_type || "");
+    for (const key of Object.keys(graph[nid].inputs || {})) {
+      const role = sizeRole(cls, key);
+      const value = graph[nid].inputs[key];
+      if (!role || role === "size" || typeof value !== "number" || isLink(value)) continue;
+      add(nid, key, `${key.replace(/_/g, " ")} (${cls})`, Number.isInteger(value) ? "int" : "float", undefined, role);
+    }
+  }
 
   if (negativeId) {
     const keys = textKeys(graph[negativeId]);
@@ -305,7 +338,9 @@ export function describeFields(graph: Json, promptId: string | null, negativeId:
       const [target, targetInput] = consumers.get(nid)![0];
       label = `${targetInput.replace(/_/g, " ")} (${graph[target].class_type || ""})`;
     } else label = `${cls} ${nid}`;
-    add(nid, key, label, kind);
+    let role: WorkflowField["role"] | undefined;
+    for (const [target, targetInput] of consumers.get(nid) || []) { role = sizeRole(String(graph[target].class_type || ""), targetInput); if (role) { if (role === "length") { const sn = snapFor(String(graph[target].class_type || "")); if (sn) { add(nid, key, label, kind, undefined, role); fields[fields.length - 1].snap = sn; role = undefined; kind = "__done"; } } break; } }
+    if (kind !== "__done") add(nid, key, label, kind, undefined, role);
   }
 
   for (const nid of sortedIds(Object.keys(graph))) {
@@ -321,7 +356,7 @@ export function describeFields(graph: Json, promptId: string | null, negativeId:
         options = Array.isArray(entry[0]) ? entry[0] : (entry.length > 1 && entry[1] && Array.isArray(entry[1].options) ? entry[1].options : undefined);
         if (!options || !options.length) continue; // without the choices a dropdown cannot be built
       }
-      add(nid, key, label, kind, options);
+      add(nid, key, label, kind, options, sizeRole(cls, key));
     }
   }
   return fields;

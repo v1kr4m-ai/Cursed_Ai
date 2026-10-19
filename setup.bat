@@ -32,10 +32,10 @@ if errorlevel 1 (
 )
 
 echo  Creating a desktop shortcut...
-powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Cursed_Ai.lnk'); $s.TargetPath='%~dp0start.bat'; $s.WorkingDirectory='%~dp0'; $s.Description='Start Cursed_Ai'; $s.Save()"
+powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Cursed_Ai.lnk'); $s.TargetPath='%~dp0Cursed_Ai.bat'; $s.WorkingDirectory='%~dp0'; $s.Description='Start Cursed_Ai'; $s.WindowStyle=7; $s.Save()"
 
 echo.
-echo  Done. Double-click "Cursed_Ai" on your desktop (or start.bat) to launch the app.
+echo  Done. Double-click "Cursed_Ai" on your desktop (or Cursed_Ai.bat) to launch the app.
 echo  Optional: copy .env.example to .env.local and add GEMINI_API_KEY for cloud image/video.
 echo.
 pause

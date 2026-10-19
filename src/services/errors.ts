@@ -3,7 +3,7 @@ export function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? "Something went wrong");
   // fetch() rejects with a bare TypeError when the server itself can't be reached.
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) {
-    return "Can't reach the Cursed_Ai server. Make sure it's running (double-click start.bat) and try again.";
+    return "Can't reach the Cursed_Ai server. Make sure it's running (double-click Cursed_Ai.bat) and try again.";
   }
   if (/could not reach comfyui/i.test(msg)) {
     return `${msg} Open the Image or Video tab and press "Start ComfyUI".`;

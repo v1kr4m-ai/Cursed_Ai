@@ -23,8 +23,8 @@ export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) 
     <div className="flex-1 bg-transparent p-4 h-full overflow-hidden">
       <div className="max-w-[1600px] mx-auto h-full">
         {workflows
-          ? <WorkflowRunner kind={kind} modelId={modelId} toolbar={toolbar} showHistory={showHistory} />
-          : <DirectStudio key={`${kind}-${source}`} kind={kind} engine={source === "cloud" ? "cloud" : "quick"} modelId={modelId} toolbar={toolbar} showHistory={showHistory} />}
+          ? <WorkflowRunner kind={kind} modelId={modelId} toolbar={toolbar} showHistory={showHistory} onCloseHistory={() => setShowHistory(false)} />
+          : <DirectStudio key={`${kind}-${source}`} kind={kind} engine={source === "cloud" ? "cloud" : "quick"} modelId={modelId} toolbar={toolbar} showHistory={showHistory} onCloseHistory={() => setShowHistory(false)} />}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { friendlyError } from "../src/services/errors";
 
 describe("friendlyError", () => {
   it("explains an unreachable server", () => {
-    expect(friendlyError(new TypeError("Failed to fetch"))).toMatch(/start\.bat/);
+    expect(friendlyError(new TypeError("Failed to fetch"))).toMatch(/Cursed_Ai\.bat/);
   });
   it("adds the next step for ComfyUI / Ollama / busy model", () => {
     expect(friendlyError(new Error("Could not reach ComfyUI at x"))).toMatch(/Start ComfyUI/);

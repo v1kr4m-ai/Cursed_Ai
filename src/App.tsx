@@ -96,6 +96,12 @@ export default function App() {
     const t = setInterval(ping, 4000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+  // Tell the server when this window closes (it stops itself in desktop-app mode if nobody else is connected).
+  useEffect(() => {
+    const bye = () => { try { navigator.sendBeacon("/api/app/closing"); } catch { /* ignore */ } };
+    window.addEventListener("pagehide", bye);
+    return () => window.removeEventListener("pagehide", bye);
+  }, []);
   // Keyboard shortcuts: Ctrl+K new chat, Ctrl+/ jump to the message box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -108,7 +114,7 @@ export default function App() {
   }, []);
   const wasUp = useRef(true);
   useEffect(() => {
-    if (wasUp.current && !serverUp) notifyError("Lost connection to the Cursed_Ai server - start it again with start.bat.");
+    if (wasUp.current && !serverUp) notifyError("Lost connection to the Cursed_Ai server - start it again with Cursed_Ai.bat.");
     if (!wasUp.current && serverUp) notify("Server connection restored");
     wasUp.current = serverUp;
   }, [serverUp]);
@@ -345,7 +351,7 @@ export default function App() {
           {!serverUp && (
             <div className="mx-2 mb-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-              Can't reach the Cursed_Ai server - it may have stopped. Start it with start.bat; this banner clears by itself when it's back.
+              Can't reach the Cursed_Ai server - it may have stopped. Start it with Cursed_Ai.bat; this banner clears by itself when it's back.
             </div>
           )}
           <MobileHeader activeTab={activeTab} setActiveTab={setActiveTab} voiceEnabled={settings.voiceEnabled} />

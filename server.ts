@@ -357,7 +357,19 @@ async function startServer() {
     return out;
   }
 
-  app.get("/api/health", (req, res) => res.json({ ok: true }));
+  // Desktop-app mode (Cursed_Ai.bat sets CURSED_APP): the page pings /api/health while it is open and says goodbye when the
+  // window closes; with nobody left the server stops by itself, so no terminal or background process stays behind.
+  let lastSeen = Date.now();
+  let everSeen = false;
+  app.get("/api/health", (req, res) => { lastSeen = Date.now(); everSeen = true; res.json({ ok: true }); });
+  app.post("/api/app/closing", (req, res) => {
+    res.end();
+    if (!process.env.CURSED_APP) return;
+    setTimeout(() => { if (Date.now() - lastSeen > 7000) { console.log("[App] Window closed - stopping the server."); process.exit(0); } }, 9000);
+  });
+  if (process.env.CURSED_APP) {
+    setInterval(() => { if (everSeen && Date.now() - lastSeen > 4 * 60 * 1000) { console.log("[App] No window for 4 minutes - stopping the server."); process.exit(0); } }, 30000).unref();
+  }
 
   // Load the offline speech model and run one tiny dummy pass now, so the first spoken sentence is not slow.
   ensureTranscriber().then(t => t(new Float32Array(16000), { max_new_tokens: 4 })).then(() => console.log("[Voice] Offline speech model warmed up.")).catch(() => { /* first real use will report the problem */ });
@@ -1302,7 +1314,7 @@ async function startServer() {
       if (!comfyStarting) {
         console.log(`[ComfyUI] Not running - launching ${launch.cmd} ${launch.args.join(" ")} (cwd ${launch.cwd})`);
         comfyStarting = (async () => {
-          const child = spawn(launch.cmd, launch.args, { detached: true, stdio: "ignore", cwd: launch.cwd, shell: launch.shell, windowsHide: false });
+          const child = spawn(launch.cmd, launch.args, { detached: true, stdio: "ignore", cwd: launch.cwd, shell: launch.shell, windowsHide: true });
           child.unref();
           for (let i = 0; i < 90; i++) { // up to ~3 minutes: first launch loads models/nodes
             await new Promise(r => setTimeout(r, 2000));

@@ -46,7 +46,7 @@ export function ToastHost({ activeTab, onNavigate }: { activeTab: string; onNavi
               initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10 }}
               className={`pointer-events-auto flex items-start gap-3 bg-zinc-900 border ${st.border} text-white text-sm font-semibold pl-4 pr-2 py-3 rounded-2xl shadow-2xl shadow-black/60`}
             >
-              {st.icon}
+              {t.thumb ? <img src={t.thumb} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" /> : st.icon}
               <button onClick={() => { if (t.tab) onNavigate(t.tab); setToasts(prev => prev.filter(x => x.id !== t.id)); }} className="text-left flex-1 break-words">{t.message}</button>
               <button onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))} title="Dismiss" className="p-1 text-zinc-500 hover:text-white"><X size={14} /></button>
             </motion.div>

@@ -7,6 +7,8 @@ export interface Notice {
   tab?: string;
   /** Only show when the user is NOT looking at that tab (or the window is in the background). */
   onlyIfAway?: boolean;
+  /** Small preview picture (URL) shown in the popup, e.g. the finished image. */
+  thumb?: string;
 }
 
 export function notify(n: Notice | string) {

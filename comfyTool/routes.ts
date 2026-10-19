@@ -10,6 +10,7 @@ import { extractUpload, PROMPT_FILE_EXTENSIONS } from "./extract";
 import { findPrompt } from "./promptFinder";
 import { autoOutputName, cancelPrompt, runWorkflow, uniqueDestination, RunEvent } from "./runner";
 import { createStore, Kind } from "./store";
+import { createPromptDb } from "./promptDb";
 
 type Json = Record<string, any>;
 
@@ -53,6 +54,11 @@ const LISTED = [...ACTIVE, "paused"];
 
 export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   const store = createStore(opts.dataDir);
+  const promptDb = createPromptDb(opts.dataDir);
+  // First run: bring over the workflow results already recorded in comfy-tool-history.json.
+  if (promptDb.count() === 0) {
+    try { for (const h of store.history().slice().reverse()) if (h.prompt) promptDb.add({ kind: h.kind, mode: "workflow", workflow: h.workflow, prompt: h.prompt, file: h.path, createdAt: Date.parse(h.createdAt) || Date.now() }); } catch { /* nothing to import */ }
+  }
   const runs = new Map<string, RunState>();
 
   // --- ComfyUI's node list: needed to read UI-format workflows and to tell which custom nodes are missing ---
@@ -140,7 +146,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   });
 
   // --- prompt files ---
-  app.post("/api/tool/prompt-file", express.raw({ type: "*/*", limit: "50mb" }), async (req, res) => {
+  app.post("/api/tool/prompt-file", express.raw({ type: "*/*", limit: "1gb" }), async (req, res) => {
     const name = String(req.query.name || "file.txt");
     if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: "Empty file" });
     try {
@@ -251,6 +257,18 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     wake(state);
   }
 
+  // Size / length / fps the run used, for the prompt library cards.
+  const summarise = (info: WorkflowInfo, fieldValues: Json = {}): Json => {
+    const get = (role: string) => { const f = info.fields.find(x => x.role === role); return f ? (f.id in fieldValues ? fieldValues[f.id] : f.value) : undefined; };
+    const out: Json = {};
+    const w = get("width"), h = get("height"), len = get("length"), fps = get("fps");
+    if (w && h) out.size = `${w}×${h}`;
+    if (len) out.frames = len;
+    if (fps) out.fps = fps;
+    if (len && fps) out.seconds = Math.round((Number(len) / Number(fps)) * 10) / 10;
+    return out;
+  };
+
   function startRun(b: Json): string {
     const kind: Kind = b.kind;
     const runId = crypto.randomUUID().replace(/-/g, "");
@@ -279,7 +297,10 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
           destFolder, destFilename, signal: state.abort.signal,
           onSubmitted: id => { state.promptId = id; },
           onEvent: e => {
-            if (e.type === "done") store.addHistory(e.path, state.workflow, String(b.promptText || ""), kind);
+            if (e.type === "done") {
+              store.addHistory(e.path, state.workflow, String(b.promptText || ""), kind);
+              try { promptDb.add({ kind, mode: "workflow", workflow: state.workflow, prompt: String(b.promptText || ""), params: { ...summarise(info, b.fieldValues), fieldValues: b.fieldValues || {} }, file: e.path }); } catch { /* the library must never break a run */ }
+            }
             push(state, e);
           },
         });
@@ -376,6 +397,38 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     }).sort((a, b) => b.created - a.created);
     res.json({ comfyReachable: reachable, active: rows.filter(r => LISTED.includes(r.status)), finished: rows.filter(r => !LISTED.includes(r.status)).slice(0, 8) });
   });
+
+  // --- prompt library ---
+  const mediaUrl = (e: { file: string; kind: Kind }) => {
+    if (!e.file) return "";
+    const g = opts.galleryDirs[e.kind];
+    return underDir(e.file, g) ? `/api/gallery/file/${e.kind}/${encodeURIComponent(path.basename(e.file))}` : `/api/tool/file?path=${encodeURIComponent(e.file)}`;
+  };
+  const decorate = (e: ReturnType<typeof promptDb.get> & object) => ({ ...e, url: mediaUrl(e), exists: !!e.file && fs.existsSync(e.file) });
+  app.get("/api/prompts", (req, res) => {
+    const q = req.query;
+    res.json((() => {
+      const r = promptDb.list({
+        kind: isKind(q.kind) ? q.kind : undefined, q: String(q.q || ""), favorite: q.favorite === "1", mode: q.mode ? String(q.mode) : undefined,
+        sort: ["new", "old", "az", "fav"].includes(String(q.sort)) ? (String(q.sort) as any) : "new", limit: Number(q.limit) || 60, offset: Number(q.offset) || 0,
+      });
+      return { total: r.total, items: r.items.map(decorate) };
+    })());
+  });
+  app.post("/api/prompts", (req, res) => {
+    const b = req.body || {};
+    if (!isKind(b.kind) || typeof b.prompt !== "string" || !b.prompt.trim()) return res.status(400).json({ error: "kind and prompt are required" });
+    // The browser names a gallery file; the full path is built here.
+    const file = typeof b.galleryFile === "string" && b.galleryFile ? path.join(opts.galleryDirs[b.kind as Kind], path.basename(b.galleryFile)) : typeof b.file === "string" ? b.file : "";
+    const id = promptDb.add({ kind: b.kind, mode: String(b.mode || ""), workflow: String(b.workflow || ""), prompt: b.prompt, negative: String(b.negative || ""), params: typeof b.params === "object" && b.params ? b.params : {}, file });
+    res.json({ id });
+  });
+  app.patch("/api/prompts/:id", (req, res) => {
+    const id = Number(req.params.id);
+    if (!promptDb.update(id, req.body || {})) return res.status(404).json({ error: "Entry not found or nothing to change" });
+    res.json(decorate(promptDb.get(id)!));
+  });
+  app.delete("/api/prompts/:id", (req, res) => { promptDb.remove(Number(req.params.id)); res.json({ removed: true }); });
 
   // --- results ---
   app.get("/api/tool/history", (req, res) => res.json({ history: store.history(isKind(req.query.kind) ? req.query.kind : undefined) }));
