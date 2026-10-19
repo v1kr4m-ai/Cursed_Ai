@@ -11,6 +11,7 @@ import { findPrompt } from "./promptFinder";
 import { autoOutputName, cancelPrompt, runWorkflow, uniqueDestination, RunEvent } from "./runner";
 import { createStore, Kind } from "./store";
 import { createPromptDb } from "./promptDb";
+import { createRecentDocs } from "./recentDocs";
 import { createGoogle, fetchPublicGoogleFile, parseGoogleLink } from "./google";
 
 type Json = Record<string, any>;
@@ -56,6 +57,7 @@ const LISTED = [...ACTIVE, "paused"];
 export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   const store = createStore(opts.dataDir);
   const promptDb = createPromptDb(opts.dataDir);
+  const recentDocs = createRecentDocs(opts.dataDir);
   const google = createGoogle(opts.dataDir, () => `http://127.0.0.1:${Number(process.env.PORT) || 3000}`);
   // Auto-save to Google Drive: runs in the background after a result is recorded; the link is kept with the prompt.
   const driveAutosave = (file: string) => {
@@ -154,12 +156,18 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
 
   // --- prompt files ---
   // Bytes of a document / sheet / slide deck -> the prompt(s) found in it.
-  const promptResult = async (name: string, bytes: Buffer) => {
+  const promptResult = async (name: string, bytes: Buffer, source: "file" | "drive" | "link" = "file") => {
     const content = await extractUpload(name, bytes);
     const r = findPrompt(content);
     const raw = content.kind === "text" ? content.text : content.cells.map(c => c.text).join("\n");
-    return { rawText: raw, extractedPrompt: r.prompt, matched: r.matched, candidates: r.candidates, columns: r.alternatives.map(a => ({ sheet: a.sheet, header: a.header, candidates: a.candidates })) };
+    const out = { rawText: raw, extractedPrompt: r.prompt, matched: r.matched, candidates: r.candidates, columns: r.alternatives.map(a => ({ sheet: a.sheet, header: a.header, candidates: a.candidates })) };
+    try { recentDocs.add(name, source, out); } catch { /* remembering must never block reading */ }
+    return out;
   };
+  app.get("/api/tool/recent-docs", (_req, res) => res.json({ docs: recentDocs.list() }));
+  app.get("/api/tool/recent-docs/latest", (_req, res) => { const d = recentDocs.latest(); res.json(d ? { id: d.id, name: d.name, source: d.source, result: d.result } : null); });
+  app.get("/api/tool/recent-docs/:id", (req, res) => { const d = recentDocs.get(req.params.id); if (!d) return res.status(404).json({ error: "That document is no longer in the recent list." }); res.json({ id: d.id, name: d.name, source: d.source, result: d.result }); });
+  app.delete("/api/tool/recent-docs/:id", (req, res) => { recentDocs.remove(req.params.id); res.json({ removed: true }); });
 
   // --- Google Drive / Sheets / Docs ---
   const gErr = (res: express.Response, e: any, code = 400) => res.status(code).json({ error: e?.message || String(e) });
@@ -188,7 +196,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   app.post("/api/google/prompt-file", async (req, res) => {
     const { id, name, mimeType } = req.body || {};
     if (typeof id !== "string" || !id) return gErr(res, "Choose a file first.");
-    try { const f = await google.download(id, String(name || "file"), String(mimeType || "")); res.json({ ...(await promptResult(f.name, f.bytes)), source: f.name }); } catch (e) { gErr(res, e, 422); }
+    try { const f = await google.download(id, String(name || "file"), String(mimeType || "")); res.json({ ...(await promptResult(f.name, f.bytes, "drive")), source: f.name }); } catch (e) { gErr(res, e, 422); }
   });
   app.post("/api/google/link", async (req, res) => {
     const link = parseGoogleLink(String(req.body?.url || ""));
@@ -199,7 +207,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
         try { const m = await google.meta(link.id); f = await google.download(link.id, m.name, m.mimeType); }
         catch { f = await fetchPublicGoogleFile(link.id, link.kind); }
       } else f = await fetchPublicGoogleFile(link.id, link.kind);
-      res.json({ ...(await promptResult(f.name, f.bytes)), source: f.name });
+      res.json({ ...(await promptResult(f.name, f.bytes, "link")), source: f.name });
     } catch (e) { gErr(res, e, 422); }
   });
 

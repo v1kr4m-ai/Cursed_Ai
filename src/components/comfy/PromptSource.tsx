@@ -1,5 +1,5 @@
 import React from "react";
-import { Cloud, Link2, FileText, Upload, ChevronDown, Search, Loader2, AlertTriangle } from "lucide-react";
+import { Cloud, Link2, X, FileText, Upload, ChevronDown, Search, Loader2, AlertTriangle } from "lucide-react";
 import { EnhancePromptButton } from "../tools/EnhancePromptButton";
 import { DrivePicker, DriveFile } from "./google";
 import { ACCENT, Kind, PromptCandidate, PromptColumnInfo, PromptFileResult, api } from "./types";
@@ -48,7 +48,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
     return () => { document.removeEventListener("pointerdown", onDown); document.removeEventListener("keydown", onKey); };
   }, [open]);
 
-  const apply = (r: PromptFileResult) => {
+  const apply = (r: PromptFileResult, fillPrompt = true) => {
     setUnmatched(!r.matched);
     setColumns(r.columns);
     const cands = r.columns.length ? r.columns[0].candidates : r.candidates;
@@ -56,15 +56,31 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
     onCandidates?.(cands.map(c => c.text));
     setColIdx(0);
     setPicked(cands.length ? 0 : -1);
-    onPrompt(r.extractedPrompt);
+    if (fillPrompt) onPrompt(r.extractedPrompt);
   };
+
+  // Recently used documents: remembered on the server, one click to reopen; the newest one is restored when the page opens.
+  interface RecentDoc { id: string; name: string; source: "file" | "drive" | "link"; at: number; count: number }
+  const [recent, setRecent] = React.useState<RecentDoc[]>([]);
+  const loadRecent = React.useCallback(() => api<{ docs: RecentDoc[] }>("/api/tool/recent-docs").then(d => setRecent(d.docs)).catch(() => {}), []);
+  React.useEffect(() => {
+    loadRecent();
+    api<{ name: string; result: PromptFileResult } | null>("/api/tool/recent-docs/latest").then(d => { if (d?.result) { setFileName(d.name); apply(d.result, false); } }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const openRecent = async (d: RecentDoc) => {
+    setBusy(true); setError(null);
+    try { const full = await api<{ name: string; result: PromptFileResult }>(`/api/tool/recent-docs/${d.id}`); setFileName(full.name); apply(full.result); }
+    catch (e: any) { setError(e.message); loadRecent(); }
+    finally { setBusy(false); }
+  };
+  const forgetRecent = async (d: RecentDoc) => { await api(`/api/tool/recent-docs/${d.id}`, { method: "DELETE" }).catch(() => {}); loadRecent(); };
 
   const readFile = async (file: File) => {
     setBusy(true); setError(null); setFileName(file.name);
     try {
       apply(await api<PromptFileResult>(`/api/tool/prompt-file?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file }));
     } catch (e: any) { setError(e.message); }
-    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+    finally { setBusy(false); loadRecent(); if (fileRef.current) fileRef.current.value = ""; }
   };
 
   // Google: a file picked from Drive, or a pasted Sheets / Docs / Slides / Drive link.
@@ -74,7 +90,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
   const fromGoogle = async (label: string, call: () => Promise<PromptFileResult & { source?: string }>) => {
     setBusy(true); setError(null); setFileName(label);
     try { const r = await call(); if (r.source) setFileName(r.source); apply(r); } catch (e: any) { setError(e.message); }
-    finally { setBusy(false); }
+    finally { setBusy(false); loadRecent(); }
   };
   const readDrive = (f: DriveFile) => { setDriveOpen(false); fromGoogle(f.name, () => api("/api/google/prompt-file", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: f.id, name: f.name, mimeType: f.mimeType }) })); };
   const readLink = () => { if (link.trim()) fromGoogle("Google link", () => api("/api/google/link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: link.trim() }) })); };
@@ -113,6 +129,21 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
         </div>
   
         )}
+      {recent.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mr-0.5">Recent</span>
+          {recent.slice(0, 5).map(d => (
+            <span key={d.id} className="group inline-flex items-center max-w-[11rem] rounded-lg bg-white/[0.05] hover:bg-white/10 transition-colors">
+              <button onClick={() => openRecent(d)} disabled={busy} title={`${d.name} - ${d.count} prompt${d.count === 1 ? "" : "s"}, ${new Date(d.at).toLocaleDateString()}`} className="flex items-center gap-1.5 pl-2 pr-1.5 py-1 min-w-0 text-[11px] text-zinc-300 disabled:opacity-50">
+                {d.source === "drive" ? <Cloud size={11} className="text-blue-300 shrink-0" /> : d.source === "link" ? <Link2 size={11} className="text-blue-300 shrink-0" /> : <FileText size={11} className="text-zinc-500 shrink-0" />}
+                <span className="truncate">{d.name}</span>
+              </button>
+              <button onClick={() => forgetRecent(d)} title="Forget" className="pr-1.5 text-zinc-600 hover:text-white hidden group-hover:block"><X size={11} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {fileName && !error && (
         <p className="text-[11px] text-zinc-500 flex items-center gap-1.5"><FileText size={12} /> {fileName}{candidates.length > 0 ? ` - ${candidates.length} prompts found` : ""}</p>
       )}
