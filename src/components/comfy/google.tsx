@@ -38,6 +38,7 @@ export function GoogleConnectPanel({ status, onChange, field }: { status: Google
   const [show, setShow] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [waiting, setWaiting] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
   React.useEffect(() => {
     if (!waiting) return;
     const t = setInterval(() => api<GoogleStatus>("/api/google/status").then(s => { if (s.connected) { setWaiting(false); onChange(); notify({ message: `Connected to Google${s.email ? " as " + s.email : ""}`, tab: "image" }); } }).catch(() => {}), 2000);
@@ -47,7 +48,7 @@ export function GoogleConnectPanel({ status, onChange, field }: { status: Google
 
   const saveClient = async () => {
     setBusy(true);
-    try { await postJson("/api/google/client", { clientId, clientSecret: secret }); setSecret(""); onChange(); } catch (e: any) { notifyError(e.message, "image"); } finally { setBusy(false); }
+    try { await postJson("/api/google/client", { clientId, clientSecret: secret }); setSecret(""); setClientId(""); setEditing(false); onChange(); } catch (e: any) { notifyError(e.message, "image"); } finally { setBusy(false); }
   };
   const connect = async () => {
     setBusy(true);
@@ -56,7 +57,7 @@ export function GoogleConnectPanel({ status, onChange, field }: { status: Google
 
   return (
     <div className="space-y-3">
-      {!status.configured ? (
+      {!status.configured || editing ? (
         <>
           <p className="text-[11px] text-zinc-400 leading-relaxed">
             One-time setup with your own Google account (nothing is shared with anyone): in <b>console.cloud.google.com</b> create a project, turn on the <b>Google Drive API</b>, then <b>Credentials → Create credentials → OAuth client ID → Desktop app</b>. Paste the client ID and secret here.
@@ -66,7 +67,7 @@ export function GoogleConnectPanel({ status, onChange, field }: { status: Google
             <input type={show ? "text" : "password"} value={secret} onChange={e => setSecret(e.target.value)} placeholder="Client secret" autoComplete="off" spellCheck={false} className={`${field} pr-10`} />
             <button onClick={() => setShow(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 hover:text-zinc-300">{show ? "hide" : "show"}</button>
           </div>
-          <button onClick={saveClient} disabled={busy || !clientId.trim() || !secret.trim()} className="w-full py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-bold disabled:opacity-40">Save</button>
+          <div className="flex gap-2"><button onClick={saveClient} disabled={busy || !clientId.trim() || !secret.trim()} className="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-bold disabled:opacity-40">Save</button>{editing && <button onClick={() => setEditing(false)} className="px-3 rounded-lg bg-white/5 text-zinc-400 text-xs">Cancel</button>}</div>
         </>
       ) : (
         <>
@@ -75,6 +76,7 @@ export function GoogleConnectPanel({ status, onChange, field }: { status: Google
             {(busy || waiting) && <Loader2 size={13} className="animate-spin" />} {waiting ? "Waiting for you to finish in the browser..." : "Connect Google"}
           </button>
           <p className="text-[10px] text-zinc-600">If Google says the app is not verified, choose Advanced → continue: it is your own project.</p>
+          <button onClick={() => setEditing(true)} className="text-[10px] text-zinc-500 hover:text-zinc-300 underline">Change the client ID / secret</button>
         </>
       )}
     </div>

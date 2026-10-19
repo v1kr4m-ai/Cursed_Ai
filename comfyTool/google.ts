@@ -76,7 +76,10 @@ export function createGoogle(dir: string, redirectBase: () => string) {
       return { configured: !!(c.clientId && c.clientSecret), connected: !!c.refreshToken, email: c.email || "", autosave: !!c.autosave, folder: c.folderId ? { id: c.folderId, name: c.folderName || "" } : null, lastUpload, redirectUri: redirectUri() };
     },
     setClient(clientId: string, clientSecret: string) {
-      const c = read(); c.clientId = clientId.trim(); c.clientSecret = clientSecret.trim(); write(c);
+      // Pasted with a prefix such as "https://" or surrounding quotes? Keep just the real ID.
+      const id = /[0-9]+-[a-z0-9]+.apps.googleusercontent.com/i.exec(clientId)?.[0];
+      if (!id) throw new Error("That does not look like a Google client ID. It looks like 123456789-abcdef.apps.googleusercontent.com.");
+      const c = read(); c.clientId = id; c.clientSecret = clientSecret.trim().replace(/^["']|["']$/g, ""); write(c);
     },
     settings(p: { autosave?: boolean; folder?: { id: string; name: string } | null }) {
       const c = read();

@@ -167,7 +167,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   app.post("/api/google/client", (req, res) => {
     const { clientId, clientSecret } = req.body || {};
     if (typeof clientId !== "string" || typeof clientSecret !== "string" || !clientId.trim() || !clientSecret.trim()) return gErr(res, "Both the client ID and the client secret are needed.");
-    google.setClient(clientId, clientSecret);
+    try { google.setClient(clientId, clientSecret); } catch (e) { return gErr(res, e); }
     res.json(google.status());
   });
   app.get("/api/google/connect", (_req, res) => { try { res.json({ url: google.authUrl() }); } catch (e) { gErr(res, e); } });
