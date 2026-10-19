@@ -5,6 +5,7 @@ import { StudioToolbar, Source } from "./StudioToolbar";
 import { useLocalMode } from "./ModeSwitch";
 import { WorkflowRunner } from "./WorkflowRunner";
 import { Kind } from "./types";
+import { savedSetting } from "../../lib/settingsStore";
 
 /**
  * The Image / Video page. One layout for every mode - Cloud, Local Quick and Local Workflows - with the same top bar,
@@ -12,7 +13,7 @@ import { Kind } from "./types";
  */
 export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) {
   // Local (offline) is the default; Cloud is the second choice. The last pick is remembered per tab.
-  const [source, setSourceState] = React.useState<Source>(() => { try { return localStorage.getItem(`cursed.source.${kind}`) === "cloud" ? "cloud" : "local"; } catch { return "local"; } });
+  const [source, setSourceState] = React.useState<Source>(() => { try { const v = localStorage.getItem(`cursed.source.${kind}`); return v === "cloud" || v === "local" ? v : savedSetting("defaultSource", "local"); } catch { return "local"; } });
   const setSource = (s: Source) => { setSourceState(s); try { localStorage.setItem(`cursed.source.${kind}`, s); } catch { /* private window */ } };
   const [mode, setMode] = useLocalMode(kind);
   const [showHistory, setShowHistory] = React.useState(false);

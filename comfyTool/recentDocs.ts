@@ -22,6 +22,7 @@ export function createRecentDocs(dir: string) {
       docs.unshift({ id: `${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`, name, source, at: Date.now(), count, result });
       write(docs.slice(0, MAX_DOCS));
     },
+    clear() { write([]); },
     remove(id: string) { write(read().filter(d => d.id !== id)); },
   };
 }

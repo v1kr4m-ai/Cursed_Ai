@@ -4,6 +4,7 @@ import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { notify, notifyError } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
 import { PromptSource } from "./PromptSource";
+import { savedSetting } from "../../lib/settingsStore";
 import { ShareMenu } from "./ShareMenu";
 import { MediaView, QueueList, QueueRow, Section, Stage, StudioFrame, fieldCls, iconBtn, isImagePath, label } from "./shared";
 import { ACCENT, Kind, api, fileUrl, nativeFiles, postJson } from "./types";
@@ -53,17 +54,17 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
   const [checkpoints, setCheckpoints] = React.useState<string[]>([]);
   const [checkpoint, setCheckpoint] = React.useState("");
   const [ckptError, setCkptError] = React.useState<string | null>(null);
-  const [sizeIdx, setSizeIdx] = React.useState(kind === "image" ? 2 : 0);
+  const [sizeIdx, setSizeIdx] = React.useState(() => (kind === "image" ? Math.min(SIZES.image.length - 1, Math.max(0, savedSetting("imageSizeIdx", 2))) : 0));
   const [refImage, setRefImage] = React.useState<string | null>(null);
   const [jobs, setJobs] = React.useState<Job[]>([]);
-  const [count, setCount] = React.useState(1);
+  const [count, setCount] = React.useState(() => Math.min(20, Math.max(1, savedSetting("defaultInstances", 1))));
   // Quick image: sampler settings. A fixed seed repeats the same picture; random gives a new one every time.
   const [steps, setSteps] = React.useState(20);
   const [cfg, setCfg] = React.useState(7);
   const [fixedSeed, setFixedSeed] = React.useState(false);
   const [seed, setSeed] = React.useState(12345);
   // Quick video: clip length. LTX-Video wants 8n+1 frames at 25 fps.
-  const [seconds, setSeconds] = React.useState(4);
+  const [seconds, setSeconds] = React.useState(() => Math.min(20, Math.max(1, savedSetting("videoSeconds", 4))));
   const FPS = 25;
   const framesFor = (sec: number) => Math.max(1, Math.round((sec * FPS - 1) / 8)) * 8 + 1;
   const [view, setView] = React.useState<View | null>(null);

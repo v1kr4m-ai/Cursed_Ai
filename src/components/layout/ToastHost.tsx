@@ -6,6 +6,22 @@ import { savedSetting } from "../../lib/settingsStore";
 
 interface Toast extends Notice { id: number }
 
+/** A short two-note chime made with the browser's own audio, no sound file needed. */
+function chime() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    [880, 1318].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.14);
+      g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + i * 0.14 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.14 + 0.3);
+      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + i * 0.14); o.stop(ctx.currentTime + i * 0.14 + 0.32);
+    });
+    setTimeout(() => ctx.close(), 800);
+  } catch { /* audio not available */ }
+}
+
 const STYLE = {
   success: { border: "border-emerald-500/40", icon: <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />, ms: 5000 },
   warning: { border: "border-amber-500/50", icon: <AlertTriangle size={18} className="text-amber-400 shrink-0" />, ms: 8000 },
@@ -32,7 +48,9 @@ export function ToastHost({ activeTab, onNavigate }: { activeTab: string; onNavi
       }
       const id = Date.now() + Math.random();
       setToasts(prev => [...prev.filter(t => t.message !== n.message).slice(-3), { ...n, kind, id }]);
-      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), STYLE[kind].ms);
+      const ms = kind === "success" ? Math.max(2, savedSetting("popupSeconds", 5)) * 1000 : STYLE[kind].ms;
+      if (kind === "success" && savedSetting("soundOnDone", false) && /ready|generated|finished|saved|imported/i.test(n.message)) chime();
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ms);
     };
     window.addEventListener("cursed:notify", onNotify);
     return () => window.removeEventListener("cursed:notify", onNotify);

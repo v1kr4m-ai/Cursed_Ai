@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { readSavedSettings, saveSettings } from "./lib/settingsStore";
+import { readSavedSettings, saveSettings, savedSetting } from "./lib/settingsStore";
 import { Eye } from "lucide-react";
 import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -73,8 +73,51 @@ const INITIAL_MODELS: AIModel[] = [
   }
 ];
 
+/** Every setting at its default (also what Settings -> Reset puts back). */
+function defaultSettings(): AppSettings {
+  return {
+    vulkanEnabled: true,
+    theme: "dark",
+    apiPort: 3000,
+    apiEnabled: false,
+    memoryEnabled: true,
+    voiceEnabled: true,
+    voiceEngine: ((): "auto" | "browser" | "whisper" => { try { const v = localStorage.getItem("cursed.voiceEngine"); return v === "browser" || v === "whisper" ? v : "auto"; } catch { return "auto"; } })(),
+    temperature: 0.7,
+    topP: 0.9,
+    maxTokens: 1024,
+    threads: 4,
+    kvCacheSize: 4096,
+    topK: 40,
+    minP: 0.05,
+    repeatPenalty: 1.1,
+    seedMode: "random",
+    seed: 42,
+    defaultSystemPrompt: "",
+    enterToSend: true,
+    autoSpeak: false,
+    confirmDelete: true,
+    popups: true,
+    desktopNotify: false,
+    reduceMotion: false,
+    startTab: "chat",
+    sidebarCollapsed: false,
+    uiFont: "default",
+    showStatusBar: true,
+    shortcuts: true,
+    historyLimit: 0,
+    memoryTopK: 3,
+    popupSeconds: 5,
+    soundOnDone: false,
+    defaultSource: "local",
+    defaultInstances: 1,
+    imageSizeIdx: 2,
+    videoSeconds: 4,
+  };
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState("chat");
+  const [activeTab, setActiveTab] = useState<string>(() => readSavedSettings().startTab || "chat");
   const [chats, setChats] = useState<Chat[]>(() => {
     try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]")).filter((c: Chat) => c.messages?.length); } catch { return []; }
   });
@@ -148,7 +191,7 @@ export default function App() {
   // Keyboard shortcuts: Ctrl+K new chat, Ctrl+/ jump to the message box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
+      if (!(e.ctrlKey || e.metaKey) || !savedSetting("shortcuts", true)) return;
       if (e.key.toLowerCase() === "k") { e.preventDefault(); setActiveChatId(undefined); setActiveTab("chat"); setTimeout(() => document.querySelector("textarea")?.focus(), 80); }
       else if (e.key === "/") { e.preventDefault(); setActiveTab("chat"); setTimeout(() => document.querySelector("textarea")?.focus(), 80); }
     };
@@ -231,35 +274,10 @@ export default function App() {
     if (firstUsable) setSelectedModelId(firstUsable.id);
   }, [models]);
 
-  const [settings, setSettings] = useState<AppSettings>(() => ({
-    vulkanEnabled: true,
-    theme: "dark",
-    apiPort: 3000,
-    apiEnabled: false,
-    memoryEnabled: true,
-    voiceEnabled: true,
-    voiceEngine: ((): "auto" | "browser" | "whisper" => { try { const v = localStorage.getItem("cursed.voiceEngine"); return v === "browser" || v === "whisper" ? v : "auto"; } catch { return "auto"; } })(),
-    temperature: 0.7,
-    topP: 0.9,
-    maxTokens: 1024,
-    threads: 4,
-    kvCacheSize: 4096,
-    topK: 40,
-    minP: 0.05,
-    repeatPenalty: 1.1,
-    seedMode: "random",
-    seed: 42,
-    defaultSystemPrompt: "",
-    enterToSend: true,
-    autoSpeak: false,
-    confirmDelete: true,
-    popups: true,
-    desktopNotify: false,
-    reduceMotion: false,
-    ...readSavedSettings(),
-  }));
+  const [settings, setSettings] = useState<AppSettings>(() => ({ ...defaultSettings(), ...readSavedSettings() }));
   // Settings survive a reload; the motion switch is applied to the whole page.
   useEffect(() => { saveSettings(settings); }, [settings]);
+  useEffect(() => { document.documentElement.dataset.font = settings.uiFont; }, [settings.uiFont]);
   useEffect(() => { document.documentElement.dataset.motion = settings.reduceMotion ? "reduce" : "full"; }, [settings.reduceMotion]);
 
   const setVoiceEngine = (v: "auto" | "browser" | "whisper") => {
@@ -407,7 +425,7 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
-          <SystemBar />
+          {settings.showStatusBar && <SystemBar />}
           {!serverUp && (
             <div className="mx-2 mb-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
@@ -459,6 +477,7 @@ export default function App() {
                   return fresh.length;
                 }}
                 onClearChats={() => { setChats([]); setActiveChatId(undefined); }}
+                onResetSettings={() => { setSettings(defaultSettings()); }}
               />
             )}
             {activeTab === "vision" && (

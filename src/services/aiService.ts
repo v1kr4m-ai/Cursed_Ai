@@ -18,6 +18,7 @@ export interface AIGenerationOptions {
   seed?: number;
   maxTokens?: number;
   memoryEnabled?: boolean;
+  memoryTopK?: number;
   signal?: AbortSignal;
 }
 
@@ -139,7 +140,8 @@ ${a.text}
             repeatPenalty: options?.repeatPenalty,
             seed: options?.seed,
             maxTokens: options?.maxTokens,
-            memoryEnabled: options?.memoryEnabled
+            memoryEnabled: options?.memoryEnabled,
+            memoryTopK: options?.memoryTopK
           }
         })
       });

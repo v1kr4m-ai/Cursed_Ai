@@ -87,7 +87,7 @@ export function Sidebar({
     if (renamingId && renameValue.trim()) onRenameChat?.(renamingId, renameValue.trim());
     setRenamingId(null);
   };
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isCollapsed, setIsCollapsed] = React.useState(() => savedSetting("sidebarCollapsed", false));
   const [showArchived, setShowArchived] = React.useState(false);
 
   const navItems = [

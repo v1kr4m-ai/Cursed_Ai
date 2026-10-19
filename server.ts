@@ -416,6 +416,15 @@ async function startServer() {
       ],
     });
   });
+  app.get("/api/app/about", (_req, res) => {
+    let version = "";
+    try { version = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")).version || ""; } catch { /* no package.json */ }
+    res.json({ name: "Cursed_Ai", version, node: process.version, platform: `${os.type()} ${os.release()}`, uptimeSec: Math.round(process.uptime()), dir: process.cwd(), port: PORT, desktopApp: !!process.env.CURSED_APP, log: fs.existsSync(path.join(process.cwd(), "app.log")) });
+  });
+  app.post("/api/app/open-log", (_req, res) => {
+    try { spawn("explorer.exe", ["/select," + path.join(process.cwd(), "app.log")], { detached: true, stdio: "ignore" }).unref(); res.json({ status: "success" }); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
   app.post("/api/app/open-data", (_req, res) => {
     try { spawn("explorer.exe", [process.cwd()], { detached: true, stdio: "ignore" }).unref(); res.json({ status: "success" }); }
     catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -587,7 +596,7 @@ async function startServer() {
       }
 
       // RAG: Inject relevant memories (unless the user turned this off in Settings)
-      const memories = options?.memoryEnabled === false ? [] : await getRelevantMemories(userQuery);
+      const memories = options?.memoryEnabled === false ? [] : await getRelevantMemories(userQuery, Math.min(10, Math.max(1, Math.round(Number(options?.memoryTopK) || 3))));
       if (memories.length > 0) {
         const contextInjection = memories.map(m => `Relevant memory: ${m.text}`).join("\n");
         finalPrompt = `Context from user memory:\n${contextInjection}\n\nUser Question: ${finalPrompt}`;

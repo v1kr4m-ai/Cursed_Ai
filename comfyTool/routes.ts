@@ -167,6 +167,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   app.get("/api/tool/recent-docs", (_req, res) => res.json({ docs: recentDocs.list() }));
   app.get("/api/tool/recent-docs/latest", (_req, res) => { const d = recentDocs.latest(); res.json(d ? { id: d.id, name: d.name, source: d.source, result: d.result } : null); });
   app.get("/api/tool/recent-docs/:id", (req, res) => { const d = recentDocs.get(req.params.id); if (!d) return res.status(404).json({ error: "That document is no longer in the recent list." }); res.json({ id: d.id, name: d.name, source: d.source, result: d.result }); });
+  app.delete("/api/tool/recent-docs", (_req, res) => { recentDocs.clear(); res.json({ cleared: true }); });
   app.delete("/api/tool/recent-docs/:id", (req, res) => { recentDocs.remove(req.params.id); res.json({ removed: true }); });
 
   // --- Google Drive / Sheets / Docs ---
@@ -487,6 +488,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     if (!promptDb.update(id, req.body || {})) return res.status(404).json({ error: "Entry not found or nothing to change" });
     res.json(decorate(promptDb.get(id)!));
   });
+  app.delete("/api/prompts", (_req, res) => { promptDb.clear(); res.json({ cleared: true }); });
   app.delete("/api/prompts/:id", (req, res) => { promptDb.remove(Number(req.params.id)); res.json({ removed: true }); });
 
   // --- results ---

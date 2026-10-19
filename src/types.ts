@@ -102,6 +102,25 @@ export interface AppSettings {
   desktopNotify: boolean;
   /** Turns off animations and transitions everywhere. */
   reduceMotion: boolean;
+  /** Which page opens when the app starts. */
+  startTab: string;
+  sidebarCollapsed: boolean;
+  uiFont: 'default' | 'serif' | 'mono';
+  showStatusBar: boolean;
+  /** Keyboard shortcuts (Ctrl+K, Ctrl+/) on or off. */
+  shortcuts: boolean;
+  /** How many of the latest messages are sent to the model (0 = the whole chat). */
+  historyLimit: number;
+  /** How many memory notes can be added to a prompt. */
+  memoryTopK: number;
+  /** Seconds a success popup stays on screen. */
+  popupSeconds: number;
+  soundOnDone: boolean;
+  /** Image / Video studio: which side opens first, and starting values for new jobs. */
+  defaultSource: 'local' | 'cloud';
+  defaultInstances: number;
+  imageSizeIdx: number;
+  videoSeconds: number;
 }
 
 export interface LogLine {

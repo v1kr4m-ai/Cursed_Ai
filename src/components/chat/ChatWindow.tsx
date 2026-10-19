@@ -303,8 +303,11 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       const toModel: Message[] = baseChat.systemPrompt?.trim()
         ? [{ id: "sys", role: MessageRole.SYSTEM, content: baseChat.systemPrompt.trim(), timestamp: 0 }, ...baseChat.messages]
         : baseChat.messages;
+      // Settings -> Chat: only the latest N messages go to the model (the system prompt always does).
+      const limit = settings.historyLimit > 0 ? settings.historyLimit : 0;
+      const sent = limit ? [...toModel.filter(m => m.role === MessageRole.SYSTEM), ...toModel.filter(m => m.role !== MessageRole.SYSTEM).slice(-limit)] : toModel;
       await AIService.generate(
-        toModel,
+        sent,
         selectedModel.id,
         {
           onToken: (token) => {
@@ -337,6 +340,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           repeatPenalty: settings.repeatPenalty > 1 ? settings.repeatPenalty : undefined,
           seed: settings.seedMode === "fixed" ? settings.seed : undefined,
           maxTokens: settings.maxTokens,
+          memoryTopK: settings.memoryTopK,
           memoryEnabled: settings.memoryEnabled
         }
       );

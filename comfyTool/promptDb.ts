@@ -76,6 +76,7 @@ export function createPromptDb(dir: string) {
       return Number(db.prepare(`UPDATE prompts SET ${sets.join(", ")} WHERE id = ?`).run(...args, id).changes) > 0;
     },
     remove(id: number): boolean { return Number(db.prepare("DELETE FROM prompts WHERE id = ?").run(id).changes) > 0; },
+    clear() { db.exec("DELETE FROM prompts"); },
     count(): number { return Number((db.prepare("SELECT COUNT(*) AS n FROM prompts").get() as any).n); },
     close() { db.close(); },
     exists: (file: string) => !!file && fs.existsSync(file),
