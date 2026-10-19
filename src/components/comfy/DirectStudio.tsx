@@ -4,6 +4,7 @@ import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { notify, notifyError } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
 import { PromptSource } from "./PromptSource";
+import { PreviousResults } from "./PreviousResults";
 import { savedSetting } from "../../lib/settingsStore";
 import { ShareMenu } from "./ShareMenu";
 import { MediaView, QueueList, QueueRow, Section, Stage, StudioFrame, fieldCls, iconBtn, isImagePath, label } from "./shared";
@@ -282,7 +283,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
 
       <Section title="Prompt" icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
         <div onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); generate(); } }}>
-          <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt onCandidates={setBatch} />
+          <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt onCandidates={setBatch} usageKey={refreshKey} />
         </div>
         {engine === "quick" && (
           <div><label className={label + " !mb-1"}>Negative prompt (optional)</label>
@@ -349,6 +350,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
           {stageFile && <button onClick={removeResult} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>}
         </div>
       )}
+      <PreviousResults kind={kind} prompt={prompt} refreshKey={refreshKey} activeUrl={stageSrc} onShow={it => setView({ url: it.url, file: it.file.split(String.fromCharCode(92)).join("/").split("/").pop(), prompt: it.prompt })} />
       <QueueList kind={kind} rows={rows} onPause={pause} onResume={resume} onCancel={cancel} onRemove={remove} />
       {gallery.length > 0 && (
         <div>

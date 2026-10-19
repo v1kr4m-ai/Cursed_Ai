@@ -12,6 +12,8 @@ interface Props {
   prompt: string;
   onPrompt: (text: string) => void;
   needsPrompt: boolean;
+  /** Changes after a result is saved, so the "already made" marks refresh. */
+  usageKey?: number;
   /** Inside a collapsible panel: no card chrome or heading. */
   bare?: boolean;
   /** Every prompt found in the file (spreadsheet column / document headings), for running them all. */
@@ -23,7 +25,7 @@ interface Props {
  * prompt is found for you. Spreadsheets list every prompt (the column is guessed and can be switched); documents with
  * several "Prompt" headings list each one. You can always edit the text by hand.
  */
-export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates, bare }: Props) {
+export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates, bare, usageKey = 0 }: Props) {
   const a = ACCENT[kind];
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = React.useState("");
@@ -95,6 +97,18 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
   const readDrive = (f: DriveFile) => { setDriveOpen(false); fromGoogle(f.name, () => api("/api/google/prompt-file", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: f.id, name: f.name, mimeType: f.mimeType }) })); };
   const readLink = () => { if (link.trim()) fromGoogle("Google link", () => api("/api/google/link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: link.trim() }) })); };
 
+  // Which prompts in the list already produced something (same kind), so they can be marked and optionally hidden.
+  const [usage, setUsage] = React.useState<number[]>([]);
+  const [hideUsed, setHideUsed] = React.useState(false);
+  React.useEffect(() => {
+    if (!candidates.length) { setUsage([]); return; }
+    let live = true;
+    fetch("/api/prompts/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, prompts: candidates.map(c => c.text) }) })
+      .then(r => r.json()).then(d => { if (live && Array.isArray(d.counts)) setUsage(d.counts); }).catch(() => {});
+    return () => { live = false; };
+  }, [candidates, kind, usageKey]);
+  const usedCount = usage.filter(n => n > 0).length;
+
   const pick = (i: number) => { setPicked(i); onPrompt(candidates[i].text); setOpen(false); setFilter(""); };
   const switchColumn = (idx: number) => {
     setColIdx(idx);
@@ -105,7 +119,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
     if (cands.length) onPrompt(cands[0].text);
   };
 
-  const shown = candidates.map((c, i) => ({ c, i })).filter(({ c }) => !filter || (c.label + " " + c.text).toLowerCase().includes(filter.toLowerCase()));
+  const shown = candidates.map((c, i) => ({ c, i })).filter(({ i }) => !hideUsed || !usage[i]).filter(({ c }) => !filter || (c.label + " " + c.text).toLowerCase().includes(filter.toLowerCase()));
   const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
 
   return (
@@ -145,7 +159,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
       )}
 
       {fileName && !error && (
-        <p className="text-[11px] text-zinc-500 flex items-center gap-1.5"><FileText size={12} /> {fileName}{candidates.length > 0 ? ` - ${candidates.length} prompts found` : ""}</p>
+        <p className="text-[11px] text-zinc-500 flex items-center gap-1.5"><FileText size={12} /> {fileName}{candidates.length > 0 ? ` - ${candidates.length} prompts found${usedCount ? `, ${usedCount} already made` : ""}` : ""}</p>
       )}
       {unmatched && <p className="text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={12} /> No "Prompt" marker found - showing the whole text. Edit it below.</p>}
       {error && <p className="text-[11px] text-red-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {error}</p>}
@@ -159,7 +173,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
           )}
           <div ref={popRef} className="relative flex-1 min-w-[220px]">
             <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-2 bg-white/5 hover:bg-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 text-left transition-colors">
-              <span className="truncate">{picked >= 0 ? candidates[picked].label : "Pick a prompt..."}</span>
+              <span className="truncate flex items-center gap-2">{picked >= 0 ? candidates[picked].label : "Pick a prompt..."}{picked >= 0 && usage[picked] > 0 && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-500/15 rounded-full px-2 py-0.5">made ×{usage[picked]}</span>}</span>
               <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
             {open && (
@@ -168,10 +182,11 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
                   <Search size={13} className="text-zinc-500 ml-1" />
                   <input autoFocus value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search prompts..." className="flex-1 bg-transparent text-xs text-white focus:outline-none placeholder:text-zinc-600" />
                 </div>
+                {usedCount > 0 && <label className="flex items-center gap-2 px-4 py-2 border-b border-white/10 text-[11px] text-zinc-400 cursor-pointer select-none"><input type="checkbox" checked={hideUsed} onChange={e => setHideUsed(e.target.checked)} /> Hide the {usedCount} already made</label>}
                 {shown.length === 0 && <p className="px-4 py-3 text-xs text-zinc-500">No prompts match.</p>}
                 {shown.map(({ c, i }) => (
                   <button key={i} onClick={() => pick(i)} className={`w-full text-left px-4 py-2 hover:bg-white/5 ${i === picked ? "bg-white/[0.07]" : ""}`}>
-                    <span className="block text-xs font-semibold text-zinc-100 truncate">{c.label}</span>
+                    <span className="flex items-center gap-2"><span className="block text-xs font-semibold text-zinc-100 truncate flex-1">{c.label}</span>{usage[i] > 0 && <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-500/15 rounded-full px-2 py-0.5" title="Already made - pick it to see the results">made ×{usage[i]}</span>}</span>
                     <span className="block text-[11px] text-zinc-500 truncate">{c.text}</span>
                   </button>
                 ))}

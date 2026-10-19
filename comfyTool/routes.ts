@@ -468,11 +468,17 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     const q = req.query;
     res.json((() => {
       const r = promptDb.list({
-        kind: isKind(q.kind) ? q.kind : undefined, q: String(q.q || ""), favorite: q.favorite === "1", mode: q.mode ? String(q.mode) : undefined,
+        kind: isKind(q.kind) ? q.kind : undefined, q: String(q.q || ""), exact: q.exact ? String(q.exact) : undefined, favorite: q.favorite === "1", mode: q.mode ? String(q.mode) : undefined,
         sort: ["new", "old", "az", "fav"].includes(String(q.sort)) ? (String(q.sort) as any) : "new", limit: Number(q.limit) || 60, offset: Number(q.offset) || 0,
       });
       return { total: r.total, items: r.items.map(decorate) };
     })());
+  });
+  // Which of these prompts already have results? (for the "used" marks in the prompt list)
+  app.post("/api/prompts/usage", (req, res) => {
+    const b = req.body || {};
+    if (!isKind(b.kind) || !Array.isArray(b.prompts)) return res.status(400).json({ error: "kind and prompts are required" });
+    res.json({ counts: promptDb.usage(b.kind, b.prompts.slice(0, 2000).map((p: any) => String(p))) });
   });
   app.post("/api/prompts", (req, res) => {
     const b = req.body || {};

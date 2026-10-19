@@ -4,6 +4,7 @@ import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
 import { PromptSource } from "./PromptSource";
+import { PreviousResults } from "./PreviousResults";
 import { ShareMenu } from "./ShareMenu";
 import { Converter } from "./Converter";
 import { QueueList } from "./shared";
@@ -441,7 +442,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               <>
                 {/* Prompt */}
                 <Section title="Prompt" icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
-                  <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} />
+                  <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} />
                 </Section>
 
                 {/* References */}
@@ -646,6 +647,8 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               <button onClick={() => removeResult(stagePath)} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>
             </div>
           )}
+
+          <PreviousResults kind={kind} prompt={prompt} refreshKey={history.length} activeUrl={stagePath} onShow={it => setViewPath(it.file)} />
 
           {/* Job queue - always visible */}
           <QueueList
