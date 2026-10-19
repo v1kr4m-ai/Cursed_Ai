@@ -75,6 +75,13 @@ export function GoogleConnectPanel({ status, onChange, field }: { status: Google
           <button onClick={connect} disabled={busy || waiting} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold disabled:opacity-60 flex items-center justify-center gap-2">
             {(busy || waiting) && <Loader2 size={13} className="animate-spin" />} {waiting ? "Waiting for you to finish in the browser..." : "Connect Google"}
           </button>
+          <div className="rounded-lg bg-white/[0.04] p-2.5 space-y-1.5">
+            <p className="text-[10px] text-zinc-400 leading-snug">Got <b>"redirect_uri_mismatch"</b>? Your client is probably a <b>Web application</b>. In Google Cloud Console open it and add this under <b>Authorized redirect URIs</b> (or create a new client of type <b>Desktop app</b>, which needs nothing):</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 min-w-0 truncate text-[11px] text-zinc-200 select-all">{status.redirectUri}</code>
+              <button onClick={() => { navigator.clipboard.writeText(status.redirectUri).then(() => notify({ message: "Redirect address copied", tab: "image" })).catch(() => {}); }} className="text-[10px] text-blue-400 hover:text-blue-300 shrink-0">Copy</button>
+            </div>
+          </div>
           <p className="text-[10px] text-zinc-600">If Google says the app is not verified, choose Advanced → continue: it is your own project.</p>
           <button onClick={() => setEditing(true)} className="text-[10px] text-zinc-500 hover:text-zinc-300 underline">Change the client ID / secret</button>
         </>
