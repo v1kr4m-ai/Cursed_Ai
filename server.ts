@@ -1368,6 +1368,8 @@ async function startServer() {
   // latent input instead, with denoise < 1 to preserve the reference).
   app.post("/api/comfyui/image/generate", async (req, res) => {
     const { prompt, negativePrompt, checkpoint, width, height, referenceImage } = req.body;
+    const clampNum = (v: any, lo: number, hi: number, d: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+    const stepsIn = Math.round(clampNum(req.body.steps, 1, 100, 20)), cfgIn = clampNum(req.body.cfg, 1, 30, 7);
     if (!prompt || !checkpoint) return res.status(400).json({ error: "prompt and checkpoint are required" });
     // Stop button = the browser aborts the request; then we cancel the ComfyUI job too.
     const ctl = new AbortController();
@@ -1375,7 +1377,7 @@ async function startServer() {
 
     try {
       console.log(`[ComfyUI Image] Generating: "${String(prompt).slice(0, 60)}..." (checkpoint=${checkpoint}, hasReference=${!!referenceImage})`);
-      const seed = Math.floor(Math.random() * 1e15);
+      const seed = Number.isFinite(Number(req.body.seed)) && req.body.seed !== null && req.body.seed !== "" ? Math.max(0, Math.floor(Number(req.body.seed))) : Math.floor(Math.random() * 1e15);
 
       const workflow: Record<string, any> = {
         "4": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: checkpoint } },
@@ -1399,7 +1401,7 @@ async function startServer() {
       workflow["3"] = {
         class_type: "KSampler",
         inputs: {
-          seed, steps: 20, cfg: 7, sampler_name: "euler", scheduler: "normal", denoise,
+          seed, steps: stepsIn, cfg: cfgIn, sampler_name: "euler", scheduler: "normal", denoise,
           model: ["4", 0], positive: ["6", 0], negative: ["7", 0], latent_image: latentSource,
         },
       };

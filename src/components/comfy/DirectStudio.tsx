@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, Minus, ListPlus, CornerUpLeft, Cpu, ExternalLink, Film, ImageIcon, Loader2, Play, Plus, Trash2, Type, X, Layers } from "lucide-react";
+import { AlertTriangle, Dices, SlidersHorizontal, Minus, ListPlus, CornerUpLeft, Cpu, ExternalLink, Film, ImageIcon, Loader2, Play, Plus, Trash2, Type, X, Layers } from "lucide-react";
 import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { notify, notifyError } from "../../lib/notify";
 import { friendlyError } from "../../services/errors";
@@ -25,7 +25,7 @@ const SIZES = {
 interface Job {
   id: string; prompt: string; negative: string; status: "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
   percent: number | null; label: string; url?: string; file?: string; error?: string;
-  checkpoint: string; width: number; height: number; image: string | null; frames?: number; fps?: number;
+  checkpoint: string; width: number; height: number; image: string | null; frames?: number; fps?: number; steps: number; cfg: number; seed: number | null;
 }
 interface View { url: string; file?: string; prompt?: string }
 interface GalleryItem { file: string; url: string; createdAt: number }
@@ -57,6 +57,11 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
   const [refImage, setRefImage] = React.useState<string | null>(null);
   const [jobs, setJobs] = React.useState<Job[]>([]);
   const [count, setCount] = React.useState(1);
+  // Quick image: sampler settings. A fixed seed repeats the same picture; random gives a new one every time.
+  const [steps, setSteps] = React.useState(20);
+  const [cfg, setCfg] = React.useState(7);
+  const [fixedSeed, setFixedSeed] = React.useState(false);
+  const [seed, setSeed] = React.useState(12345);
   // Quick video: clip length. LTX-Video wants 8n+1 frames at 25 fps.
   const [seconds, setSeconds] = React.useState(4);
   const FPS = 25;
@@ -88,6 +93,12 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     fetch(`/api/gallery?kind=${kind}`).then(r => r.json()).then(d => setGallery(d.items || [])).catch(() => {});
   }, [kind, refreshKey]);
 
+  // Turbo / Lightning / LCM checkpoints need very few steps and a low CFG; switch the defaults when one is picked.
+  React.useEffect(() => {
+    if (kind !== "image" || !checkpoint) return;
+    if (/turbo|lightning|lcm|hyper|schnell/i.test(checkpoint)) { setSteps(4); setCfg(1.5); } else { setSteps(s => (s <= 8 ? 20 : s)); setCfg(c => (c < 3 ? 7 : c)); }
+  }, [checkpoint, kind]);
+
   // --- queue ---
   const patch = (id: string, p: Partial<Job>) => setJobs(js => js.map(j => j.id === id ? { ...j, ...p } : j));
 
@@ -104,7 +115,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
       const token = `img-${job.id}`;
       const poll = setInterval(async () => { try { const p = await (await fetch(`/api/progress/${token}`)).json(); patch(job.id, { percent: p.percent, label: p.label }); } catch { /* busy */ } }, 700);
       try {
-        const r = await fetch("/api/comfyui/image/generate", body({ token, prompt: job.prompt, negativePrompt: job.negative, checkpoint: job.checkpoint, width: job.width, height: job.height, referenceImage: job.image }));
+        const r = await fetch("/api/comfyui/image/generate", body({ token, prompt: job.prompt, negativePrompt: job.negative, checkpoint: job.checkpoint, width: job.width, height: job.height, referenceImage: job.image, steps: job.steps, cfg: job.cfg, seed: job.seed }));
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || "Generation failed");
         return { url: d.src as string, file: d.file as string | undefined };
@@ -146,7 +157,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     execute(next, ctl.signal).then(res => {
       patch(next.id, { status: "done", url: res.url, file: res.file });
       // Keep the prompt with its picture in the library.
-      if (res.file) fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, mode: engine, prompt: next.prompt, negative: next.negative, galleryFile: res.file, params: engine === "quick" ? { size: `${next.width}×${next.height}`, checkpoint: next.checkpoint, ...(next.frames ? { frames: next.frames, fps: next.fps, seconds: Math.round((next.frames / (next.fps || FPS)) * 10) / 10 } : {}) } : {} }) }).catch(() => {}).finally(() => setRefreshKey(k => k + 1));
+      if (res.file) fetch("/api/prompts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, mode: engine, prompt: next.prompt, negative: next.negative, galleryFile: res.file, params: engine === "quick" ? { size: `${next.width}×${next.height}`, checkpoint: next.checkpoint, ...(kind === "image" ? { steps: next.steps, cfg: next.cfg, ...(next.seed !== null ? { seed: next.seed } : {}) } : {}), ...(next.frames ? { frames: next.frames, fps: next.fps, seconds: Math.round((next.frames / (next.fps || FPS)) * 10) / 10 } : {}) } : {} }) }).catch(() => {}).finally(() => setRefreshKey(k => k + 1));
       setView({ url: res.url, file: res.file, prompt: next.prompt });
       setRefreshKey(k => k + 1);
       notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${next.prompt.slice(0, 60)}`, tab: kind, thumb: kind === "image" ? res.url : undefined });
@@ -164,7 +175,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     const size = sizes[sizeIdx];
     const fresh: Job[] = prompts.filter(p => p.trim()).flatMap(p => Array(count).fill(p) as string[]).map((p, i) => ({
       id: `${Date.now()}-${i}`, prompt: p.trim(), negative, status: "queued", percent: null, label: "Waiting",
-      checkpoint, width: size.width, height: size.height, image: engine === "quick" ? refImage : null,
+      checkpoint, width: size.width, height: size.height, image: engine === "quick" ? refImage : null, steps, cfg, seed: fixedSeed && count === 1 ? seed : null,
       ...(kind === "video" && engine === "quick" ? { frames: framesFor(seconds), fps: FPS } : {}),
     }));
     if (!fresh.length) return;
@@ -252,6 +263,19 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
         <Section title="Model" icon={<Layers size={14} />} accent={a.text} badge={kind === "image" ? "Imagen 4" : "Veo 2"} defaultOpen>
           <p className="text-[11px] text-zinc-500">{kind === "image" ? "Google's Imagen 4 through your Gemini key." : "Google's Veo 2 through your Gemini key - clips take a few minutes."}</p>
           {hasKey === false && <p className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> No Gemini key yet - click the key icon in the top bar to add yours.</p>}
+        </Section>
+      )}
+
+      {engine === "quick" && kind === "image" && (
+        <Section title="Advanced" icon={<SlidersHorizontal size={14} />} accent={a.text} badge={`${steps} steps · CFG ${cfg}${fixedSeed ? " · seed " + seed : ""}`}>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={label + " !mb-1"}>Steps</label><input type="number" min={1} max={100} value={steps} onChange={e => setSteps(Math.min(100, Math.max(1, Math.round(Number(e.target.value) || 1))))} className={field} /></div>
+            <div><label className={label + " !mb-1"}>CFG (prompt strength)</label><input type="number" min={1} max={30} step={0.5} value={cfg} onChange={e => setCfg(Math.min(30, Math.max(1, Number(e.target.value) || 1)))} className={field} /></div>
+          </div>
+          <p className="text-[11px] text-zinc-600">Turbo and Lightning models want few steps (1-8) and a low CFG (1-2); regular models like 20-30 steps and CFG 5-8.</p>
+          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer"><input type="checkbox" checked={fixedSeed} onChange={e => setFixedSeed(e.target.checked)} /> <Dices size={14} /> Use a fixed seed (same picture every time)</label>
+          {fixedSeed && <input type="number" min={0} value={seed} onChange={e => setSeed(Math.max(0, Math.floor(Number(e.target.value) || 0)))} className={field} aria-label="Seed" />}
+          {fixedSeed && count > 1 && <p className="text-[11px] text-amber-400">Several instances always use new seeds.</p>}
         </Section>
       )}
 
