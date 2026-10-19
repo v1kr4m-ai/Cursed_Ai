@@ -1,6 +1,7 @@
 import React from "react";
-import { FileText, Upload, ChevronDown, Search, Loader2, AlertTriangle } from "lucide-react";
+import { Cloud, Link2, FileText, Upload, ChevronDown, Search, Loader2, AlertTriangle } from "lucide-react";
 import { EnhancePromptButton } from "../tools/EnhancePromptButton";
+import { DrivePicker, DriveFile } from "./google";
 import { ACCENT, Kind, PromptCandidate, PromptColumnInfo, PromptFileResult, api } from "./types";
 
 const FILE_TYPES = ".txt,.md,.csv,.tsv,.rtf,.doc,.docx,.docm,.odt,.xlsx,.xlsm,.pptx,.pptm,.pdf,.png,.jpg,.jpeg,.webp,.bmp";
@@ -65,6 +66,18 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
     } catch (e: any) { setError(e.message); }
     finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   };
+
+  // Google: a file picked from Drive, or a pasted Sheets / Docs / Slides / Drive link.
+  const [driveOpen, setDriveOpen] = React.useState(false);
+  const [linkOpen, setLinkOpen] = React.useState(false);
+  const [link, setLink] = React.useState("");
+  const fromGoogle = async (label: string, call: () => Promise<PromptFileResult & { source?: string }>) => {
+    setBusy(true); setError(null); setFileName(label);
+    try { const r = await call(); if (r.source) setFileName(r.source); apply(r); } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+  const readDrive = (f: DriveFile) => { setDriveOpen(false); fromGoogle(f.name, () => api("/api/google/prompt-file", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: f.id, name: f.name, mimeType: f.mimeType }) })); };
+  const readLink = () => { if (link.trim()) fromGoogle("Google link", () => api("/api/google/link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: link.trim() }) })); };
 
   const pick = (i: number) => { setPicked(i); onPrompt(candidates[i].text); setOpen(false); setFilter(""); };
   const switchColumn = (idx: number) => {
@@ -138,7 +151,14 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
       )}
 
       <div>
-        <div className="flex items-center justify-between mb-1"><label className={label + " !mb-0"}>Prompt text</label><span className="inline-flex items-center gap-1.5">{bare && <button onClick={() => fileRef.current?.click()} disabled={busy} title="Pull the prompt out of a file (txt, md, docx, xlsx, pdf, image)" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors disabled:opacity-40">{busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}</button>}<EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></span></div>
+        <div className="flex items-center justify-between mb-1"><label className={label + " !mb-0"}>Prompt text</label><span className="inline-flex items-center gap-1.5">{bare && <button onClick={() => fileRef.current?.click()} disabled={busy} title="Pull the prompt out of a file (txt, md, docx, xlsx, pdf, image)" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors disabled:opacity-40">{busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}</button>}{bare && <button onClick={() => setDriveOpen(true)} disabled={busy} title="Read prompts from Google Drive / Sheets / Docs" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-blue-300 transition-colors disabled:opacity-40"><Cloud size={15} /></button>}{bare && <button onClick={() => setLinkOpen(o => !o)} title="Paste a Google Sheets / Docs / Drive link" className={`p-2.5 rounded-xl transition-colors ${linkOpen ? "bg-white/15 text-white" : "bg-white/5 hover:bg-white/10 text-zinc-300"}`}><Link2 size={15} /></button>}<EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></span></div>
+        {linkOpen && (
+          <div className="flex gap-2 mb-2">
+            <input value={link} onChange={e => setLink(e.target.value)} onKeyDown={e => e.key === "Enter" && readLink()} placeholder="https://docs.google.com/spreadsheets/d/..." className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none placeholder:text-zinc-700" />
+            <button onClick={readLink} disabled={busy || !link.trim()} className="px-3 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-bold disabled:opacity-40">Read</button>
+          </div>
+        )}
+        <DrivePicker open={driveOpen} mode="file" field="w-full bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none placeholder:text-zinc-700" onClose={() => setDriveOpen(false)} onPickFile={readDrive} />
         <textarea
           value={prompt}
           onChange={(e) => onPrompt(e.target.value)}

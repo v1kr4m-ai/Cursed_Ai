@@ -104,6 +104,27 @@ export default function App() {
     const t = setTimeout(() => { fetch("/api/chats", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chats }) }).catch(() => {}); }, 1500);
     return () => clearTimeout(t);
   }, [chats, chatsSynced]);
+  // Unread tracking: a chat that gets new assistant text while it is not on screen is marked unread; opening it clears the mark.
+  const chatSig = useRef(new Map<string, string>());
+  useEffect(() => {
+    const viewing = (id: string) => activeTab === "chat" && activeChatId === id && !document.hidden;
+    let changed = false;
+    const next = chats.map(c => {
+      const last = c.messages[c.messages.length - 1];
+      const sig = last ? `${c.messages.length}:${last.role}:${last.content.length}` : "";
+      const before = chatSig.current.get(c.id);
+      chatSig.current.set(c.id, sig);
+      if (viewing(c.id)) { if (c.unread) { changed = true; return { ...c, unread: false }; } return c; }
+      if (before !== undefined && before !== sig && last?.role === "assistant" && !c.unread) { changed = true; return { ...c, unread: true }; }
+      return c;
+    });
+    if (changed) setChats(next);
+  }, [chats, activeTab, activeChatId]);
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden) setChats(prev => prev.some(c => c.unread && c.id === activeChatId && activeTab === "chat") ? prev.map(c => c.id === activeChatId ? { ...c, unread: false } : c) : prev); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [activeChatId, activeTab]);
   const [serverUp, setServerUp] = useState(true);
   // Heartbeat: shows a banner the moment the local server stops answering.
   useEffect(() => {

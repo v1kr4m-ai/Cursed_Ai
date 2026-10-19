@@ -69,3 +69,14 @@ describe("extractUpload", () => {
     expect(pptx.prompt).toBe("a red kite");
   });
 });
+
+describe("parseGoogleLink", () => {
+  it("finds the file id and kind in Google links", async () => {
+    const { parseGoogleLink } = await import("../comfyTool/google");
+    expect(parseGoogleLink("https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQ/edit#gid=0")).toEqual({ id: "1AbCdEfGhIjKlMnOpQ", kind: "sheet" });
+    expect(parseGoogleLink("https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQ/edit")?.kind).toBe("doc");
+    expect(parseGoogleLink("https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQ/view")?.kind).toBe("file");
+    expect(parseGoogleLink("https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQ")?.id).toBe("1AbCdEfGhIjKlMnOpQ");
+    expect(parseGoogleLink("https://example.com/x")).toBeNull();
+  });
+});

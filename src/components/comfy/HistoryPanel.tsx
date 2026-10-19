@@ -9,7 +9,7 @@ import { ACCENT, Kind, api, postJson } from "./types";
 
 export interface PromptItem {
   id: number; kind: Kind; mode: string; workflow: string; prompt: string; negative: string; params: Record<string, any>;
-  file: string; url: string; exists: boolean; favorite: boolean; notes: string; tags: string; createdAt: number;
+  file: string; driveUrl?: string; url: string; exists: boolean; favorite: boolean; notes: string; tags: string; createdAt: number;
 }
 
 const SORTS = [{ key: "new", label: "Newest first" }, { key: "old", label: "Oldest first" }, { key: "az", label: "Prompt A → Z" }, { key: "fav", label: "Favourites first" }];
@@ -116,7 +116,7 @@ export function HistoryPanel({ kind, refreshKey, onUse }: { kind: Kind; refreshK
                       <p className="text-[13px] text-zinc-200 leading-snug line-clamp-3 break-words">{it.prompt}</p>
                       {it.negative && <p className="text-[11px] text-zinc-500 line-clamp-1">Avoid: {it.negative}</p>}
                       {(it.notes || it.tags) && <p className="text-[11px] text-zinc-500 line-clamp-1">{it.tags && <span className={a.text}>{it.tags} </span>}{it.notes}</p>}
-                      <p className="text-[10px] text-zinc-600 truncate">{meta(it)}</p>
+                      <p className="text-[10px] text-zinc-600 truncate">{meta(it)}{it.driveUrl && <> · <a href={it.driveUrl} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">on Drive</a></>}</p>
                       <div className="flex items-center gap-1 pt-0.5">
                         <button onClick={() => patch(it.id, { favorite: !it.favorite })} title={it.favorite ? "Remove from favourites" : "Add to favourites"} className={`${iconBtn} !p-1.5 ${it.favorite ? "!text-amber-400" : ""}`}><Star size={13} className={it.favorite ? "fill-current" : ""} /></button>
                         <button onClick={() => onUse(it)} title="Use this prompt again" className={`${iconBtn} !p-1.5 flex items-center gap-1 text-[11px] font-semibold !px-2.5`}><CornerUpLeft size={13} /> Use</button>

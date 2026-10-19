@@ -34,6 +34,8 @@ export interface Chat {
   archived?: boolean;
   /** Instructions given to the model at the start of this chat (persona, tone, rules). */
   systemPrompt?: string;
+  /** A reply arrived while this chat was not on screen. Cleared when it is opened. */
+  unread?: boolean;
   /** Pinned chats stay at the top of History. */
   pinned?: boolean;
 }

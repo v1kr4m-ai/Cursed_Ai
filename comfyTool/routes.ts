@@ -11,6 +11,7 @@ import { findPrompt } from "./promptFinder";
 import { autoOutputName, cancelPrompt, runWorkflow, uniqueDestination, RunEvent } from "./runner";
 import { createStore, Kind } from "./store";
 import { createPromptDb } from "./promptDb";
+import { createGoogle, fetchPublicGoogleFile, parseGoogleLink } from "./google";
 
 type Json = Record<string, any>;
 
@@ -55,6 +56,12 @@ const LISTED = [...ACTIVE, "paused"];
 export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   const store = createStore(opts.dataDir);
   const promptDb = createPromptDb(opts.dataDir);
+  const google = createGoogle(opts.dataDir, () => `http://127.0.0.1:${Number(process.env.PORT) || 3000}`);
+  // Auto-save to Google Drive: runs in the background after a result is recorded; the link is kept with the prompt.
+  const driveAutosave = (file: string) => {
+    if (!file || !google.wantsAutosave()) return;
+    google.upload(file).then(r => { if (r.ok && r.url) promptDb.setDriveUrl(file, r.url); }).catch(() => {});
+  };
   // First run: bring over the workflow results already recorded in comfy-tool-history.json.
   if (promptDb.count() === 0) {
     try { for (const h of store.history().slice().reverse()) if (h.prompt) promptDb.add({ kind: h.kind, mode: "workflow", workflow: h.workflow, prompt: h.prompt, file: h.path, createdAt: Date.parse(h.createdAt) || Date.now() }); } catch { /* nothing to import */ }
@@ -146,18 +153,61 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   });
 
   // --- prompt files ---
+  // Bytes of a document / sheet / slide deck -> the prompt(s) found in it.
+  const promptResult = async (name: string, bytes: Buffer) => {
+    const content = await extractUpload(name, bytes);
+    const r = findPrompt(content);
+    const raw = content.kind === "text" ? content.text : content.cells.map(c => c.text).join("\n");
+    return { rawText: raw, extractedPrompt: r.prompt, matched: r.matched, candidates: r.candidates, columns: r.alternatives.map(a => ({ sheet: a.sheet, header: a.header, candidates: a.candidates })) };
+  };
+
+  // --- Google Drive / Sheets / Docs ---
+  const gErr = (res: express.Response, e: any, code = 400) => res.status(code).json({ error: e?.message || String(e) });
+  app.get("/api/google/status", (_req, res) => res.json(google.status()));
+  app.post("/api/google/client", (req, res) => {
+    const { clientId, clientSecret } = req.body || {};
+    if (typeof clientId !== "string" || typeof clientSecret !== "string" || !clientId.trim() || !clientSecret.trim()) return gErr(res, "Both the client ID and the client secret are needed.");
+    google.setClient(clientId, clientSecret);
+    res.json(google.status());
+  });
+  app.get("/api/google/connect", (_req, res) => { try { res.json({ url: google.authUrl() }); } catch (e) { gErr(res, e); } });
+  app.get("/api/google/callback", async (req, res) => {
+    const page = (title: string, body: string) => res.type("html").send(`<!doctype html><meta charset="utf-8"><title>Cursed_Ai</title><body style="font-family:system-ui;background:#09090b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center;max-width:420px"><h2>${title}</h2><p style="color:#a1a1aa">${body}</p></div></body>`);
+    if (req.query.error) return page("Google sign-in was cancelled", "You can close this window and try again from Cursed_Ai.");
+    try { await google.handleCallback(String(req.query.code || ""), String(req.query.state || "")); page("Connected to Google", "You can close this window and go back to Cursed_Ai."); }
+    catch (e: any) { page("Could not connect", String(e?.message || e).split("<").join("&lt;")); }
+  });
+  app.post("/api/google/disconnect", (_req, res) => { google.disconnect(); res.json(google.status()); });
+  app.post("/api/google/settings", (req, res) => { google.settings({ autosave: typeof req.body?.autosave === "boolean" ? req.body.autosave : undefined, folder: req.body?.folder }); res.json(google.status()); });
+  app.get("/api/google/files", async (req, res) => {
+    try { res.json(await google.list({ parent: String(req.query.parent || "root"), q: String(req.query.q || ""), pageToken: req.query.pageToken ? String(req.query.pageToken) : undefined, foldersOnly: req.query.foldersOnly === "1" })); } catch (e) { gErr(res, e); }
+  });
+  app.post("/api/google/folder", async (req, res) => {
+    try { res.json(await google.createFolder(String(req.body?.name || "").trim() || "Cursed_Ai", req.body?.parent ? String(req.body.parent) : undefined)); } catch (e) { gErr(res, e); }
+  });
+  app.post("/api/google/prompt-file", async (req, res) => {
+    const { id, name, mimeType } = req.body || {};
+    if (typeof id !== "string" || !id) return gErr(res, "Choose a file first.");
+    try { const f = await google.download(id, String(name || "file"), String(mimeType || "")); res.json({ ...(await promptResult(f.name, f.bytes)), source: f.name }); } catch (e) { gErr(res, e, 422); }
+  });
+  app.post("/api/google/link", async (req, res) => {
+    const link = parseGoogleLink(String(req.body?.url || ""));
+    if (!link) return gErr(res, "That is not a Google Sheets, Docs, Slides or Drive link.");
+    try {
+      let f: { name: string; bytes: Buffer };
+      if (google.connected()) {
+        try { const m = await google.meta(link.id); f = await google.download(link.id, m.name, m.mimeType); }
+        catch { f = await fetchPublicGoogleFile(link.id, link.kind); }
+      } else f = await fetchPublicGoogleFile(link.id, link.kind);
+      res.json({ ...(await promptResult(f.name, f.bytes)), source: f.name });
+    } catch (e) { gErr(res, e, 422); }
+  });
+
   app.post("/api/tool/prompt-file", express.raw({ type: "*/*", limit: "1gb" }), async (req, res) => {
     const name = String(req.query.name || "file.txt");
     if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: "Empty file" });
     try {
-      const content = await extractUpload(name, req.body);
-      const r = findPrompt(content);
-      const raw = content.kind === "text" ? content.text : content.cells.map(c => c.text).join("\n");
-      res.json({
-        rawText: raw, extractedPrompt: r.prompt, matched: r.matched,
-        candidates: r.candidates,
-        columns: r.alternatives.map(a => ({ sheet: a.sheet, header: a.header, candidates: a.candidates })),
-      });
+      res.json(await promptResult(name, req.body));
     } catch (e: any) {
       res.status(422).json({ error: e.message || "Couldn't read that file" });
     }
@@ -299,7 +349,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
           onEvent: e => {
             if (e.type === "done") {
               store.addHistory(e.path, state.workflow, String(b.promptText || ""), kind);
-              try { promptDb.add({ kind, mode: "workflow", workflow: state.workflow, prompt: String(b.promptText || ""), params: { ...summarise(info, b.fieldValues), fieldValues: b.fieldValues || {} }, file: e.path }); } catch { /* the library must never break a run */ }
+              try { promptDb.add({ kind, mode: "workflow", workflow: state.workflow, prompt: String(b.promptText || ""), params: { ...summarise(info, b.fieldValues), fieldValues: b.fieldValues || {} }, file: e.path }); driveAutosave(e.path); } catch { /* the library must never break a run */ }
             }
             push(state, e);
           },
@@ -421,6 +471,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     // The browser names a gallery file; the full path is built here.
     const file = typeof b.galleryFile === "string" && b.galleryFile ? path.join(opts.galleryDirs[b.kind as Kind], path.basename(b.galleryFile)) : typeof b.file === "string" ? b.file : "";
     const id = promptDb.add({ kind: b.kind, mode: String(b.mode || ""), workflow: String(b.workflow || ""), prompt: b.prompt, negative: String(b.negative || ""), params: typeof b.params === "object" && b.params ? b.params : {}, file });
+    if (id) driveAutosave(file);
     res.json({ id });
   });
   app.patch("/api/prompts/:id", (req, res) => {

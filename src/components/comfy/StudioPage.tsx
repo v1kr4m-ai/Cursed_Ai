@@ -11,7 +11,9 @@ import { Kind } from "./types";
  * prompt-from-file, queue, recent results and History.
  */
 export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) {
-  const [source, setSource] = React.useState<Source>("cloud");
+  // Local (offline) is the default; Cloud is the second choice. The last pick is remembered per tab.
+  const [source, setSourceState] = React.useState<Source>(() => { try { return localStorage.getItem(`cursed.source.${kind}`) === "cloud" ? "cloud" : "local"; } catch { return "local"; } });
+  const setSource = (s: Source) => { setSourceState(s); try { localStorage.setItem(`cursed.source.${kind}`, s); } catch { /* private window */ } };
   const [mode, setMode] = useLocalMode(kind);
   const [showHistory, setShowHistory] = React.useState(false);
   const icon = kind === "image" ? <ImagePlus className="text-pink-500" size={24} /> : <Clapperboard className="text-orange-500" size={24} />;

@@ -124,7 +124,8 @@ export function Sidebar({
             onClick={() => { setActiveChatId(chat.id); }}
           >
             <MessageSquare size={14} className="mr-3 flex-shrink-0 opacity-50" />
-            <span className="truncate">{chat.title || "Untitled History"}</span>
+            <span className={`truncate ${chat.unread ? "font-bold text-white" : ""}`}>{chat.title || "Untitled History"}</span>
+            {chat.unread && <span className="ml-auto w-2 h-2 rounded-full bg-violet-500 shrink-0 group-hover:hidden" />}
           </Button>
           <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
         <button title={chat.pinned ? "Unpin" : "Pin to top"} onClick={() => onPinChat?.(chat.id)} className={`p-1.5 rounded-md hover:bg-white/10 ${chat.pinned ? "text-violet-400" : "text-zinc-500 hover:text-white"}`}><Pin size={13} className={chat.pinned ? "fill-current" : ""} /></button>
@@ -200,9 +201,9 @@ export function Sidebar({
             >
               <item.icon size={18} />
               {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
-              {!isCollapsed && item.id === "chat" && chats.length > 0 && (
-                <Badge variant="outline" className="ml-auto bg-black/40 border-white/5 text-[10px] text-zinc-500">
-                  {chats.length}
+              {!isCollapsed && item.id === "chat" && chats.some(c => c.unread && !c.archived) && (
+                <Badge variant="outline" title="Chats with a reply you have not seen" className="ml-auto bg-violet-600 border-violet-500/50 text-[10px] text-white font-bold">
+                  {chats.filter(c => c.unread && !c.archived).length}
                 </Badge>
               )}
             </Button>

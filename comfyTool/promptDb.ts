@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 export type Kind = "image" | "video";
 export interface PromptEntry {
   id: number; kind: Kind; mode: string; workflow: string; prompt: string; negative: string;
-  params: Record<string, any>; file: string; favorite: boolean; notes: string; tags: string; createdAt: number; updatedAt: number;
+  params: Record<string, any>; file: string; driveUrl: string; favorite: boolean; notes: string; tags: string; createdAt: number; updatedAt: number;
 }
 export interface PromptInput { kind: Kind; mode: string; workflow?: string; prompt: string; negative?: string; params?: Record<string, any>; file?: string; createdAt?: number }
 export interface PromptQuery { kind?: Kind; q?: string; favorite?: boolean; mode?: string; sort?: "new" | "old" | "az" | "fav"; limit?: number; offset?: number }
@@ -27,10 +27,11 @@ export function createPromptDb(dir: string) {
     CREATE INDEX IF NOT EXISTS prompts_kind_created ON prompts(kind, created_at DESC);
     CREATE INDEX IF NOT EXISTS prompts_file ON prompts(file);
   `);
+  try { db.exec("ALTER TABLE prompts ADD COLUMN drive_url TEXT NOT NULL DEFAULT ''"); } catch { /* column already there */ }
 
   const row = (r: any): PromptEntry => ({
     id: Number(r.id), kind: r.kind, mode: r.mode, workflow: r.workflow, prompt: r.prompt, negative: r.negative,
-    params: (() => { try { return JSON.parse(r.params); } catch { return {}; } })(), file: r.file,
+    params: (() => { try { return JSON.parse(r.params); } catch { return {}; } })(), file: r.file, driveUrl: r.drive_url || "",
     favorite: !!r.favorite, notes: r.notes, tags: r.tags, createdAt: Number(r.created_at), updatedAt: Number(r.updated_at),
   });
 
@@ -61,6 +62,7 @@ export function createPromptDb(dir: string) {
       const rows = db.prepare(`SELECT * FROM prompts ${w} ORDER BY ${order}, id DESC LIMIT ? OFFSET ?`).all(...args, Math.min(q.limit || 60, 200), q.offset || 0);
       return { items: rows.map(row), total };
     },
+    setDriveUrl(file: string, url: string) { db.prepare("UPDATE prompts SET drive_url = ? WHERE file = ?").run(url, path.resolve(file)); },
     get(id: number): PromptEntry | null { const r = db.prepare("SELECT * FROM prompts WHERE id = ?").get(id); return r ? row(r) : null; },
     update(id: number, p: Partial<Pick<PromptEntry, "prompt" | "negative" | "notes" | "tags" | "favorite">>): boolean {
       const sets: string[] = [], args: any[] = [];
