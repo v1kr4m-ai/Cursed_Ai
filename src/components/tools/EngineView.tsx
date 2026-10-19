@@ -2,9 +2,10 @@ import React from "react";
 import { Activity, BatteryFull, BatteryLow, BatteryMedium, Cpu, Database, Gauge, HardDrive, Layers, MemoryStick, Power, RotateCcw, Timer, Zap } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 
-interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null }
+interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
 interface EngineInfo {
   settings: EngineSettings;
+  comfyUrl?: string;
   defaults: { threads: number; batchSize: number };
   hardware: { cores: number; ramGb: number; gpu: string | null; gpuNames: string[] };
   model: { name: string | null; gpuLayers: number; flashAttentionSupported: boolean; contextSize: number | null } | null;
@@ -86,8 +87,16 @@ export function EngineView() {
   };
   const unload = async () => { setBusy(true); try { await fetch("/api/engine/unload", { method: "POST" }); notify({ message: "Model unloaded - memory freed", tab: "engine" }); await loadStats(); await loadInfo(); } finally { setBusy(false); } };
   const wipe = async () => { if (!window.confirm("Delete every stored memory entry? This can't be undone.")) return; setBusy(true); try { await fetch("/api/memory", { method: "DELETE" }); notify({ message: "Memory wiped", tab: "engine" }); } finally { setBusy(false); } };
-  const reset = () => change({ gpuLayers: "auto", flashAttention: false, batchSize: null, useMmap: true, useMlock: false, keepAliveMinutes: 0, threads: null, contextSize: null }, true);
+  const reset = () => change({ gpuLayers: "auto", flashAttention: false, batchSize: null, useMmap: true, useMlock: false, keepAliveMinutes: 0, threads: null, contextSize: null, preloadModel: false, autoStartComfy: false, comfyUrl: null }, true);
 
+  const [comfyDraft, setComfyDraft] = React.useState<string | null>(null);
+  const saveComfyUrl = async () => {
+    try {
+      const r = await fetch("/api/engine/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comfyUrl: comfyDraft }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not save");
+      notify({ message: "ComfyUI address saved", tab: "engine" }); setComfyDraft(null); loadInfo();
+    } catch (e: any) { notifyError(e.message, "engine"); }
+  };
   const s = info?.settings;
   const hw = info?.hardware;
   const tps: number | undefined = stats?.engine?.tps;
@@ -184,6 +193,22 @@ export function EngineView() {
           </div>
 
           <div className="space-y-6">
+            <section className={card}>
+              <h2 className={heading}><Power size={14} className="text-cyan-500" /> Startup & services</h2>
+              <div className="divide-y divide-white/5">
+                <Toggle on={!!s?.preloadModel} disabled={!s} onChange={v => change({ preloadModel: v })} title="Load the last model at launch" note={s?.lastModel ? `Warms up ${s.lastModel.split("/").pop()} so the first reply is quick.` : "Chat once first so the app knows which model to load."} />
+                <div className="pt-1"><Toggle on={!!s?.autoStartComfy} disabled={!s} onChange={v => change({ autoStartComfy: v })} title="Start ComfyUI at launch" note="Needs the ComfyUI folder to be set (Image or Video tab)." /></div>
+                <div className="pt-3">
+                  <p className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest mb-2">ComfyUI address</p>
+                  <div className="flex gap-2">
+                    <input value={comfyDraft ?? info?.comfyUrl ?? ""} onChange={e => setComfyDraft(e.target.value)} placeholder="http://127.0.0.1:8188" spellCheck={false} className="flex-1 min-w-0 bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-white font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500" />
+                    <button onClick={saveComfyUrl} disabled={comfyDraft === null} className="px-3.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold disabled:opacity-40">Save</button>
+                  </div>
+                  <p className="text-[11px] text-zinc-600 mt-2 leading-snug">Where ComfyUI listens - change it if you run it on another port or another PC.</p>
+                </div>
+              </div>
+            </section>
+
             <section className={card}>
               <h2 className={heading}><HardDrive size={14} className="text-cyan-500" /> This PC</h2>
               <dl className="space-y-3 text-[13px]">

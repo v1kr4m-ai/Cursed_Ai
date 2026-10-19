@@ -40,13 +40,14 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { AppSettings } from "../../types";
+import { AppSettings, Chat } from "../../types";
 
 import { AIService } from "../../services/aiService";
 import { notify, notifyError } from "../../lib/notify";
 import { FolderPickerDialog } from "./FolderPickerDialog";
 import { MicTest } from "./MicTest";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { MoreSettings } from "./MoreSettings";
 import { VoiceSpeechSettings } from "./VoiceSpeechSettings";
 
 export function MemoryView() {
@@ -322,7 +323,7 @@ function ModelsDirectorySection() {
   );
 }
 
-export function SettingsView({ settings, setSettings }: { settings: AppSettings, setSettings: (s: AppSettings) => void }) {
+export function SettingsView({ settings, setSettings, chats = [], onImportChats = () => 0, onClearChats = () => {} }: { settings: AppSettings, setSettings: (s: AppSettings) => void, chats?: Chat[], onImportChats?: (c: Chat[]) => number, onClearChats?: () => void }) {
   const [stats, setStats] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -567,6 +568,7 @@ export function SettingsView({ settings, setSettings }: { settings: AppSettings,
             </section>
 
             <AppearanceSettings />
+            <MoreSettings settings={settings} setSettings={setSettings} chats={chats} onImportChats={onImportChats} onClearChats={onClearChats} />
 
             <ModelsDirectorySection />
 

@@ -332,11 +332,16 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           signal: controller.signal,
           temperature: settings.temperature,
           topP: settings.topP,
+          topK: settings.topK > 0 ? settings.topK : undefined,
+          minP: settings.minP > 0 ? settings.minP : undefined,
+          repeatPenalty: settings.repeatPenalty > 1 ? settings.repeatPenalty : undefined,
+          seed: settings.seedMode === "fixed" ? settings.seed : undefined,
           maxTokens: settings.maxTokens,
           memoryEnabled: settings.memoryEnabled
         }
       );
       if (!controller.signal.aborted && finalContent) notify({ message: "Your chat reply is ready", tab: "chat", onlyIfAway: true });
+      if (!controller.signal.aborted && finalContent && settings.autoSpeak && typeof speechSynthesis !== "undefined") { try { speechSynthesis.cancel(); speechSynthesis.speak(makeUtterance(finalContent)); } catch { /* no voice available */ } }
       // Stopped before any text arrived: leave a note instead of an empty bubble.
       if (controller.signal.aborted && !finalContent) {
         const msgs = [...updatedChat.messages];
@@ -504,7 +509,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           onChange={(e) => setInput(e.target.value)}
           onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); onFilesChosen(e.clipboardData.files); } }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && (settings.enterToSend ? !e.shiftKey : (e.ctrlKey || e.metaKey))) {
               e.preventDefault();
               onSend();
             }

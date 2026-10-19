@@ -81,6 +81,27 @@ export interface AppSettings {
   threads: number;
   /** Context window size (tokens) requested when the model is loaded. */
   kvCacheSize: number;
+  /** Advanced sampling. topK 0 / minP 0 / repeatPenalty 1 mean "off". */
+  topK: number;
+  minP: number;
+  repeatPenalty: number;
+  /** 'random' = a different seed every reply; 'fixed' = the same seed (repeatable answers at low temperature). */
+  seedMode: 'random' | 'fixed';
+  seed: number;
+  /** Instructions given to every NEW chat (a chat can still change its own). */
+  defaultSystemPrompt: string;
+  /** true: Enter sends, Shift+Enter is a new line. false: Ctrl+Enter sends, Enter is a new line. */
+  enterToSend: boolean;
+  /** Read every finished reply aloud. */
+  autoSpeak: boolean;
+  /** Ask before deleting a chat. */
+  confirmDelete: boolean;
+  /** Popups for finished work and errors. */
+  popups: boolean;
+  /** Also raise a Windows notification when the window is in the background. */
+  desktopNotify: boolean;
+  /** Turns off animations and transitions everywhere. */
+  reduceMotion: boolean;
 }
 
 export interface LogLine {

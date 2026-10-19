@@ -193,6 +193,10 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
         signal: controller.signal,
         temperature: settingsRef.current.temperature,
         topP: settingsRef.current.topP,
+        topK: settingsRef.current.topK > 0 ? settingsRef.current.topK : undefined,
+        minP: settingsRef.current.minP > 0 ? settingsRef.current.minP : undefined,
+        repeatPenalty: settingsRef.current.repeatPenalty > 1 ? settingsRef.current.repeatPenalty : undefined,
+        seed: settingsRef.current.seedMode === "fixed" ? settingsRef.current.seed : undefined,
         maxTokens: settingsRef.current.maxTokens,
         memoryEnabled: settingsRef.current.memoryEnabled,
       });

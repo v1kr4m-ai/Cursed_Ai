@@ -90,7 +90,7 @@ async function startServer() {
   let userThreads: number | undefined;
   let userContextSize: number | undefined;
   // Engine settings from the Engine tab (kept in config.json). Threads / context size also come from the Settings tab.
-  const ENGINE_DEFAULTS: EngineSettings = { gpuLayers: "auto", flashAttention: false, batchSize: null, useMmap: true, useMlock: false, keepAliveMinutes: 0, threads: null, contextSize: null };
+  const ENGINE_DEFAULTS: EngineSettings = { gpuLayers: "auto", flashAttention: false, batchSize: null, useMmap: true, useMlock: false, keepAliveMinutes: 0, threads: null, contextSize: null, preloadModel: false, autoStartComfy: false, comfyUrl: null, lastModel: null };
   let engineSettings: EngineSettings = { ...ENGINE_DEFAULTS };
   let lastEngineUse = Date.now();
 
@@ -189,7 +189,7 @@ async function startServer() {
   // Config persistence (currently just modelsDir) — a real, user-editable
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
-  interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null }
+  interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
   interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
@@ -311,6 +311,7 @@ async function startServer() {
       contextSequence: context.getSequence()
     });
     activeModelName = modelName;
+    if (engineSettings.lastModel !== modelName) { engineSettings.lastModel = modelName; try { serverConfig.engine = engineSettings; saveConfig(); } catch { /* not fatal */ } }
     return modelInstance;
   }
 
@@ -389,6 +390,37 @@ async function startServer() {
     res.json({ saved: chats.length });
   });
 
+  // What the app keeps on this PC and where (Settings -> Data).
+  const folderBytes = (dir: string, depth = 0): { bytes: number; files: number } => {
+    let bytes = 0, files = 0;
+    try {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory() && depth < 4) { const r = folderBytes(p, depth + 1); bytes += r.bytes; files += r.files; }
+        else if (e.isFile()) { bytes += fs.statSync(p).size; files++; }
+      }
+    } catch { /* unreadable folder */ }
+    return { bytes, files };
+  };
+  app.get("/api/app/data-info", (_req, res) => {
+    const size = (f: string) => { try { return fs.statSync(path.join(process.cwd(), f)).size; } catch { return 0; } };
+    const out = folderBytes(path.join(process.cwd(), "outputs"));
+    res.json({
+      dir: process.cwd(),
+      items: [
+        { name: "Chats", file: "chats.json", bytes: size("chats.json") },
+        { name: "Memory notes", file: "memory.json", bytes: size("memory.json") },
+        { name: "Prompt library", file: "prompts.db", bytes: size("prompts.db") },
+        { name: "Settings", file: "config.json", bytes: size("config.json") },
+        { name: "Generated images and videos", file: "outputs", bytes: out.bytes, files: out.files },
+      ],
+    });
+  });
+  app.post("/api/app/open-data", (_req, res) => {
+    try { spawn("explorer.exe", [process.cwd()], { detached: true, stdio: "ignore" }).unref(); res.json({ status: "success" }); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Desktop-app mode (Cursed_Ai.bat sets CURSED_APP): the page pings /api/health while it is open and says goodbye when the
   // window closes; with nobody left the server stops by itself, so no terminal or background process stays behind.
   let lastSeen = Date.now();
@@ -438,11 +470,11 @@ async function startServer() {
       resp = provider === "ollama"
         ? await fetch(`${OLLAMA_URL}/api/chat`, {
             method: "POST", signal, headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, num_predict: options?.maxTokens, num_ctx: 4096 } }),
+            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, top_k: options?.topK, min_p: options?.minP, repeat_penalty: options?.repeatPenalty, seed: options?.seed, num_predict: options?.maxTokens, num_ctx: 4096 } }),
           })
         : await fetch(`${LMSTUDIO_URL}/v1/chat/completions`, {
             method: "POST", signal, headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model, messages: history, stream: true, temperature: options?.temperature, top_p: options?.topP, max_tokens: options?.maxTokens }),
+            body: JSON.stringify({ model, messages: history, stream: true, temperature: options?.temperature, top_p: options?.topP, top_k: options?.topK, min_p: options?.minP, repeat_penalty: options?.repeatPenalty, seed: options?.seed, max_tokens: options?.maxTokens }),
           });
     } catch (e: any) {
       if (signal.aborted) return;
@@ -572,6 +604,10 @@ async function startServer() {
         temperature: options?.temperature ?? 0.7,
         topP: options?.topP ?? 0.9,
         maxTokens: options?.maxTokens ?? 1024,
+        ...(Number.isFinite(options?.topK) ? { topK: Math.round(options.topK) } : {}),
+        ...(Number.isFinite(options?.minP) ? { minP: options.minP } : {}),
+        ...(Number.isFinite(options?.seed) ? { seed: Math.round(options.seed) } : {}),
+        ...(Number.isFinite(options?.repeatPenalty) && options.repeatPenalty > 0 ? { repeatPenalty: { penalty: options.repeatPenalty } } : {}),
         signal: abortController.signal,
         // Streams decoded text (llama.decode doesn't exist; onToken only gives raw token ids).
         onTextChunk(token: string) {
@@ -704,6 +740,7 @@ async function startServer() {
     try { gpuNames = llama ? await llama.getGpuDeviceNames() : []; } catch { /* no GPU info */ }
     res.json({
       settings: { ...engineSettings, threads: userThreads ?? null, contextSize: userContextSize ?? null },
+      comfyUrl: COMFYUI_URL,
       defaults: { threads: PERFORMANCE_PROFILES[performanceMode].threads, batchSize: PERFORMANCE_PROFILES[performanceMode].batchSize },
       hardware: { cores: os.cpus().length, ramGb: Math.round(os.totalmem() / 1024 ** 3), gpu: llama ? (llama.gpu || "cpu") : null, gpuNames },
       model: modelInstance ? { name: activeModelName, gpuLayers: modelInstance.gpuLayers, flashAttentionSupported: modelInstance.flashAttentionSupported, contextSize: context?.contextSize ?? null } : null,
@@ -722,6 +759,14 @@ async function startServer() {
     if (b.keepAliveMinutes !== undefined) engineSettings.keepAliveMinutes = num(b.keepAliveMinutes, 0, 1440) ?? 0;
     if (b.threads === null) { userThreads = undefined; engineSettings.threads = null; } else if (b.threads !== undefined) { const n = num(b.threads, 1, 256); if (n !== null) { userThreads = n; engineSettings.threads = n; } }
     if (b.contextSize === null) { userContextSize = undefined; engineSettings.contextSize = null; } else if (b.contextSize !== undefined) { const n = num(b.contextSize, 256, 262144); if (n !== null) { userContextSize = n; engineSettings.contextSize = n; } }
+    if (typeof b.preloadModel === "boolean") engineSettings.preloadModel = b.preloadModel;
+    if (typeof b.autoStartComfy === "boolean") engineSettings.autoStartComfy = b.autoStartComfy;
+    if (b.comfyUrl === null || b.comfyUrl === "") { engineSettings.comfyUrl = null; if (!process.env.COMFYUI_URL) COMFYUI_URL = "http://127.0.0.1:8188"; }
+    else if (typeof b.comfyUrl === "string") {
+      const u = b.comfyUrl.trim().replace(/\/+$/, "");
+      if (!/^https?:\/\/[^\s/]+(:\d+)?$/i.test(u)) return res.status(400).json({ error: "The ComfyUI address should look like http://127.0.0.1:8188" });
+      engineSettings.comfyUrl = u; if (!process.env.COMFYUI_URL) COMFYUI_URL = u;
+    }
     saveEngineSettings();
     try {
       // The model itself is reloaded (next message) when how it is loaded changes; the rest applies in place.
@@ -1200,7 +1245,7 @@ async function startServer() {
   // instance is the actual verification. If a node's input names have
   // drifted from what's below (ComfyUI node schemas do change over time),
   // the error message ComfyUI returns will name the exact node/field.
-  const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8188";
+  let COMFYUI_URL = process.env.COMFYUI_URL || engineSettings.comfyUrl || "http://127.0.0.1:8188";
 
   async function comfyFetch(pathSuffix: string, options?: RequestInit): Promise<Response> {
     let resp: Response;
@@ -1610,7 +1655,14 @@ async function startServer() {
 
   // Listen on IPv6 + IPv4 together: "localhost" resolves to ::1 first on many systems, and an IPv4-only
   // server makes every request wait for that attempt to fail (a ~2 s delay on Windows).
-  const onListening = () => console.log(`Cursed Local API running on http://localhost:${PORT}`);
+  const onListening = () => {
+    console.log(`Cursed Local API running on http://localhost:${PORT}`);
+    // Startup tasks chosen in the Engine tab.
+    if (engineSettings.autoStartComfy) fetch(`http://127.0.0.1:${PORT}/api/comfyui/start`, { method: "POST" }).catch(() => {});
+    if (engineSettings.preloadModel && engineSettings.lastModel) {
+      loadModel(engineSettings.lastModel).then(() => console.log("[Llama] Preloaded " + engineSettings.lastModel)).catch(e => console.log("[Llama] Preload skipped: " + (e?.message || e)));
+    }
+  };
   const dualStack = app.listen(PORT, "::", onListening);
   dualStack.on("error", (e: any) => {
     if (e.code === "EAFNOSUPPORT" || e.code === "EADDRNOTAVAIL") app.listen(PORT, "0.0.0.0", onListening); // IPv6 off on this PC

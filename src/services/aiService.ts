@@ -12,6 +12,10 @@ import { friendlyError } from "./errors";
 export interface AIGenerationOptions {
   temperature?: number;
   topP?: number;
+  topK?: number;
+  minP?: number;
+  repeatPenalty?: number;
+  seed?: number;
   maxTokens?: number;
   memoryEnabled?: boolean;
   signal?: AbortSignal;
@@ -130,6 +134,10 @@ ${a.text}
           options: {
             temperature: options?.temperature,
             topP: options?.topP,
+            topK: options?.topK,
+            minP: options?.minP,
+            repeatPenalty: options?.repeatPenalty,
+            seed: options?.seed,
             maxTokens: options?.maxTokens,
             memoryEnabled: options?.memoryEnabled
           }

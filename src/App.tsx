@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { readSavedSettings, saveSettings } from "./lib/settingsStore";
 import { Eye } from "lucide-react";
 import { Sidebar, MobileHeader } from "./components/layout/Sidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -230,7 +231,7 @@ export default function App() {
     if (firstUsable) setSelectedModelId(firstUsable.id);
   }, [models]);
 
-  const [settings, setSettings] = useState<AppSettings>({
+  const [settings, setSettings] = useState<AppSettings>(() => ({
     vulkanEnabled: true,
     theme: "dark",
     apiPort: 3000,
@@ -243,7 +244,23 @@ export default function App() {
     maxTokens: 1024,
     threads: 4,
     kvCacheSize: 4096,
-  });
+    topK: 40,
+    minP: 0.05,
+    repeatPenalty: 1.1,
+    seedMode: "random",
+    seed: 42,
+    defaultSystemPrompt: "",
+    enterToSend: true,
+    autoSpeak: false,
+    confirmDelete: true,
+    popups: true,
+    desktopNotify: false,
+    reduceMotion: false,
+    ...readSavedSettings(),
+  }));
+  // Settings survive a reload; the motion switch is applied to the whole page.
+  useEffect(() => { saveSettings(settings); }, [settings]);
+  useEffect(() => { document.documentElement.dataset.motion = settings.reduceMotion ? "reduce" : "full"; }, [settings.reduceMotion]);
 
   const setVoiceEngine = (v: "auto" | "browser" | "whisper") => {
     setSettings(prev => ({ ...prev, voiceEngine: v }));
@@ -261,6 +278,7 @@ export default function App() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       modelId: selectedModelId,
+      ...(settings.defaultSystemPrompt.trim() ? { systemPrompt: settings.defaultSystemPrompt.trim() } : {}),
     };
     // Functional update: createNewChat and the onUpdateChat it's immediately
     // followed by (sending the first message from the welcome screen) both
@@ -430,9 +448,17 @@ export default function App() {
             <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
             <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
             {activeTab === "settings" && (
-              <SettingsView 
-                settings={settings} 
-                setSettings={setSettings} 
+              <SettingsView
+                settings={settings}
+                setSettings={setSettings}
+                chats={chats}
+                onImportChats={(incoming) => {
+                  const have = new Set(chats.map(c => c.id));
+                  const fresh = incoming.filter(c => !have.has(c.id));
+                  setChats(prev => [...fresh, ...prev]);
+                  return fresh.length;
+                }}
+                onClearChats={() => { setChats([]); setActiveChatId(undefined); }}
               />
             )}
             {activeTab === "vision" && (

@@ -1,4 +1,5 @@
 import React from "react";
+import { savedSetting } from "../../lib/settingsStore";
 import { 
   MessageSquare, 
   Database, 
@@ -132,7 +133,7 @@ export function Sidebar({
             <button title="Rename" onClick={() => { setRenamingId(chat.id); setRenameValue(chat.title); }} className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10"><Pencil size={13} /></button>
             <button
               title="Delete chat"
-              onClick={() => { if (window.confirm(`Delete "${chat.title}"? This can't be undone.`)) onDeleteChat?.(chat.id); }}
+              onClick={() => { if (!savedSetting("confirmDelete", true) || window.confirm(`Delete "${chat.title}"? This can't be undone.`)) onDeleteChat?.(chat.id); }}
               className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-white/10"
             ><Trash2 size={13} /></button>
           </div>

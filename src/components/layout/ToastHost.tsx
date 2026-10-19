@@ -2,6 +2,7 @@ import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
 import { Notice } from "../../lib/notify";
+import { savedSetting } from "../../lib/settingsStore";
 
 interface Toast extends Notice { id: number }
 
@@ -21,10 +22,12 @@ export function ToastHost({ activeTab, onNavigate }: { activeTab: string; onNavi
     const onNotify = (e: Event) => {
       const n = (e as CustomEvent<Notice>).detail;
       const kind = n.kind || "success";
+      // Popups can be turned off in Settings; errors always show.
+      if (kind === "success" && !savedSetting("popups", true)) return;
       const looking = !document.hidden && n.tab === tabRef.current;
       if (n.onlyIfAway && looking) return;
       // A desktop notification too when the window is in the background and the browser already allows it.
-      if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+      if (document.hidden && savedSetting("desktopNotify", false) && typeof Notification !== "undefined" && Notification.permission === "granted") {
         try { new Notification("Cursed_Ai", { body: n.message }); } catch { /* not allowed here */ }
       }
       const id = Date.now() + Math.random();
