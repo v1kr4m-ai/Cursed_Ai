@@ -24,6 +24,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 | **Image** | Cloud (Gemini/Imagen) **or** local ComfyUI: txt2img and img2img with a reference image, checkpoint dropdown, size presets - or switch Local to **Workflows** to run your own saved ComfyUI workflows (see below). Results are saved to `outputs/` and shown as a history: click to enlarge, click away to collapse, delete or open file location |
 | **Video** | Cloud (Veo) **or** local ComfyUI LTX-Video (text-to-video, optional starting image), or Local -> **Workflows** for your own video workflows; saved to `outputs/` with the same history (delete, open file location) |
 | **Vision** | Pick an image, choose any installed model flagged Vision (llava, llama3.2-vision, qwen-vl... - detected from Ollama's own capability report) and ask about it. **Keep the conversation going**: ask follow-ups about the same image, then **Continue in Chat** moves the whole exchange (image included) into a new chat so you can carry on there |
+| **Series** | **Series Studio**: take a multi-episode video series from an idea to finished files without leaving the app - discuss it with a model, turn the discussion into a plan (episodes and scenes; story material can be attached as txt, md, csv, Word, PDF, Excel, PowerPoint or images), render reference stills and scenes through ComfyUI one job at a time with live progress, and join each episode with ffmpeg. Voice typing in the composer. Project data lives in `series/<name>/` (`project.json` is the source of truth; clips, refs and exports are media files kept out of git). Details in `seriesTool/README.md`; the worked example is in `modules/before-the-dragons/docs/HANDOFF.md` |
 | **Console** | Live stream of the server's real log output (sits just above Settings in the sidebar) |
 | **Settings** | A full settings centre with a category list and a **search box** - **General** (start page, collapsed sidebar, status bar, local API / network address), **Appearance** (interface size, font, reduce motion), **Chat & memory** (default system prompt, Enter / Ctrl+Enter, read replies aloud, confirm delete, how many past messages are sent, memory notes on and how many are used), **Generation** (temperature, Top P, max length, Top K, Min P, repeat penalty, seed), **Voice** (engine, microphone test, speaking voice and speed), **Image & video** (open on Local or Cloud, runs per Generate, Quick image size and video length, output folders), **Models & compute** (live engine state, Vulkan, threads, context size, model locations), **Notifications** (popups, how long they stay, a chime, Windows notifications), **Integrations** (Gemini key, Google Drive connection and auto-save, other services), **Privacy & data** (what is stored and how big, open the data folder, export / import chats, clear chats / memory / prompt library / recent documents), **Shortcuts**, and **About & reset** (version, uptime, log file, reset all settings). Everything is saved automatically |
 
@@ -161,13 +162,14 @@ CPU inference on an unaccelerated emulator is very slow (tens of seconds per tok
 ## Architecture
 
 ```
-src/                     React app (chat, models, voice, memory, engine, console, image, video, vision, settings)
+src/                     React app (chat, models, voice, memory, engine, console, image, video, vision, series, settings)
   components/            chat, models (cards, hub, flags), voice (assistant, mic selector), layout (sidebar, status bar, popups, progress)
   lib/                   modelTags (capability flags), ramFit (will it fit?), notify (popups), gpuInfo
   services/              aiService (chat streaming), localVoice (offline mic), voiceEngine (online/offline choice), tts (voice + speed), attachments, errors
 components/ui/           shadcn-style primitives
 server.ts                Express API: chat (SSE), memory, models, engine, config, console, voice,
                          image/video (Gemini + ComfyUI, with live progress), attachments, filesystem browse
+seriesTool/              Series Studio backend (project store, prompt assembly, ffmpeg join, routes)
 comfyTool/               Workflow runner: workflow converter, titler/registry, prompt-file reader, runner (ComfyUI websocket), store, routes
 hub.ts                   Model catalog: Hugging Face + Ollama + ComfyUI model search, background downloads
 localModels.ts           Finds models in place: download folder, LM Studio, Ollama (manifests -> blobs), custom folders
