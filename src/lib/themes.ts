@@ -187,6 +187,7 @@ export function effectiveTheme(choice: ThemeChoice, moduleId: string): string {
   return themeById(own || choice.theme).id;
 }
 
+const HUES = ["emerald", "rose", "red", "amber", "yellow", "orange", "sky", "blue", "cyan", "teal", "green", "pink", "purple", "fuchsia"];
 const STEPS = ["100", "200", "300", "400", "500", "600", "700", "800", "900", "950"];
 
 /** CSS for every theme. Tailwind utilities read `--color-*`, so re-pointing those under `[data-theme]` re-colours a whole subtree. */
@@ -200,8 +201,10 @@ export function themeCss(): string {
       ...STEPS.map((s, i) => `--color-violet-${s}:${v.v[i]}`),
     ].join(";");
     const sel = `[data-theme="${t.id}"]`;
+    // Light themes: the pale text shades of the status colours (emerald-300, rose-400 ...) are unreadable, so point them at the dark shade.
+    const dark = t.mode === "light" ? HUES.flatMap(h => ["200", "300", "400"].map(n => `--color-${h}-${n}:var(--color-${h}-700)`)).join(";") + ";" : "";
     // Text on accent buttons / white buttons keeps its contrast whatever the overlay colour is.
-    return `${sel}{${decl};color-scheme:${t.mode};color:${v.text}}`
+    return `${sel}{${decl};${dark}color-scheme:${t.mode};color:${v.text}}`
       + `${sel} :is(.bg-violet-500,.bg-violet-600,.bg-violet-700,.bg-violet-900,.from-violet-500,.from-violet-600){--color-white:${v.onAccent}}`
       + `${sel} .bg-white{--color-black:${v.bg}}`;
   }).join("\n");
