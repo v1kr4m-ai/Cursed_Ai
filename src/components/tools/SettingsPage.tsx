@@ -6,6 +6,7 @@ import { notify, notifyError } from "../../lib/notify";
 import { MicTest } from "./MicTest";
 import { VoiceSpeechSettings } from "./VoiceSpeechSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { ThemeSettings } from "./ThemeSettings";
 import { GoogleConnectPanel, useGoogleStatus } from "../comfy/google";
 import { nativeFolder, postJson, api } from "../comfy/types";
 
@@ -136,8 +137,9 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
         <Row title="Reachable at" note="Open this from a phone or another PC on the same network."><span className="text-emerald-300 font-mono text-xs">{stats?.localAddress || `http://localhost:${settings.apiPort}/api/*`}</span></Row>
       </Group>) },
 
-    { id: "ui", cat: "appearance", title: "Interface", keywords: "interface size font text motion animation theme", node: (
+    { id: "ui", cat: "appearance", title: "Interface", keywords: "interface size font text motion animation theme themes colour color dark light global module", node: (
       <>
+        <ThemeSettings settings={settings} set={set} />
         <AppearanceSettings />
         <Group title="Font & motion">
           <Row title="Font" note="Changes the typeface everywhere."><Seg value={settings.uiFont} onChange={v => set({ uiFont: v })} options={[{ value: "default", label: "Default" }, { value: "serif", label: "Serif" }, { value: "mono", label: "Mono" }]} /></Row>

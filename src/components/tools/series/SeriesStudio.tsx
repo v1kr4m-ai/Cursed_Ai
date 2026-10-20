@@ -210,14 +210,14 @@ const store = {
   set: (k: string, v: string | null) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* storage blocked */ } },
 };
 
-export function SeriesStudioView({ modelId }: { modelId?: string }) {
+export function SeriesStudioView({ modelId, look }: { modelId?: string; look?: "light" | "dark" }) {
   // Opens straight into the series you were last in, as an immersive board; "All series" goes back to the list.
   const [projectId, setProjectId] = React.useState<string | null>(() => store.get(LAST_KEY));
   const [project, setProject] = React.useState<Project | null>(null);
   const [stage, setStage] = React.useState<Stage>("dashboard");
   const [focusEpisode, setFocusEpisode] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [theme, setTheme] = React.useState<"light" | "dark">(() => (store.get(THEME_KEY) === "dark" ? "dark" : "light"));
+  const [theme, setTheme] = React.useState<"light" | "dark">(() => (store.get(THEME_KEY) === "dark" ? "dark" : store.get(THEME_KEY) === "light" ? "light" : look || "light"));
 
   const open = (id: string | null) => {
     store.set(LAST_KEY, id);

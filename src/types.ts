@@ -66,7 +66,8 @@ export interface AIModel {
 
 export interface AppSettings {
   vulkanEnabled: boolean;
-  theme: 'light' | 'dark' | 'system';
+  /** Id of the global colour theme (see lib/themes.ts). */
+  theme: string;
   apiPort: number;
   apiEnabled: boolean;
   memoryEnabled: boolean;
@@ -123,6 +124,9 @@ export interface AppSettings {
   videoSeconds: number;
   /** Let the voice assistant open the Image / Video studios when asked to create something. */
   assistantStudio: boolean;
+  /** Colour theme for the whole app, and whether single modules may use their own (themeMode "modules"). */
+  themeMode: 'global' | 'modules';
+  moduleThemes: Record<string, string>;
 }
 
 export interface LogLine {

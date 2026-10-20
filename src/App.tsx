@@ -22,6 +22,7 @@ import { ConsoleView } from "./components/tools/ConsoleView";
 import { ImageGeneratorView } from "./components/tools/ImageGenerator";
 import { VideoGeneratorView } from "./components/tools/VideoGenerator";
 import { SeriesStudioView } from "./components/tools/series/SeriesStudio";
+import { effectiveTheme, themeById } from "./lib/themes";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,7 @@ const INITIAL_MODELS: AIModel[] = [
 function defaultSettings(): AppSettings {
   return {
     vulkanEnabled: true,
-    theme: "dark",
+    theme: "classic",
     apiPort: 3000,
     apiEnabled: false,
     memoryEnabled: true,
@@ -116,6 +117,8 @@ function defaultSettings(): AppSettings {
     imageSizeIdx: 2,
     videoSeconds: 4,
     assistantStudio: true,
+    themeMode: "global",
+    moduleThemes: {},
   };
 }
 
@@ -281,6 +284,9 @@ export default function App() {
   // Settings survive a reload; the motion switch is applied to the whole page.
   useEffect(() => { saveSettings(settings); }, [settings]);
   useEffect(() => { document.documentElement.dataset.font = settings.uiFont; }, [settings.uiFont]);
+  const globalTheme = themeById(settings.theme).id;
+  const moduleTheme = effectiveTheme(settings, activeTab);
+  useEffect(() => { document.documentElement.dataset.theme = globalTheme; }, [globalTheme]);
   useEffect(() => { document.documentElement.dataset.motion = settings.reduceMotion ? "reduce" : "full"; }, [settings.reduceMotion]);
 
   const setVoiceEngine = (v: "auto" | "browser" | "whisper") => {
@@ -405,7 +411,7 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen bg-[#050505] text-[#e5e5e5] overflow-hidden font-sans selection:bg-violet-500/30 selection:text-violet-400 p-4 gap-4">
+      <div className="flex h-screen overflow-hidden font-sans selection:bg-violet-500/30 selection:text-violet-400 p-4 gap-4">
         <div className="atmosphere"></div>
         <ToastHost activeTab={activeTab} onNavigate={setActiveTab} />
         {/* Desktop Sidebar */}
@@ -437,7 +443,7 @@ export default function App() {
           )}
           <MobileHeader activeTab={activeTab} setActiveTab={setActiveTab} voiceEnabled={settings.voiceEnabled} />
 
-          <main className="flex-1 overflow-hidden h-full">
+          <main data-theme={moduleTheme} data-override={moduleTheme !== globalTheme ? "" : undefined} className="flex-1 overflow-hidden h-full">
             {activeTab === "chat" && (
               <ChatWindow
                 chat={activeChat}
@@ -470,7 +476,7 @@ export default function App() {
             {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
             <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
             <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
-            <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} /></div>
+            <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
             {activeTab === "settings" && (
               <SettingsView
                 settings={settings}

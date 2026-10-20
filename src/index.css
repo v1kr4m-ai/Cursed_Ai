@@ -21,19 +21,19 @@ html[data-ui="large"] { font-size: 16px; }
 
 @layer base {
   body {
-    @apply bg-[#050505] text-[#e5e5e5] antialiased selection:bg-violet-500/30 selection:text-violet-400;
+    @apply antialiased selection:bg-violet-500/30 selection:text-violet-400;
   }
 }
 
 @layer components {
   .atmosphere {
     @apply fixed inset-0 pointer-events-none z-[-1] opacity-60;
-    background: radial-gradient(circle at 20% 20%, #1e1b4b 0%, transparent 40%), 
-                radial-gradient(circle at 80% 80%, #064e3b 0%, transparent 40%);
+    background: var(--t-atmo, none);
   }
 
   .glass {
-    @apply bg-white/3 backdrop-blur-[20px] border border-white/[0.08];
+    @apply backdrop-blur-[20px] border;
+    background: var(--t-glass); border-color: var(--t-glass-border);
   }
 
   .model-tag {
@@ -57,11 +57,13 @@ html[data-ui="large"] { font-size: 16px; }
   }
 
   .ai-bubble {
-    @apply bg-white/3 backdrop-blur-[20px] border border-white/[0.08] rounded-bl-sm;
+    @apply backdrop-blur-[20px] border rounded-bl-sm;
+    background: var(--t-glass); border-color: var(--t-glass-border);
   }
 
   .user-bubble {
-    @apply bg-violet-900 text-white rounded-br-sm self-end border-none shadow-lg shadow-violet-950/20;
+    @apply rounded-br-sm self-end border-none shadow-lg shadow-violet-950/20;
+    background: var(--t-bubble); color: var(--t-bubble-ink);
   }
 
   .pulse-anim {
@@ -266,3 +268,17 @@ html[data-ui="large"] { font-size: 16px; }
 /* Settings -> Appearance -> Font */
 :root[data-font="serif"] body { font-family: Georgia, "Times New Roman", serif; }
 :root[data-font="mono"] body { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+
+/* Beats the shadcn body colours above. */
+html body {
+  background-image: var(--t-page, none);
+  background-color: var(--t-bg, #050505);
+  color: var(--t-text, #e5e5e5);
+}
+
+/* A module with its own theme paints its own backdrop over the page. */
+main[data-override] {
+  background-image: var(--t-atmo, none), var(--t-page, none);
+  background-color: var(--t-bg);
+  border-radius: 2rem;
+}
