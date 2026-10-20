@@ -22,6 +22,7 @@ import { ConsoleView } from "./components/tools/ConsoleView";
 import { ImageGeneratorView } from "./components/tools/ImageGenerator";
 import { VideoGeneratorView } from "./components/tools/VideoGenerator";
 import { SeriesStudioView } from "./components/tools/series/SeriesStudio";
+import { ThemeQuick } from "./components/tools/ThemeSettings";
 import { effectiveTheme, themeById } from "./lib/themes";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -434,7 +435,7 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 h-full relative">
-          {settings.showStatusBar && <SystemBar />}
+          {settings.showStatusBar && <SystemBar lead={<ThemeQuick settings={settings} set={patch => setSettings({ ...settings, ...patch })} tab={activeTab} />} />}
           {!serverUp && (
             <div className="mx-2 mb-2 px-4 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />

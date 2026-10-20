@@ -1,5 +1,5 @@
 import React from "react";
-import { Check } from "lucide-react";
+import { Check, Palette } from "lucide-react";
 import { AppSettings } from "../../types";
 import { THEMES, THEME_MODULES, Theme, themeById } from "../../lib/themes";
 
@@ -99,5 +99,39 @@ export function ThemeSettings({ settings, set }: { settings: AppSettings; set: (
         </>
       )}
     </section>
+  );
+}
+
+/** Small palette button for the top bar: pick a theme without opening Settings (the current page's own theme when per-module themes are on). */
+export function ThemeQuick({ settings, set, tab }: { settings: AppSettings; set: (patch: Partial<AppSettings>) => void; tab: string }) {
+  const [open, setOpen] = React.useState(false);
+  const perModule = settings.themeMode === "modules" && THEME_MODULES.some(m => m.id === tab);
+  const current = perModule ? (settings.moduleThemes?.[tab] || settings.theme) : settings.theme;
+  const pick = (id: string) => {
+    if (perModule) set({ moduleThemes: { ...settings.moduleThemes, [tab]: id } });
+    else set({ theme: id });
+    setOpen(false);
+  };
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)} title={perModule ? "Theme for this page" : "Theme"} aria-label="Change theme"
+        className="h-6 w-6 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 hover:text-zinc-100">
+        <Palette size={12} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-8 z-50 w-48 rounded-2xl border border-white/10 bg-zinc-900 p-2 shadow-xl">
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 px-2 pb-1">{perModule ? "This page" : "Theme"}</p>
+            {THEMES.map(t => (
+              <button key={t.id} onClick={() => pick(t.id)} className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-left ${themeById(current).id === t.id ? "bg-white/10 text-zinc-100" : "text-zinc-300 hover:bg-white/5"}`}>
+                <span className="w-4 h-4 rounded-full border border-white/20 shrink-0" style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0 45%, ${t.swatch[1]} 45% 75%, ${t.swatch[2]} 75%)` }} />
+                {t.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

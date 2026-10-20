@@ -60,7 +60,7 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 **Job queue controls:** the **Jobs** list in the workflow runner has icons per job: **pause** (a job still waiting is taken out of ComfyUI's queue and kept; ComfyUI cannot pause one that is already generating), **cancel** (also stops a running job inside ComfyUI), and for paused jobs **resume** (goes to the end of the queue) or remove.
 
-**Themes:** **Settings -> Appearance -> Theme** has 11 themes (Classic, Ember, Gilded, Midnight, Dusk, Frost, Indigo Light, Aurora, Mono Glass, Sunlit, Ink & Lilac), each shown as a live mini preview of the app. **Global** applies one to the whole app; **Per module** keeps that as the default and lets Chat, Vision, Image, Video, Series, Models, Memory, Engine, Console and Settings each pick their own. Themes live in `src/lib/themes.ts`.
+**Themes:** **Settings -> Appearance -> Theme** has 11 themes (Classic, Ember, Gilded, Midnight, Dusk, Frost, Indigo Light, Aurora, Mono Glass, Sunlit, Ink & Lilac), each shown as a live mini preview of the app. **Global** applies one to the whole app; **Per module** keeps that as the default and lets Chat, Vision, Image, Video, Series, Models, Memory, Engine, Console and Settings each pick their own. A palette button in the status bar switches theme in one click (the current page only when per-module themes are on). Themes live in `src/lib/themes.ts`.
 
 **Look and feel:** compact type by default, with **Settings -> Appearance -> Interface size** (Small / Default / Large) that scales text, buttons and spacing everywhere; the message bar is slim, glows when you focus it, slides in, and the send button pops when there is something to send.
 

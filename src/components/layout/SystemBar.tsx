@@ -21,7 +21,7 @@ function Pill({ label, value, text, color, hint }: { label: string; value: numbe
 }
 
 /** Real-time CPU / RAM / GPU / VRAM / temperature readings, refreshed every 2 seconds. Small, top-right. */
-export function SystemBar() {
+export function SystemBar({ lead }: { lead?: React.ReactNode }) {
   const [live, setLive] = React.useState<Live | null>(null);
   const [offline, setOffline] = React.useState(false);
 
@@ -45,6 +45,7 @@ export function SystemBar() {
 
   return (
     <div className={`flex items-center justify-end gap-1.5 px-1 mb-1.5 shrink-0 ${offline ? "opacity-40" : ""}`}>
+      {lead}
       <Pill label="CPU" value={live.cpu} text={`${live.cpu}%`} color={level(live.cpu, 70, 90, "bg-emerald-500")} hint="Processor load" />
       <Pill label="RAM" value={live.ram} text={`${live.ram}%`} color={level(live.ram, 80, 92, "bg-emerald-500")} hint={`${live.ramUsedGB.toFixed(1)} of ${live.ramTotalGB.toFixed(1)} GB in use`} />
       <Pill label="GPU" value={g ? g.util : null} text={g ? `${g.util}%` : "n/a"} color={level(g?.util ?? 0, 70, 90, "bg-violet-500")} hint={g ? g.detail : "No GPU reading available"} />
