@@ -34,6 +34,8 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 **Quick video duration:** Local -> Quick video has a Duration box (1-20 s, shown as frames at 25 fps, rounded to what LTX-Video needs) next to the size; the length is saved with the prompt in the library.
 
+**Typed requests in Chat:** write "create an image of a red fox" or "make a video of waves" in a chat and, as well as the model's answer, a small bar offers **Open studio** (Image or Video with your prompt filled in) or **Generate now**. Same wording as the voice assistant; switch it off in Settings -> Voice.
+
 **Already-made prompts:** in the prompt list read from a document, sheet or slide deck, every prompt that has already produced pictures or clips (for that tool - Image and Video are tracked separately) carries a green **made xN** mark, the file line says how many are already made, and a **Hide the N already made** checkbox filters them out. Whenever the prompt in the box matches one from the library (spacing and letter case ignored), a **Made before with this prompt** strip appears under the preview; click a thumbnail to show that earlier picture or video on the stage. Works the same in Cloud, Quick and Workflows, for both Image and Video.
 
 **Recent documents:** every document the prompt box reads (a local file, a Drive file or a link) is remembered in `recent-documents.json` (gitignored) together with the prompts found in it. A small **Recent** row under the Prompt heading reopens one with a click (hover to forget it), and the newest document's prompt list is restored automatically the next time the page opens.

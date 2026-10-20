@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Send,
+  Clapperboard,
+  ImagePlus,
   RotateCcw,
   Square,
   Copy,
@@ -41,6 +43,7 @@ import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speech
 import { MicModeButton } from "../voice/MicModeButton";
 import { cn } from "@/lib/utils";
 import { notify, notifyError, notifyWarning } from "../../lib/notify";
+import { parseStudioCommand, StudioIntent, StudioRequest } from "../../services/studioIntent";
 import { makeUtterance } from "../../services/tts";
 import { ProgressBar } from "../layout/ProgressBar";
 import { fitFor, useSystemInfo } from "../../lib/ramFit";
@@ -56,6 +59,8 @@ interface ChatWindowProps {
   onSelectModel: (id: string) => void;
   settings: AppSettings;
   onSetVoiceEngine?: (pref: "auto" | "browser" | "whisper") => void;
+  /** Open an Image / Video studio with a prompt (typed requests like "create an image of ..."). */
+  onOpenStudio?: (req: StudioRequest) => void;
 }
 
 /** Markdown code block with a copy button. */
@@ -73,7 +78,9 @@ function CodeBlock({ children }: { children?: React.ReactNode }) {
   );
 }
 
-export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings, onSetVoiceEngine }: ChatWindowProps) {
+export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings, onSetVoiceEngine, onOpenStudio }: ChatWindowProps) {
+  // A typed "create an image of ..." gets a one-click offer to open the studio (the model still answers as usual).
+  const [studioHint, setStudioHint] = useState<StudioIntent | null>(null);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -259,6 +266,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
     const activeChat = targetChat ?? chat;
     if (!canSend || isGenerating || !activeChat) return;
 
+    setStudioHint(onOpenStudio && settings.assistantStudio !== false && !pending.some(p => p.image) ? parseStudioCommand(input) : null);
     const userMessage: Message = {
       id: Date.now().toString(),
       role: MessageRole.USER,
@@ -742,6 +750,16 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
             </AnimatePresence>
           </div>
           
+          {studioHint && (
+            <div className="mb-2 flex items-center gap-2 flex-wrap rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs text-zinc-300">
+              <span className={studioHint.request.kind === "video" ? "text-orange-400" : "text-pink-400"}>{studioHint.request.kind === "video" ? <Clapperboard size={15} /> : <ImagePlus size={15} />}</span>
+              <span className="flex-1 min-w-[12rem]">Make this in the {studioHint.request.kind} studio{studioHint.request.prompt ? <>: <span className="text-zinc-100">"{studioHint.request.prompt}"</span></> : ""}?</span>
+              <button onClick={() => { onOpenStudio?.({ ...studioHint.request, generate: false }); setStudioHint(null); }} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 font-bold text-white">Open studio</button>
+              {studioHint.request.prompt && <button onClick={() => { onOpenStudio?.({ ...studioHint.request, generate: true }); setStudioHint(null); }} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 font-bold text-white">Generate now</button>}
+              <button onClick={() => setStudioHint(null)} title="Dismiss" className="p-1.5 text-zinc-500 hover:text-white"><X size={14} /></button>
+            </div>
+          )}
+
           {isGenerating && (
             <div className="mb-2">
               <ProgressBar

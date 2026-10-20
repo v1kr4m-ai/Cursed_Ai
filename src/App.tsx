@@ -441,6 +441,7 @@ export default function App() {
             {activeTab === "chat" && (
               <ChatWindow
                 chat={activeChat}
+                onOpenStudio={(req) => { setActiveTab(req.kind); requestStudio(req); }}
                 onUpdateChat={updateChat}
                 onArchiveChat={archiveChat}
                 onCreateChat={createNewChat}
