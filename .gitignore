@@ -46,3 +46,22 @@ google.json
 google.json.*
 recent-documents.json
 recent-documents.json.*
+
+# Series Studio / reel production media (kept on disk, not in git)
+series/**/*.mp4
+series/**/*.mov
+series/**/*.webm
+series/**/*.png
+series/**/*.jpg
+series/**/*.jpeg
+series/**/*.webp
+series/**/*.wav
+series/**/*.mp3
+modules/**/*.mp4
+modules/**/*.mov
+modules/**/*.webm
+modules/**/*.png
+modules/**/*.jpg
+modules/**/*.jpeg
+modules/**/*.webp
+modules/**/*.zip
