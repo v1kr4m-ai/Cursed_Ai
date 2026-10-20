@@ -222,8 +222,9 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
   );
 }
 
-export function Board({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
-  const [openEpisode, setOpenEpisode] = React.useState<string | null>(project.episodes[0]?.id || null);
+export function Board({ project, onChanged, focusEpisodeId }: { project: Project; onChanged: (p: Project) => void; focusEpisodeId?: string | null }) {
+  const [openEpisode, setOpenEpisode] = React.useState<string | null>(focusEpisodeId || project.episodes[0]?.id || null);
+  React.useEffect(() => { if (focusEpisodeId) setOpenEpisode(focusEpisodeId); }, [focusEpisodeId]);
   const running = project.running || null;
 
   if (!project.episodes.length) {

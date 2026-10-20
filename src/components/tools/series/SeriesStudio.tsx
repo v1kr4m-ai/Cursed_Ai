@@ -1,10 +1,11 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles } from "lucide-react";
+import { LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles } from "lucide-react";
 import { api, type Project, type ProjectSummary } from "./api";
 import { Develop } from "./Develop";
 import { Board } from "./Board";
 import { Assemble } from "./Assemble";
+import { ProjectDashboard } from "./ProjectDashboard";
 
 /**
  * Series Studio: take an idea from a conversation to finished episodes without leaving the app.
@@ -15,9 +16,10 @@ import { Assemble } from "./Assemble";
  * can be opened by hand at any point.
  */
 
-type Stage = "develop" | "produce" | "assemble" | "settings";
+type Stage = "dashboard" | "develop" | "produce" | "assemble" | "settings";
 
 const STAGES: { id: Stage; label: string; hint: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+  { id: "dashboard", label: "Dashboard", hint: "Where the series stands and what is next", icon: LayoutDashboard },
   { id: "develop", label: "Develop", hint: "Discuss the idea and turn it into a plan", icon: MessagesSquare },
   { id: "produce", label: "Produce", hint: "Render reference stills and scenes", icon: LayoutGrid },
   { id: "assemble", label: "Assemble", hint: "Join scenes into finished episodes", icon: Scissors },
@@ -184,7 +186,8 @@ function SettingsPane({ project, onChanged }: { project: Project; onChanged: (p:
 export function SeriesStudioView({ modelId }: { modelId?: string }) {
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const [project, setProject] = React.useState<Project | null>(null);
-  const [stage, setStage] = React.useState<Stage>("develop");
+  const [stage, setStage] = React.useState<Stage>("dashboard");
+  const [focusEpisode, setFocusEpisode] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const reload = React.useCallback(async (id: string) => {
@@ -266,10 +269,12 @@ export function SeriesStudioView({ modelId }: { modelId?: string }) {
               transition={{ duration: 0.18 }}>
           {!project ? (
             <div className="flex items-center gap-2 text-sm text-neutral-500"><Loader2 size={14} className="animate-spin" /> Loading...</div>
+          ) : stage === "dashboard" ? (
+            <ProjectDashboard project={project} onGo={(st, episodeId) => { setFocusEpisode(episodeId || null); setStage(st); }} />
           ) : stage === "develop" ? (
             <Develop project={project} modelId={modelId} onSaved={setProject} />
           ) : stage === "produce" ? (
-            <Board project={project} onChanged={setProject} />
+            <Board project={project} onChanged={setProject} focusEpisodeId={focusEpisode} />
           ) : stage === "assemble" ? (
             <Assemble project={project} onChanged={setProject} />
           ) : (
