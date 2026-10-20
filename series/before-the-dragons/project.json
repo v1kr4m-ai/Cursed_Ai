@@ -1,0 +1,1797 @@
+{
+  "id": "f5yieiun",
+  "title": "Before the Dragons",
+  "dir": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons",
+  "createdAt": "2026-10-20T03:31:53.894573",
+  "updatedAt": "2026-10-20T06:09:27.254Z",
+  "idea": {
+    "logline": "The history of the known world before House Targaryen, from the Dawn Age to the Doom of Valyria.",
+    "audience": "YouTube Shorts and Reels viewers who like dense narrated history",
+    "tone": "Cold documentary. Withholding, never camp.",
+    "notes": "Vertical 9:16. One narration line per clip, 18-22 words. Original writing only - no source text is quoted."
+  },
+  "discussion": [],
+  "styleLock": "Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field.",
+  "voiceLock": "narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1)",
+  "settings": {
+    "comfyUrl": "http://127.0.0.1:8188",
+    "videoWorkflow": "F:\\ComfyUI\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows\\video_minimax_h3_r2v.json",
+    "imageWorkflow": "F:\\ComfyUI\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows\\Text to Image Creation by Juggernaut.json",
+    "width": 544,
+    "height": 928,
+    "seconds": 7,
+    "steps": 12,
+    "fps": 24
+  },
+  "episodes": [
+    {
+      "id": "gyi105b5",
+      "number": 1,
+      "title": "The World Before Men",
+      "era": "Dawn Age — children of the forest, giants, weirwoods, arrival of the First Men, the Pact",
+      "hookOut": "But the dark was not finished with them.",
+      "refs": [
+        {
+          "id": "j3wn30f7",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 17910,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep01_style_plate_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "54xdo6k2",
+          "name": "child of the forest",
+          "role": "character",
+          "prompt": "",
+          "negative": "",
+          "seed": 20111,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep01_child_forest_v3_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "ggpavcdn",
+          "name": "the giant",
+          "role": "character",
+          "prompt": "",
+          "negative": "",
+          "seed": 80245,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep01_giant_v2_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "lvsk60d5",
+          "name": "First Men warrior",
+          "role": "character",
+          "prompt": "",
+          "negative": "",
+          "seed": 89682,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep01_first_men_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "5qmnhrco",
+          "name": "weirwood face",
+          "role": "character",
+          "prompt": "",
+          "negative": "",
+          "seed": 63288,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep01_weirwood_v2_00001_.png",
+          "status": "done",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "1n3e4ahf",
+          "number": 1,
+          "vo": "Twelve thousand years before dragons ever crossed the narrow sea, this continent already belonged to someone else.",
+          "shot": "Aerial descent through cold grey mist over an endless primeval forest at first light; no roads, no smoke, no buildings anywhere in frame. Camera tilts down slowly.",
+          "textCard": "12,000 YEARS BEFORE THE DRAGONS",
+          "refIds": [
+            "j3wn30f7",
+            "54xdo6k2"
+          ],
+          "seed": 43662,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field, matching the look established in <Picture 1>. An extreme aerial wide shot descends through layers of grey mist over an endless primeval forest at first light, with no roads, no smoke and no buildings anywhere in the frame. The camera tilts down with large amplitude at slow speed as the mist parts to reveal dense black canopy stretching to every horizon. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Twelve thousand years before dragons ever crossed the narrow sea, this continent already belonged to someone else.</d>\noverall_soundscape: A high cold wind moves continuously over open air, thinning as the shot descends. Distant birds call twice across the canopy and the wind settles into a low forest hush.\nnon_diegetic_music: A single sustained low string note at a very slow tempo, joined by a deep drum strike that decays slowly into silence.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip01_00001_.mp4",
+          "durationS": 8,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "cdkz99ep",
+          "number": 2,
+          "vo": "They were small, dark-eyed, and older than memory. Men would later call them the children of the forest.",
+          "shot": "Forest floor at dusk. Three small slender figures in bark-coloured hides move between vast white-barked trees, pausing to look directly at the lens before slipping behind a trunk.",
+          "textCard": "THE CHILDREN OF THE FOREST",
+          "refIds": [
+            "j3wn30f7",
+            "54xdo6k2"
+          ],
+          "seed": 69205,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the small forest being, preserving its face, skin tone, eyes, proportions and leaf-and-moss cloak.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A low medium shot frames the forest floor at dusk between vast white-barked trees with red leaves. Three small slender figures matching <Picture 2>, no taller than a child, move silently across the frame from left to right. The camera trucks right with small amplitude at slow speed following them. One figure stops, turns its large dark eyes directly toward the lens, holds still, then slips behind a trunk and is gone. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They were small, dark-eyed, and older than memory. Men would later call them the children of the forest.</d>\noverall_soundscape: Dense forest ambience with layered insect noise and slow dripping water. Bare feet press softly into wet leaf litter and a branch shifts once as the figures pass.\nnon_diegetic_music: Sparse low woodwind tones at a slow tempo over a quiet sustained drone, decreasing in volume at the end.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip02_00001_.mp4",
+          "durationS": 8,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "ec0yfrvg",
+          "number": 3,
+          "vo": "They shared the land with giants, who walked with mammoths through snow that never fully melted.",
+          "shot": "Northern snowfield in flat white light. Two enormous shaggy human silhouettes walk beside woolly mammoths across a ridge, seen from low angle in falling snow.",
+          "textCard": "AND THE GIANTS",
+          "refIds": [
+            "j3wn30f7",
+            "ggpavcdn"
+          ],
+          "seed": 91026,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the giant, preserving its build, fur, face and scale relative to a man.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A low-angle wide shot looks up a snow ridge in flat white light as heavy snow falls. Two enormous shaggy humanoid giants matching <Picture 2>, twice the height of a man, walk along the ridgeline beside woolly mammoths, their shapes half-lost in the falling snow. The camera pedestals up with small amplitude at slow speed as the column crosses the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They shared the land with giants, who walked with mammoths through snow that never fully melted.</d>\noverall_soundscape: A hard gusting wind drives snow across open ground. Heavy footfalls compress the drifts in a slow rhythm and a mammoth exhales in a long low breath.\nnon_diegetic_music: Two low brass notes at a very slow tempo beneath a quiet sustained string bed that swells slightly and fades.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip03_00001_.mp4",
+          "durationS": 8,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "amb4r4jh",
+          "number": 4,
+          "vo": "Into the pale trees they carved faces, and through those faces, they say, the forest watched.",
+          "shot": "Slow push in on a white weirwood trunk with a carved face, red sap running from the eyes; a small hand withdraws from the bark, leaving the carving finished.",
+          "textCard": "",
+          "refIds": [
+            "j3wn30f7",
+            "54xdo6k2",
+            "5qmnhrco"
+          ],
+          "seed": 86713,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the carved tree face, preserving the white bark, the carved features and the red sap.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A close shot holds on the trunk of a white-barked tree in dim green forest light, matching the carving and bark shown in <Picture 2>. A small pale hand works the last cut of a carved face into the bark, then withdraws out of the frame. The camera pushes in with small amplitude at slow speed as thick red sap wells from the carved eyes and runs down the white bark in two slow lines. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Into the pale trees they carved faces, and through those faces, they say, the forest watched.</d>\noverall_soundscape: Close forest ambience with faint wind in high branches. A blade scrapes wood three times, then a slow viscous drip falls onto leaf litter.\nnon_diegetic_music: A single bowed cello note held at a slow tempo, joined by a faint high metallic ring that fades out.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip04_00001_.mp4",
+          "durationS": 8,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "fywp0lhb",
+          "number": 5,
+          "vo": "Then, across a land bridge in the far south, the First Men came — with bronze, with horses, with axes.",
+          "shot": "A long column of fur-and-leather-clad men leads horses across a narrow rocky isthmus between two seas at dawn; bronze weapons catch the light.",
+          "textCard": "THE FIRST MEN",
+          "refIds": [
+            "j3wn30f7"
+          ],
+          "seed": 66882,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the warriors, preserving their furs, leather, braided hair and bronze weapons.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A high wide shot at dawn frames a narrow rocky isthmus with open sea on both sides. A long column of men dressed as in <Picture 2>, in furs and boiled leather, leads horses across the crossing, their bronze axes and spearheads catching the low sun. The camera arcs slowly around the column with large amplitude at slow speed, revealing the full length of the crossing behind them. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then, across a land bridge in the far south, the First Men came, with bronze, with horses, with axes.</d>\noverall_soundscape: Surf breaks against rock on both sides of the crossing under a steady sea wind. Hooves strike stone, harness leather creaks, and men call to one another in short bursts.\nnon_diegetic_music: A low drum pattern at a moderate tempo with a rising sustained string line that grows steadily in volume.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip05_00001_.mp4",
+          "durationS": 8,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "36sgrhcn",
+          "number": 6,
+          "vo": "They did not come to share. Every carved tree they found, they cut down.",
+          "shot": "Handheld shot inside a burning grove. Bronze axes bite into a white trunk; the carved face splits as the tree falls; smoke swallows the frame.",
+          "textCard": "",
+          "refIds": [
+            "j3wn30f7",
+            "5qmnhrco"
+          ],
+          "seed": 47021,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the white-barked carved tree. Use <Picture 3> as the appearance reference for the men swinging the axes.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A handheld medium shot stands inside a burning grove of white-barked trees like the one in <Picture 2>, thick smoke crossing the frame. A bronze axe held by a fur-clad man matching <Picture 3> bites repeatedly into a trunk bearing a carved face; the carving splits down the centre. The camera shakes slightly and tilts up with large amplitude at fast speed as the tree falls through the smoke and strikes the ground. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They did not come to share. Every carved tree they found, they cut down.</d>\noverall_soundscape: Fire roars steadily through dry branches with sharp cracking bursts. An axe strikes wood in a hard repeated rhythm before a long splitting groan and a heavy ground impact.\nnon_diegetic_music: Fast repeated low strings at a driving tempo with a percussive hit on the tree's impact, cutting off abruptly.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip06_00001_.mp4",
+          "durationS": 8,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "dzkv4bb5",
+          "number": 7,
+          "vo": "So the children broke the world. The land bridge shattered, and the sea poured through it forever.",
+          "shot": "Wide coastal shot: the rocky isthmus fractures and collapses into churning water as a vast wave drives through the gap, drowning the crossing.",
+          "textCard": "THE HAMMER OF THE WATERS",
+          "refIds": [
+            "j3wn30f7"
+          ],
+          "seed": 78600,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A high wide coastal shot frames a narrow rocky isthmus under a black storm sky. The stone fractures along its length, collapses into churning grey water, and a vast wave drives through the new gap from one sea into the other. The camera pulls out with large amplitude at slow speed as the crossing disappears completely beneath the water. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] So the children broke the world. The land bridge shattered, and the sea poured through it forever.</d>\noverall_soundscape: A deep grinding rumble builds beneath heavy rain as rock splits and falls. A massive volume of water surges through with a sustained roar that slowly levels into open sea noise.\nnon_diegetic_music: A deep sub-bass swell at a slow tempo under crashing low percussion, decaying into a long low drone.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip07_00001_.mp4",
+          "durationS": 7.292,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "6h8zgjob",
+          "number": 8,
+          "vo": "It bought them nothing. After two thousand years of war, both sides sat on an island and signed a peace. But the dark was not finished with them.",
+          "shot": "An island in a still lake at dusk, ringed with weirwoods. Two small figures and two tall ones stand facing each other beside the water as the camera pulls slowly back and up.",
+          "textCard": "PART 2 — THE LONG NIGHT",
+          "refIds": [
+            "j3wn30f7"
+          ],
+          "seed": 61163,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the small hooded forest beings. Use <Picture 3> as the appearance reference for the fur-clad men.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot frames a small island in a still lake at dusk, ringed with white-barked red-leafed trees and low mist on the water. Two small figures matching <Picture 2> stand facing two tall men in furs matching <Picture 3> at the water's edge, neither side moving. The camera pulls out and pedestals up with large amplitude at slow speed until the whole island and the darkening lake fill the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] It bought them nothing. After two thousand years of war, both sides sat on an island and signed a peace. But the dark was not finished with them.</d>\noverall_soundscape: Very still lake ambience with faint water lapping at a stone shore. A light wind moves through leaves and a single distant bird call carries across the water.\nnon_diegetic_music: A quiet sustained string chord at a slow tempo that thins to a single note, followed by one low drum strike at the end.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep01_clip08_00001_.mp4",
+          "durationS": 7.292,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP01_the_world_before_men.mp4"
+    },
+    {
+      "id": "4bm7emdn",
+      "number": 2,
+      "title": "The Long Night",
+      "era": "The Others, the Last Hero, the Wall, the founding of the Night's Watch",
+      "hookOut": "Eight thousand years of quiet followed. It would not last.",
+      "refs": [
+        {
+          "id": "z0hqy2bp",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "cinematic film still, vertical composition, a frozen northern wilderness at deep dusk under a starless black sky, deep snow drifts and skeletal dead trees, blue-grey moonlight, heavy falling snow, freezing fog, desaturated cold color grade crushed toward blue and black, shallow depth of field, anamorphic lens, 35mm film grain, no people, bleak documentary realism",
+          "negative": "$BASENEG, warm light, sunset, green foliage, summer",
+          "seed": 25768,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep02_style_plate_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "hjhkff1m",
+          "name": "the Others",
+          "role": "character",
+          "prompt": "cinematic film still, vertical composition, a tall gaunt humanoid figure standing in deep snow at night, translucent pale blue-white skin stretched over sharp bone, ice-crystal armour that reflects the surroundings like a mirror, piercing luminous ice-blue eyes, long thin frost-covered sword of clear ice, seen at middle distance half-obscured by falling snow and freezing fog, cold blue moonlight, desaturated blue-black grade, photoreal practical creature effect, 35mm film grain, full body",
+          "negative": "$BASENEG, skeleton, zombie, orc, armour plate metal, glowing red eyes, human face, beard",
+          "seed": 59206,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep02_other_v2_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "221thty1",
+          "name": "wight column",
+          "role": "character",
+          "prompt": "cinematic film still, vertical composition, a column of frost-covered reanimated corpses marching through deep snow at night, grey-blue frozen flesh, torn ancient furs and rusted mail, pale glowing blue eyes, blank expressions, ragged column stretching back into blizzard haze, low camera angle, cold blue-black desaturated grade, falling snow, photoreal practical makeup effects, 35mm film grain",
+          "negative": "$BASENEG, modern zombie makeup, blood gore, running, snarling faces, warm light",
+          "seed": 65028,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep02_wight_v2_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "bheoz0jr",
+          "name": "the Last Hero",
+          "role": "character",
+          "prompt": "cinematic film still, vertical composition, a lone weary warrior struggling up a snow ridge in a blizzard, heavy frost-caked furs and dented bronze scale armour, hood up, ice in the beard, leading an exhausted horse by the reins, broken sword at the hip, dim blue twilight, whiteout snow, desaturated cold grade, photoreal, 35mm film grain, full body wide shot",
+          "negative": "$BASENEG, clean armour, heroic pose, shining sword, castle background, warm light",
+          "seed": 7458,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep02_last_hero_00001_.png",
+          "status": "done",
+          "error": null
+        },
+        {
+          "id": "024z9vms",
+          "name": "the Wall",
+          "role": "character",
+          "prompt": "cinematic film still, vertical composition, a colossal wall of solid ice seven hundred feet tall stretching from horizon to horizon across a frozen landscape, sheer weathered blue-white ice face streaked with snow, tiny human figures on the top edge for scale, low grey overcast sky, cold desaturated blue grade, aerial wide shot, volumetric haze, photoreal, 35mm film grain",
+          "negative": "$BASENEG, glacier only, mountain, castle, fantasy city, warm light",
+          "seed": 35287,
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\ep02_wall_00001_.png",
+          "status": "done",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "vovab2au",
+          "number": 1,
+          "vo": "For four thousand years, men and the children kept the peace. Then the sun failed to come back.",
+          "shot": "Grey dawn over a snowbound plain; the light visibly drains out of the sky in a slow time-lapse until the frame is near black.",
+          "textCard": "THE LONG NIGHT",
+          "refIds": [
+            "z0hqy2bp"
+          ],
+          "seed": 20076,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wide static shot frames a snowbound plain under a grey dawn sky. The light visibly drains out of the sky across the shot, the horizon dimming from pale grey to deep blue-black while the snow loses its highlights and falls into shadow. The camera holds a static shot as the darkness closes in. Plain white text reading \"THE LONG NIGHT\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] For four thousand years, men and the children kept the peace. Then the sun failed to come back.</d>\noverall_soundscape: A thin high wind crosses open snow with no other sound beneath it. The wind drops away almost entirely toward the end, leaving a hollow silence.\nnon_diegetic_music: A sustained low string drone at a very slow tempo that descends in pitch and thins to almost nothing.",
+          "promptEdited": true,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene01.mp4",
+          "durationS": 5.167,
+          "promptId": "e1f1f1fa-6cd2-4999-9451-39f9f701bcc1",
+          "error": null
+        },
+        {
+          "id": "ihzehpu7",
+          "number": 2,
+          "vo": "Winter arrived and refused to leave. A generation was born and died without ever seeing summer.",
+          "shot": "A frozen village half-buried in drifts; a woman drags firewood past frost-covered doorways as a child watches from a shuttered window.",
+          "textCard": "",
+          "refIds": [
+            "z0hqy2bp"
+          ],
+          "seed": 92490,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A medium shot frames a frozen village half-buried in snow drifts at night, timber roofs sagging under ice. A woman in heavy layered furs drags a bundle of firewood past frost-covered doorways, her breath clouding hard in the freezing air. The camera trucks left with small amplitude at slow speed, revealing a child watching her from behind a shuttered window. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Winter arrived and refused to leave. A generation was born and died without ever seeing summer.</d>\noverall_soundscape: Wind gusts between buildings, rattling a loose shutter twice. Boots compress dry snow in a slow dragging rhythm and firewood scrapes against ice.\nnon_diegetic_music: Sparse low piano notes at a very slow tempo over a faint sustained string bed, fading toward the end.",
+          "promptEdited": true,
+          "status": "running",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": "15b3de34-207c-4e44-8b17-b7f1ac3691be",
+          "error": null
+        },
+        {
+          "id": "dvp0kj91",
+          "number": 3,
+          "vo": "Crops failed. Herds froze. And in the darkness, something walked south that was not alive.",
+          "shot": "Deep night in a snowfield. Blue-white light glints between trees; a tall pale silhouette with mirror-bright armour moves at the edge of visibility and is gone.",
+          "textCard": "THE OTHERS",
+          "refIds": [
+            "z0hqy2bp"
+          ],
+          "seed": 68032,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the pale figure, preserving its translucent skin, mirror-like ice armour, luminous eyes and proportions.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot holds on a snowfield between dead trees in deep night. Blue-white light glints faintly between the trunks. A tall pale figure matching <Picture 2> moves slowly across the far treeline at the edge of visibility, its mirror-like armour catching the moonlight once, then is gone behind the trees. The camera pushes in with small amplitude at slow speed on the empty gap where it stood. Plain white text reading \"THE OTHERS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Crops failed. Herds froze. And in the darkness, something walked south that was not alive.</d>\noverall_soundscape: A low wind moves through dead branches with a dry rattle. A faint high crystalline ringing rises once and fades, followed by settling snow.\nnon_diegetic_music: A single high sustained string harmonic at a slow tempo over a deep low drone, growing quieter until it disappears.",
+          "promptEdited": true,
+          "status": "queued",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "i94lc065",
+          "number": 4,
+          "vo": "Their dead rose and marched with them. Every village they took, they added to their column.",
+          "shot": "Low tracking shot along a marching line of frost-rimed corpses with pale blue eyes, walking in silence through knee-deep snow.",
+          "textCard": "",
+          "refIds": [
+            "z0hqy2bp",
+            "221thty1"
+          ],
+          "seed": 74698,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the marching dead, preserving their frozen grey-blue flesh, torn furs, rusted mail and pale blue eyes.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A low tracking shot moves alongside a marching column of frost-covered corpses matching <Picture 2>, walking in complete silence through knee-deep snow, their pale blue eyes fixed forward and their faces blank. The camera trucks left with large amplitude at slow speed, the column continuing unbroken into the blizzard haze behind them. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Their dead rose and marched with them. Every village they took, they added to their column.</d>\noverall_soundscape: Many feet compress deep snow in an unsynchronised shuffling rhythm with no voices at all. Frozen leather and mail creak stiffly and wind drives snow across the frame.\nnon_diegetic_music: A low repeated percussion pulse at a slow steady tempo beneath a single sustained bass note, gradually increasing in volume.",
+          "promptEdited": true,
+          "status": "queued",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "29acsuct",
+          "number": 5,
+          "vo": "One man went north to find help — the Last Hero, with twelve companions, a horse and a dog.",
+          "shot": "Blizzard. A lone armoured figure leads a horse up a ridge; behind them, twelve dark shapes are strung out and falling further behind with every step.",
+          "textCard": "THE LAST HERO",
+          "refIds": [
+            "z0hqy2bp",
+            "bheoz0jr"
+          ],
+          "seed": 22802,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the lone warrior, preserving the frost-caked furs, dented bronze scale armour and hooded silhouette.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot in a blizzard follows a lone armoured figure matching <Picture 2> leading an exhausted horse up a snow ridge, head down against the wind. Behind them, twelve dark human shapes are strung out across the slope, each further back than the last, two of them stopped and no longer moving. The camera tracks with the figure at slow speed as the whiteout closes over the stragglers. Plain white text reading \"THE LAST HERO\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] One man went north to find help, the Last Hero, with twelve companions, a horse and a dog.</d>\noverall_soundscape: A heavy blizzard wind roars continuously across the ridge. Boots and hooves break through crusted snow and the horse breathes hard in long ragged pulls.\nnon_diegetic_music: Low strings at a slow tempo playing a single rising line that swells and then drops away sharply.",
+          "promptEdited": true,
+          "status": "queued",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "9vlgih2b",
+          "number": 6,
+          "vo": "He lost every one of them. What he found, and what he traded for it, no story agrees.",
+          "shot": "The same figure alone at the treeline, sword broken, kneeling before three small hooded figures who emerge from the snow to meet them.",
+          "textCard": "",
+          "refIds": [
+            "z0hqy2bp"
+          ],
+          "seed": 50885,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the kneeling warrior. Use <Picture 3> as the exact appearance reference for the small forest beings who emerge from the snow.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A medium wide shot frames the warrior from <Picture 2> alone at a snowbound treeline, his horse gone and his sword broken at the hilt. He sinks to his knees in the drift. Three small hooded figures matching <Picture 3> step out from between the trees without sound and stand facing him, close enough to touch. The camera pushes in with small amplitude at slow speed as neither side moves. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] He lost every one of them. What he found, and what he traded for it, no story agrees.</d>\noverall_soundscape: The blizzard drops to a low steady hiss at the treeline. Snow compresses under knees, a broken blade drops into powder, and small feet crust the snow with almost no weight.\nnon_diegetic_music: A single low bowed note held at a very slow tempo, joined near the end by a faint high sustained tone.",
+          "promptEdited": true,
+          "status": "queued",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "kuboya4t",
+          "number": 7,
+          "vo": "The dead were broken in one last battle, and men decided they would never trust the north again.",
+          "shot": "Aerial over a huge ice wall under construction: thousands of tiny figures hauling ice blocks up ramps as the barrier stretches from horizon to horizon.",
+          "textCard": "THE WALL",
+          "refIds": [
+            "z0hqy2bp",
+            "024z9vms"
+          ],
+          "seed": 88724,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the scale, surface and colour of the ice wall.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A high aerial shot looks down on an enormous wall of ice under construction, matching the surface and scale of <Picture 2>. Thousands of tiny human figures haul cut ice blocks up long timber ramps along its face while the barrier stretches away to both horizons. The camera pulls out with large amplitude at slow speed until the full span fills the frame and the workers become specks. Plain white text reading \"THE WALL\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The dead were broken in one last battle, and men decided they would never trust the north again.</d>\noverall_soundscape: A steady high wind crosses the open face of the wall. Ropes strain, timber creaks under load, and distant voices call in rhythm as blocks grind into place.\nnon_diegetic_music: A slow deep drum pattern joined by low brass at a moderate tempo, building steadily in volume.",
+          "promptEdited": true,
+          "status": "queued",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "n71uik1h",
+          "number": 8,
+          "vo": "Seven hundred feet of ice, three hundred miles long, and a brotherhood sworn to hold it. Eight thousand quiet years followed. They would not last.",
+          "shot": "Slow crane up the black face of the finished Wall to a line of men in black cloaks standing on top, looking north into white nothing.",
+          "textCard": "PART 3 — THE EMPIRE OF CHAINS",
+          "refIds": [
+            "z0hqy2bp",
+            "024z9vms"
+          ],
+          "seed": 3578,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the finished ice wall.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A close shot on the sheer weathered face of the finished ice wall from <Picture 2>. The camera pedestals up with large amplitude at slow speed along the ice, travelling hundreds of feet upward, until it clears the top edge and reveals a line of men in heavy black cloaks standing on the walkway, all facing away from camera into an empty white nothing. Plain white text reading \"PART 3 — THE EMPIRE OF CHAINS\" appears low in the frame at the end of the shot. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Seven hundred feet of ice, three hundred miles long, and a brotherhood sworn to hold it. Eight thousand quiet years followed. They would not last.</d>\noverall_soundscape: Wind rises steadily in pitch and force as the camera climbs the ice face, peaking at the top edge. Heavy wool cloaks snap in the gusts and boots shift on packed snow.\nnon_diegetic_music: Sustained low strings at a slow tempo joined by a single deep drum strike as the top edge is cleared, then thinning to one held note.",
+          "promptEdited": true,
+          "status": "queued",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "yaflpynh",
+      "number": 3,
+      "title": "The Empire of Chains",
+      "era": "Old Ghis, the Ghiscari legions, the first slave empire",
+      "hookOut": "Far to the west, shepherds were about to find something worse.",
+      "refs": [
+        {
+          "id": "hjawveag",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 94123,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "yrkv8rfq",
+          "number": 1,
+          "vo": "While Westeros froze, the first true empire in the world was being built on the other side of the sea.",
+          "shot": "Aerial at golden hour over a vast harsh red-brown coastline with a colossal walled city of stepped brick pyramids on the shore.",
+          "textCard": "OLD GHIS",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 58579,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the city, preserving its stepped brick pyramids, brick colour and scale.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A high aerial shot at golden hour crosses a harsh red-brown coastline toward a colossal walled city of stepped brick pyramids matching <Picture 2>, its terraces stacked above a wide harbour. The camera pushes in with large amplitude at slow speed as the scale of the pyramids resolves against the tiny figures on the streets below. Plain white text reading \"OLD GHIS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] While Westeros froze, the first true empire in the world was being built on the other side of the sea.</d>\noverall_soundscape: A dry wind carries over open water toward the city. Distant crowd noise, harbour bells and the creak of moored hulls rise gradually as the shot closes in.\nnon_diegetic_music: A low bowed string drone at a slow tempo joined by a struck metal tone that rings and decays.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "rw0wg6yi",
+          "number": 2,
+          "vo": "Ghis did not invent cruelty. It industrialised it.",
+          "shot": "Long overhead shot of an enormous brick quarry where thousands of chained labourers move stone in ordered lines under overseers.",
+          "textCard": "",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 88301,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the chained labourers, preserving their clothing, iron collars, build and skin condition.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A high overhead shot looks down into an enormous brick quarry cut in terraces under a white midday sun. Hundreds of chained labourers matching <Picture 2> move cut stone along ordered lines, each line moving at the same forced pace, with overseers spaced along the rim. The camera pulls out with large amplitude at slow speed until the lines become a pattern and individual figures disappear into it. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Ghis did not invent cruelty. It industrialised it.</d>\noverall_soundscape: Stone grinds against stone in a relentless overlapping rhythm across the quarry. Chains drag and clink, tools strike rock, and a whip cracks twice in the distance.\nnon_diegetic_music: A low repeated percussive pulse at a steady moderate tempo beneath a single held bass note, unchanging in volume.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "bjmntlc9",
+          "number": 3,
+          "vo": "Its wealth was people. Bought, bred, counted, and worked until they were replaced.",
+          "shot": "Ground-level shot down a market row: iron collars being fitted, a clerk marking a wax tablet, a line of people waiting without expression.",
+          "textCard": "THE FIRST SLAVE EMPIRE",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 64928,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the collared people, preserving their clothing, iron collars and bearing.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A ground-level shot tracks slowly down a market row of brick stalls in hard afternoon light. An iron collar is fitted and hammered closed around a man's neck in the foreground while a clerk beside him marks a wax tablet without looking up. Behind them a long line of people matching <Picture 2> waits in the sun with no expression at all. The camera trucks right with small amplitude at slow speed past the full length of the line. Plain white text reading \"THE FIRST SLAVE EMPIRE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Its wealth was people. Bought, bred, counted, and worked until they were replaced.</d>\noverall_soundscape: A busy market hum of voices and footsteps carries under the shot. A hammer strikes iron three times, a stylus scratches wax, and chains shift as the line moves forward one pace.\nnon_diegetic_music: Sparse low string notes at a slow tempo with long gaps between them, holding at a constant quiet level.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "yxa4udzs",
+          "number": 4,
+          "vo": "Its power was the legion — lockstep, disciplined, and utterly without mercy.",
+          "shot": "Low angle on a marching legion in bronze scale and tall shields, spears rising and falling in perfect unison, dust boiling around their feet.",
+          "textCard": "THE GHISCARI LEGIONS",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 47229,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the soldiers, preserving their bronze scale armour, tall shields, helmets and spears.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A low-angle shot sits close to the ground as a legion of soldiers matching <Picture 2> marches past in lockstep, bronze scale armour and tall shields filling the frame, spears rising and falling in perfect unison. Dust boils around their feet and blows across the lens. The camera pans right with small amplitude at slow speed, holding the marching rhythm as rank after identical rank crosses the frame. Plain white text reading \"THE GHISCARI LEGIONS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Its power was the legion, lockstep, disciplined, and utterly without mercy.</d>\noverall_soundscape: Hundreds of boots strike the ground in one unified beat that dominates everything. Bronze scales rattle, shield rims knock together, and a hoarse cadence is called in the distance.\nnon_diegetic_music: A hard low drum on the marching beat at a moderate tempo, joined by flat brass notes that hold and cut off sharply.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "32vodlks",
+          "number": 5,
+          "vo": "For centuries nothing on the continent could stand against that formation. Nothing needed to be.",
+          "shot": "Battlefield wide shot: a shield wall grinding forward over broken bodies; opposing banners collapse and are trampled.",
+          "textCard": "",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 67491,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the soldiers in the shield wall.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A wide battlefield shot frames a shield wall of soldiers matching <Picture 2> grinding forward across broken ground in thick dust, stepping over bodies without breaking formation. Enemy banners at the far edge of the frame lean, collapse and go down under the advance. The camera tracks backward with large amplitude at slow speed, staying ahead of the wall as it comes on. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] For centuries nothing on the continent could stand against that formation. Nothing needed to be.</d>\noverall_soundscape: A dense wall of shouting, clashing bronze and shields grinding together moves steadily forward. Feet drag through loose earth and a horn sounds twice above the noise.\nnon_diegetic_music: Low strings at a driving moderate tempo under repeated deep drum strikes, sustaining without resolution.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "z5481j67",
+          "number": 6,
+          "vo": "Then, far to the west, on a peninsula of volcanoes, some shepherds went looking for lost sheep.",
+          "shot": "Hard cut to a bleak volcanic slope at dawn; two ragged shepherds climb between black lava rocks, calling into the wind.",
+          "textCard": "THE FOURTEEN FLAMES",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 95514,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the volcanic landscape, preserving its black lava rock, ash slopes and smoking peaks.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty tones and deep shadows, heavy haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot at dawn frames a bleak volcanic slope of black lava rock matching <Picture 2>, thin smoke rising from the peaks behind. Two ragged shepherds in dusty wool climb between the broken rocks, stopping to call out into the wind and listen for an answer that does not come. The camera arcs slowly around them with small amplitude at slow speed, revealing a dark cave mouth in the rock below their path. Plain white text reading \"THE FOURTEEN FLAMES\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then, far to the west, on a peninsula of volcanoes, some shepherds went looking for lost sheep.</d>\noverall_soundscape: A dry wind scours bare rock with loose scree sliding underfoot. Two voices call out in short bursts and the calls return as faint echoes off the slope.\nnon_diegetic_music: A single low woodwind tone at a slow tempo over a faint sustained drone, holding quietly throughout.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "4qbdgwgr",
+          "number": 7,
+          "vo": "They found caves. In the caves they found something sleeping that had never been tamed.",
+          "shot": "Cave interior lit only by a deep red glow; a huge scaled flank rises and falls with slow breathing as the shepherds' torchlight finds an enormous closed eye.",
+          "textCard": "",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 60233,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the volcanic rock and cave surfaces. Use <Picture 3> as the exact appearance reference for the sleeping creature, preserving its scale texture, colour, horn shape and size.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated color grade lit almost entirely by a deep red glow from below, heavy haze, handheld-stabilized documentary realism, shallow depth of field. A slow shot moves into a vast cave of black volcanic rock matching <Picture 2>, the only light a dull red glow from a fissure in the floor. A huge scaled flank matching <Picture 3> fills the right of the frame, rising and falling with slow steady breathing. Two small torch flames enter from the left as the shepherds edge forward, and the torchlight travels across the scales until it finds an enormous closed eye. The camera pushes in with small amplitude at slow speed on the eye. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They found caves. In the caves they found something sleeping that had never been tamed.</d>\noverall_soundscape: A deep slow breathing sound fills the cave, with a low resonant rumble beneath it. Torch flames gutter, small stones fall, and two people breathe fast and shallow.\nnon_diegetic_music: A very low sustained bass note at a slow tempo that rises almost imperceptibly in volume throughout.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "8nsgjamn",
+          "number": 8,
+          "vo": "Ghis had legions. Valyria was about to have dragons. That fight was only going to end one way.",
+          "shot": "The eye opens. Cut wide: a shepherd stands frozen as vast wings unfold behind them, filling the frame.",
+          "textCard": "PART 4 — FOURTEEN FLAMES",
+          "refIds": [
+            "hjawveag"
+          ],
+          "seed": 75827,
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the creature, preserving its scale texture, colour, horn shape and eye.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated color grade lit by a deep red glow from below, heavy haze, handheld-stabilized documentary realism, shallow depth of field. An extreme close-up holds on the enormous closed eye of the creature from <Picture 2> in torchlight. The eye opens, the slit pupil contracting hard in the light. The camera pulls out with large amplitude at fast speed to a wide shot as a shepherd stands frozen in the foreground and vast wings unfold behind him, filling the cave and blocking the red glow. Plain white text reading \"PART 4 — FOURTEEN FLAMES\" appears low in the frame at the end of the shot. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Ghis had legions. Valyria was about to have dragons. That fight was only going to end one way.</d>\noverall_soundscape: A wet membranous sound as the eye opens, followed by an enormous intake of breath. Huge wings unfold with a heavy leathery crack and displaced air moves through the cave.\nnon_diegetic_music: A rising low brass swell at a slow tempo that cuts off abruptly on the wings opening, leaving a single held bass note.",
+          "promptEdited": true,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "8b6kzj00",
+      "number": 4,
+      "title": "Fourteen Flames",
+      "era": "Valyrian shepherds discover dragons; the Freehold is born",
+      "hookOut": "Ghis had legions. Valyria had dragons.",
+      "refs": [
+        {
+          "id": "lyqoadzq",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 48333,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "tc5kx8ea",
+          "number": 1,
+          "vo": "Valyria had no kings. It had families, forty of them, and every one of them owned dragons.",
+          "shot": "Aerial through cloud onto a peninsula of black volcanic mountains ringed by white marble towers, dragons circling the peaks like birds.",
+          "textCard": "VALYRIA",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 51821,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "jcn5ahmj",
+          "number": 2,
+          "vo": "They learned to bind a dragon to a rider while both were young, and they never shared how.",
+          "shot": "A young rider in scaled armour walks slowly toward a chained hatchling in a torchlit pit, one hand extended, saying nothing.",
+          "textCard": "THE DRAGONLORDS",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 72599,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "tipz0d6k",
+          "number": 3,
+          "vo": "They kept the bloodline inside the family, because they believed the fire was in the blood.",
+          "shot": "A formal marriage rite in a mirrored marble hall; a silver-haired pair of near-identical appearance stand facing each other before robed witnesses.",
+          "textCard": "",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 7931,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "xo4yjd4r",
+          "number": 4,
+          "vo": "Beneath their cities, chained men cut the mountains open so the sorcerers could work the flame.",
+          "shot": "Descending shot down a shaft into a glowing mine: chained figures with picks working ledges above open magma, overseers on the rim.",
+          "textCard": "",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 12075,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "8xufqvdz",
+          "number": 5,
+          "vo": "With fire and spells they folded steel that would never dull and never break.",
+          "shot": "Extreme close-up of a smith folding a rippling dark blade in a furnace as another figure speaks over it in a low unbroken chant.",
+          "textCard": "VALYRIAN STEEL",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 14242,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "avpgxokp",
+          "number": 6,
+          "vo": "They laid straight black roads across a continent, and the roads never cracked.",
+          "shot": "Low aerial skimming along a perfectly straight fused-stone road running dead straight over hills to the horizon.",
+          "textCard": "THE DRAGONROADS",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 20730,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "biknf7vl",
+          "number": 7,
+          "vo": "In two hundred years they went from herding goats to owning the largest empire men had ever built.",
+          "shot": "Time-lapse-style push out from a single stone hut to a vast marble city sprawling across the volcanic slopes.",
+          "textCard": "",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 16211,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "xnkjlbmn",
+          "number": 8,
+          "vo": "Only one power stood in their way. It had been standing there for five thousand years.",
+          "shot": "Cut to the walls of Ghis at dusk; sentries turn to look west as a shadow crosses the sun above them.",
+          "textCard": "PART 5 — FIVE WARS, ONE ASH FIELD",
+          "refIds": [
+            "lyqoadzq"
+          ],
+          "seed": 27590,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "d31zmdss",
+      "number": 5,
+      "title": "Five Wars, One Ash Field",
+      "era": "The Ghiscari wars; Ghis burned and sown with salt",
+      "hookOut": "Nothing now stood between Valyria and the world.",
+      "refs": [
+        {
+          "id": "fgdb0e5k",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 83668,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "mbuzjcn7",
+          "number": 1,
+          "vo": "Ghis and Valyria fought five wars. Ghis won none of them.",
+          "shot": "Split-horizon wide: a legion in perfect formation on a plain, and above the ridge behind them, three dragons rising.",
+          "textCard": "FIVE WARS",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 30107,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "8684x43c",
+          "number": 2,
+          "vo": "The legions did everything correctly. That was the problem — they stood in ranks.",
+          "shot": "Ground-level in the shield wall as officers dress the line; men lock shields and brace, eyes on the sky rather than the front.",
+          "textCard": "",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 60622,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "x10pl4zr",
+          "number": 3,
+          "vo": "Ranks are hard to break with cavalry. They are very easy to burn.",
+          "shot": "A wall of dragonfire rolls the length of the formation; shields blacken and men scatter as the line disintegrates.",
+          "textCard": "",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 98492,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "zfnmhup2",
+          "number": 4,
+          "vo": "War after war, the empire shrank. Cities changed hands, then changed shape.",
+          "shot": "Aerial over a burned coastal city, its brick pyramids slumped and glassy, smoke drifting over an empty harbour.",
+          "textCard": "",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 60922,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "ejf957va",
+          "number": 5,
+          "vo": "In the fifth war Valyria stopped taking territory and started removing it.",
+          "shot": "Night raid: repeated fire passes over a walled city, each pass leaving a wider ring of flame until the walls glow.",
+          "textCard": "THE FIFTH WAR",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 26694,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "q8v5myqg",
+          "number": 6,
+          "vo": "They burned Ghis to the ground, tore down what was left, and ploughed the ruin under.",
+          "shot": "Dawn over the ruin field: teams of chained labourers dragging ploughs through ash and broken brick where a city stood.",
+          "textCard": "",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 46585,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "5mub95y3",
+          "number": 7,
+          "vo": "Then they sowed the fields with salt, so that nothing would grow there again.",
+          "shot": "Close on hands scattering coarse white salt into black ash; camera pulls back to reveal the scale of the dead ground.",
+          "textCard": "SOWN WITH SALT",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 71780,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "gdrngmdk",
+          "number": 8,
+          "vo": "The oldest empire in the world ended in a single afternoon. Nothing now stood between Valyria and everything else.",
+          "shot": "Slow aerial pull-back from the salted plain to a horizon of circling dragons under a red sky.",
+          "textCard": "PART 6 — THE FREEHOLD",
+          "refIds": [
+            "fgdb0e5k"
+          ],
+          "seed": 88353,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "hqbso0fg",
+      "number": 6,
+      "title": "The Freehold",
+      "era": "Valyria at its height — sorcery, Valyrian steel, dragonroads, the mines",
+      "hookOut": "Every empire mistakes its peak for its permanence.",
+      "refs": [
+        {
+          "id": "1ay1ouui",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 69208,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "ybr6r9b3",
+          "number": 1,
+          "vo": "At its height, Valyria ruled from the far east to the narrow sea, and answered to no one.",
+          "shot": "Vast aerial at dawn over marble cities, aqueducts and volcanic peaks, dragons distant against a pale sky.",
+          "textCard": "THE VALYRIAN FREEHOLD",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 29536,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "k6jupi1s",
+          "number": 2,
+          "vo": "It called itself a freehold, not an empire. Any freeborn landholder had a voice.",
+          "shot": "Interior of a domed marble assembly: hundreds of silver-haired figures arguing on tiered benches, no throne anywhere in frame.",
+          "textCard": "",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 8514,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "4lhjx78o",
+          "number": 3,
+          "vo": "The word freeborn was doing a great deal of work in that sentence.",
+          "shot": "Slow pan from the polished assembly floor down through a grate to a torchlit tunnel of chained workers beneath it.",
+          "textCard": "",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 92667,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "k4eefy4g",
+          "number": 4,
+          "vo": "Their sorcerers built with fire and stone fused together, and left no seams for us to study.",
+          "shot": "Push in on a colossal seamless black stone wall; the surface is glassy and jointless, reflecting torchlight.",
+          "textCard": "",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 13074,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "c9jkgyk6",
+          "number": 5,
+          "vo": "Their ships carried their language, their gods, and their prices to every coast worth reaching.",
+          "shot": "Busy harbour at golden hour: ranked galleys unloading crates, clerks tallying, a slave column boarding a hull.",
+          "textCard": "",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 85096,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "0mma2yxe",
+          "number": 6,
+          "vo": "Nothing threatened them. So they stopped watching the mountains that had made them.",
+          "shot": "Wide static on the Fourteen Flames at dusk, thin smoke rising from every summit; a single figure on a balcony turns away from the view.",
+          "textCard": "THE FOURTEEN FLAMES",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 71473,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "70smumgn",
+          "number": 7,
+          "vo": "Meanwhile, in the west, another people were loading their ships.",
+          "shot": "Cut to a cold rocky shore across the sea: bearded men in mail loading longships, seven-pointed stars carved into the prows.",
+          "textCard": "THE ANDALS",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 6111,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "llrg7yuf",
+          "number": 8,
+          "vo": "Every empire mistakes its peak for its permanence. Valyria had four hundred years left.",
+          "shot": "Return to the assembly dome, camera craning up past it to the smoking volcanoes behind.",
+          "textCard": "PART 7 — THE ANDAL TIDE",
+          "refIds": [
+            "1ay1ouui"
+          ],
+          "seed": 94318,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "o3ogb2mv",
+      "number": 7,
+      "title": "The Andal Tide",
+      "era": "Andals cross the narrow sea; the Faith; the fall of the First Men kingdoms",
+      "hookOut": "One kingdom in the North never bent. One kingdom in the south was still to come.",
+      "refs": [
+        {
+          "id": "gus3z47s",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 79998,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "qfnvja5j",
+          "number": 1,
+          "vo": "Six thousand years ago, Westeros was invaded again — and this time it stuck.",
+          "shot": "Aerial over a fleet of longships crossing a grey sea toward a green coastline at dawn.",
+          "textCard": "THE ANDAL INVASION",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 99933,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "b41vy5fk",
+          "number": 2,
+          "vo": "The Andals came out of the east with iron, and iron beats bronze every single time.",
+          "shot": "Close combat: an iron blade shears through a bronze sword and the bronze buckles; the bearer falls back.",
+          "textCard": "IRON vs BRONZE",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 44420,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "efla3bq3",
+          "number": 3,
+          "vo": "They also came with a new religion, and they did not consider it optional.",
+          "shot": "A hillside baptism at dawn: robed septons marking foreheads with oil before a seven-pointed star raised on a pole.",
+          "textCard": "THE FAITH OF THE SEVEN",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 26359,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "1tw0azvz",
+          "number": 4,
+          "vo": "Where they landed, the weirwoods came down and the old gods went quiet.",
+          "shot": "Axes at the base of a carved white tree; the face is hacked away before the trunk falls into a cleared grove.",
+          "textCard": "",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 43306,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "urx2zvhj",
+          "number": 5,
+          "vo": "Kingdom by kingdom, the First Men lost the south. Marriage where it worked, slaughter where it did not.",
+          "shot": "Two shots in one move: a formal wedding in a hall, camera trucks right through a doorway into a burning yard of bodies.",
+          "textCard": "",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 88120,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "i3jqocn2",
+          "number": 6,
+          "vo": "Six kingdoms fell or converted. The seventh looked at the Neck and decided not to bother.",
+          "shot": "Wide on a foggy causeway through endless bog; an armoured column halts at the water's edge and turns back.",
+          "textCard": "THE NORTH HELD",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 49823,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "mkxfshsc",
+          "number": 7,
+          "vo": "The North kept its trees, its gods, and its grudge. It kept all three for six thousand years.",
+          "shot": "Slow push in on a snow-covered weirwood in a northern grove, red leaves against grey sky, an armed man kneeling beneath it.",
+          "textCard": "",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 99557,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "o061j8lj",
+          "number": 8,
+          "vo": "Six kingdoms, and one that would not bend. The seventh had not been invented yet — and it was coming by sea.",
+          "shot": "Cut to a river delta far to the east: an immense fleet of small ships massing at dusk under an unfamiliar banner.",
+          "textCard": "PART 8 — TEN THOUSAND SHIPS",
+          "refIds": [
+            "gus3z47s"
+          ],
+          "seed": 29289,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "s9g5p6t5",
+      "number": 8,
+      "title": "Ten Thousand Ships",
+      "era": "The Rhoynar wars, Garin's curse, Nymeria's crossing, the birth of Dorne",
+      "hookOut": "Valyria had won again. It had one century left.",
+      "refs": [
+        {
+          "id": "d98o8209",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 99291,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "sd16pv53",
+          "number": 1,
+          "vo": "The Rhoynar lived along the greatest river in the world, and they had done it for a very long time.",
+          "shot": "Aerial along an immense slow river at golden hour, terraced water-cities and painted boats crowding both banks.",
+          "textCard": "THE RHOYNAR",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 94782,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "k96t6n0s",
+          "number": 2,
+          "vo": "They were traders, not conquerors, and their water wizards kept their cities from ever being taken.",
+          "shot": "River-level shot: robed figures raise their hands and the river visibly swells against a stone wall, holding it.",
+          "textCard": "",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 49270,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "5qx9hbiu",
+          "number": 3,
+          "vo": "Then Valyria wanted their trade routes, and being peaceful stopped being an option.",
+          "shot": "Wide on dragons crossing the river at low altitude while painted barges scatter beneath them.",
+          "textCard": "",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 52033,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "z9iv7rht",
+          "number": 4,
+          "vo": "Prince Garin raised a quarter of a million men. It was the largest army the Rhoyne had ever seen.",
+          "shot": "Enormous ground-level tracking shot down a river bank packed with assembled spearmen stretching past the horizon.",
+          "textCard": "GARIN THE GREAT",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 75485,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "ojdljibi",
+          "number": 5,
+          "vo": "Valyria burned it in an afternoon, then hung him in a golden cage above his own city.",
+          "shot": "A gilded cage suspended from a high stone arch above a smoking city; a figure inside watches the water below.",
+          "textCard": "",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 47276,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "o732fqqd",
+          "number": 6,
+          "vo": "He cursed them from that cage. Within days the river rose and swallowed the city whole.",
+          "shot": "Flooding shot: dark water climbing marble steps, palaces sinking, mist closing over rooftops until nothing is left.",
+          "textCard": "GARIN'S CURSE",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 63662,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "uuzejvq0",
+          "number": 7,
+          "vo": "One princess refused to die there. Nymeria loaded ten thousand ships and sailed west with the survivors.",
+          "shot": "Aerial over a colossal ragged fleet at dawn, decks crowded with people, sails patched, all pointed the same way.",
+          "textCard": "NYMERIA",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 73409,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "rzym7qbz",
+          "number": 8,
+          "vo": "She burned the ships on a desert shore so no one could go back. Out of that came Dorne.",
+          "shot": "Night: the entire fleet burning on a dark shoreline, a woman standing on the sand watching, back to camera.",
+          "textCard": "PART 9 — THE DREAM OF FIRE",
+          "refIds": [
+            "d98o8209"
+          ],
+          "seed": 57512,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "lwji6f90",
+      "number": 9,
+      "title": "The Dream of Fire",
+      "era": "Daenys the Dreamer; House Targaryen sells up and sails to Dragonstone",
+      "hookOut": "Their neighbours laughed. Twelve years remained.",
+      "refs": [
+        {
+          "id": "52sj6jti",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 73892,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "n7tosao6",
+          "number": 1,
+          "vo": "Of the forty dragonlord families of Valyria, House Targaryen was not important.",
+          "shot": "Interior of a lamplit marble hall, a modest household of silver-haired figures at a long table, the room plainly smaller than its neighbours.",
+          "textCard": "HOUSE TARGARYEN",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 69977,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "s0iwd566",
+          "number": 2,
+          "vo": "They were rich enough, old enough, and nowhere near the top of anyone's list.",
+          "shot": "Slow pan across a wall of ancestral busts, the Targaryen name plate small and set to one side among far grander ones.",
+          "textCard": "",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 19681,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "judp1q7v",
+          "number": 3,
+          "vo": "Then a daughter of the house began dreaming the same thing, night after night.",
+          "shot": "A young woman wakes in the dark, sits up sharply and stares at nothing, breathing hard, sweat on her face.",
+          "textCard": "DAENYS THE DREAMER",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 86853,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "3j54lpo4",
+          "number": 4,
+          "vo": "She dreamed Valyria burning. Not a battle — the land itself coming apart.",
+          "shot": "Dream imagery: marble towers cracking as fire opens along the ground beneath them, all in silence.",
+          "textCard": "",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 20515,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "cxujnkr0",
+          "number": 5,
+          "vo": "Her father believed her. That decision is the only reason any dragon survived.",
+          "shot": "The father listens without interrupting at a table by candlelight, then rises and starts giving orders to servants.",
+          "textCard": "LORD AENAR",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 4863,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "oprr5bsp",
+          "number": 6,
+          "vo": "He sold everything the family owned in Valyria and bought a rock in the narrow sea.",
+          "shot": "Clerks stamping deeds; wagons loaded in a courtyard; a bare volcanic island shown on an unrolled sea chart.",
+          "textCard": "DRAGONSTONE",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 30306,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "wvynw28l",
+          "number": 7,
+          "vo": "Neighbours called it cowardice. Kin called it madness. They sailed anyway, with their dragons.",
+          "shot": "Departure at dawn: loaded ships pulling away from a marble harbour while figures on the quay watch and turn away.",
+          "textCard": "",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 79746,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "l5nyzvam",
+          "number": 8,
+          "vo": "They reached a black castle on a smoking island at the edge of the world. Twelve years remained.",
+          "shot": "Aerial approach to a black stone fortress on a bare volcanic island under low cloud, dragons circling the towers.",
+          "textCard": "PART 10 — THE DOOM",
+          "refIds": [
+            "52sj6jti"
+          ],
+          "seed": 17321,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    },
+    {
+      "id": "aelc1jmf",
+      "number": 10,
+      "title": "The Doom",
+      "era": "The Doom of Valyria; the Century of Blood; one small family on one small rock",
+      "hookOut": "The last dragonlords in the world were now a single household.",
+      "refs": [
+        {
+          "id": "uhrwvryv",
+          "name": "style_plate",
+          "role": "style",
+          "prompt": "",
+          "negative": "",
+          "seed": 47054,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "scenes": [
+        {
+          "id": "1qvfzcxg",
+          "number": 1,
+          "vo": "For twelve years, nothing happened. Valyria traded, built, and quietly forgot the warning.",
+          "shot": "Busy Valyrian street at midday, ordinary commerce, no tension anywhere in the frame.",
+          "textCard": "TWELVE YEARS LATER",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 9602,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "5fnqq41s",
+          "number": 2,
+          "vo": "Then, on one morning, every one of the fourteen volcanoes went up at the same time.",
+          "shot": "Static wide on the mountain range as fourteen columns of fire and ash erupt simultaneously into a clear sky.",
+          "textCard": "THE DOOM OF VALYRIA",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 83002,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "avpd7x50",
+          "number": 3,
+          "vo": "The peninsula cracked apart. Hills exploded. The sea came in through the wounds.",
+          "shot": "The landmass fracturing along glowing lines; a marble city slides into a widening chasm as seawater floods in.",
+          "textCard": "",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 39840,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "5iz3otf2",
+          "number": 4,
+          "vo": "Dragons died in the air. Sorcerers died mid-word. It took less than a day.",
+          "shot": "Ash-choked sky, burning shapes falling; a robed figure with hands raised is engulfed mid-gesture.",
+          "textCard": "",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 33994,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "6hgyjt2t",
+          "number": 5,
+          "vo": "The greatest civilisation men had built was gone, and it left no one behind who understood it.",
+          "shot": "Aerial over a drowned smoking archipelago where a continent used to be, wrecked stone under shallow water.",
+          "textCard": "",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 94011,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "qbblbbew",
+          "number": 6,
+          "vo": "What followed was a hundred years of everyone taking what they could reach.",
+          "shot": "Rapid succession: mercenary companies on the march, sacked cities, slave columns, burning ports.",
+          "textCard": "THE CENTURY OF BLOOD",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 40223,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "ar6okjjv",
+          "number": 7,
+          "vo": "Free cities fought free cities. Old empires dug themselves back up. Nobody ruled anything for long.",
+          "shot": "Map-like aerial of the eastern coast with fleets and armies moving against each other in every direction.",
+          "textCard": "",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 92308,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        },
+        {
+          "id": "0f5zqhnr",
+          "number": 8,
+          "vo": "And on one small island in the west, the last dragonlords in the world sat down to plan.",
+          "shot": "Slow push through a black stone hall to a huge carved table shaped like a continent, a figure standing over it.",
+          "textCard": "NEXT: THE CONQUEST",
+          "refIds": [
+            "uhrwvryv"
+          ],
+          "seed": 18689,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ],
+      "exportPath": null
+    }
+  ],
+  "sources": []
+}

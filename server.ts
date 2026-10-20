@@ -2,6 +2,7 @@ import { registerHub, modelDirs } from "./hub";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
 import { registerComfyTool } from "./comfyTool/routes";
+import { registerSeriesTool } from "./seriesTool/routes";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -1641,6 +1642,11 @@ async function startServer() {
     getComfyUrl: () => COMFYUI_URL,
     getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
     galleryDirs: { image: galleryDir("image"), video: galleryDir("video") },
+  });
+
+  registerSeriesTool(app, {
+    projectsRoot: path.join(process.cwd(), "series"),
+    getComfyUrl: () => COMFYUI_URL,
   });
 
   // An unknown /api route must answer 404 here. Without this the Vite middleware's dev proxy (/api -> localhost:3000, i.e. this very

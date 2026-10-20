@@ -415,10 +415,10 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       <button
         onClick={() => setShowModelPicker(v => !v)}
         title="Select model"
-        className="h-9 px-2.5 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 border border-white/5"
+        className="h-9 px-2 sm:px-2.5 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 border border-white/5 max-w-[45%]"
       >
-        <Cpu size={16} className="text-violet-400" />
-        <span className="text-xs font-bold max-w-[100px] truncate">{selectedModel.name}</span>
+        <Cpu size={16} className="text-violet-400 shrink-0" />
+        <span className="hidden sm:inline text-xs font-bold max-w-[110px] truncate">{selectedModel.name}</span>
         <ChevronDown size={14} className={cn("transition-transform", showModelPicker && "rotate-180")} />
       </button>
       <AnimatePresence>
@@ -427,7 +427,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            className="absolute bottom-full mb-2 left-0 w-72 max-h-80 overflow-y-auto bg-zinc-950 border border-white/15 rounded-2xl shadow-2xl shadow-black/60 z-50"
+            className="absolute bottom-full mb-2 left-0 w-[min(18rem,calc(100vw-2.5rem))] max-h-80 overflow-y-auto bg-zinc-950 border border-white/15 rounded-2xl shadow-2xl shadow-black/60 z-50"
           >
             {models.map((m) => (
               <button
@@ -487,7 +487,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       </div>
     )}
     <div className="bg-white/5 border border-white/10 rounded-2xl p-1.5 flex items-end gap-1.5 transition-all duration-300 ease-out shadow-xl shadow-black/40 focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
-      <div className="flex gap-0.5 mb-0.5 ml-0.5">
+      <div className="flex shrink-0 gap-0.5 mb-0.5 ml-0.5">
         {modelPicker}
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -507,7 +507,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           />
         )}
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}

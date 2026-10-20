@@ -1,0 +1,325 @@
+import React from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Play, RefreshCw, Image as ImageIcon, Film, ChevronRight, X, AlertTriangle,
+  Clock, Loader2, CheckCircle2, CircleSlash, Trash2, Wand2, Clapperboard, Mic,
+} from "lucide-react";
+import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type Status } from "./api";
+import { RefDrop } from "./RefDrop";
+
+/**
+ * Stage 2. The production board: every episode, its reference stills and its scenes, each with a
+ * status and a render button. This is the screen that answers "what is done, what is left".
+ */
+
+const field = "w-full bg-neutral-900/60 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors";
+
+const STATUS_ICON: Record<Status, React.ComponentType<{ size?: number; className?: string }>> = {
+  pending: CircleSlash, queued: Clock, running: Loader2, done: CheckCircle2, failed: AlertTriangle,
+};
+const STATUS_TONE: Record<Status, string> = {
+  pending: "bg-neutral-700/40 text-neutral-400 border-neutral-700",
+  queued: "bg-amber-500/15 text-amber-300 border-amber-700/50",
+  running: "bg-sky-500/15 text-sky-300 border-sky-600/50",
+  done: "bg-emerald-500/15 text-emerald-300 border-emerald-700/50",
+  failed: "bg-rose-500/15 text-rose-300 border-rose-700/50",
+};
+
+function Badge({ status, progress }: { status: Status; progress?: [number, number] | null }) {
+  const Icon = STATUS_ICON[status];
+  const label = status === "running" && progress && progress[1]
+    ? `${Math.round((progress[0] / progress[1]) * 100)}%`
+    : status;
+  return (
+    <motion.span
+      layout
+      initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${STATUS_TONE[status]}`}
+    >
+      <Icon size={10} className={status === "running" ? "animate-spin" : ""} />
+      {label}
+    </motion.span>
+  );
+}
+
+function RefCard({ project, episode, ref_, running, onChanged }: {
+  project: Project; episode: Episode; ref_: Ref;
+  running: { targetId: string; progress: [number, number] | null } | null;
+  onChanged: (p: Project) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(ref_);
+  React.useEffect(() => setDraft(ref_), [ref_.id, ref_.status, ref_.file]);
+  const isRunning = running?.targetId === ref_.id;
+
+  const save = async (changes: Partial<Ref>) => {
+    const next = { ...draft, ...changes };
+    setDraft(next);
+    const episodes = project.episodes.map(e => e.id !== episode.id ? e : { ...e, refs: e.refs.map(r => (r.id === ref_.id ? next : r)) });
+    onChanged(await api.patch(project.id, { episodes }));
+  };
+
+  const remove = async () => {
+    if (!confirm(`Remove the reference "${ref_.name}"? Scenes using it will lose that slot.`)) return;
+    await api.deleteRef(project.id, ref_.id);
+    onChanged(await api.get(project.id));
+  };
+
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }}
+      className="group rounded-lg border border-neutral-800 bg-neutral-900/50 overflow-hidden hover:border-neutral-700 transition-colors">
+      <div className="flex items-center gap-2 p-2">
+        <motion.div whileHover={{ scale: 1.08 }} className="h-12 w-12 shrink-0 overflow-hidden rounded bg-neutral-800 grid place-items-center">
+          {ref_.file
+            ? <img src={fileUrl(ref_.file)} alt={ref_.name} className="h-full w-full object-cover" />
+            : <ImageIcon size={16} className="text-neutral-600" />}
+        </motion.div>
+        <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(o => !o)}>
+          <div className="truncate text-sm text-neutral-200">{ref_.name}</div>
+          <div className="flex items-center gap-1 text-[11px] text-neutral-500">
+            {ref_.role === "style" ? <><Wand2 size={9} className="text-violet-400" /> style plate - Picture 1</> : <><ImageIcon size={9} /> character reference</>}
+          </div>
+        </button>
+        <Badge status={isRunning ? "running" : ref_.status} progress={running?.progress} />
+        <div className="flex items-center gap-1">
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => api.generateRef(project.id, ref_.id)}
+            className="rounded-md border border-neutral-700 p-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white"
+            title={ref_.file ? "Render again" : "Render this still"}>
+            {ref_.file ? <RefreshCw size={14} /> : <Play size={14} />}
+          </motion.button>
+          <button onClick={remove} className="rounded-md p-1.5 text-neutral-600 opacity-0 transition group-hover:opacity-100 hover:text-rose-400" title="Remove reference">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+      {ref_.error && <div className="px-3 pb-2 text-[11px] text-rose-300">{ref_.error}</div>}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-t border-neutral-800">
+            <div className="space-y-2 p-3">
+              <textarea className={`${field} h-24 resize-none text-xs`} value={draft.prompt} onChange={e => setDraft({ ...draft, prompt: e.target.value })} onBlur={() => save({ prompt: draft.prompt })} placeholder="Image prompt" />
+              <textarea className={`${field} h-16 resize-none text-xs`} value={draft.negative} onChange={e => setDraft({ ...draft, negative: e.target.value })} onBlur={() => save({ negative: draft.negative })} placeholder="Negative prompt" />
+              {ref_.file && <a href={fileUrl(ref_.file)} target="_blank" rel="noreferrer" className="block truncate text-[11px] text-sky-400 hover:underline">{ref_.file}</a>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function SceneCard({ project, episode, scene, running, onChanged }: {
+  project: Project; episode: Episode; scene: Scene;
+  running: { targetId: string; progress: [number, number] | null } | null;
+  onChanged: (p: Project) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(scene);
+  React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
+
+  const isRunning = running?.targetId === scene.id;
+  const words = draft.vo.trim().split(/\s+/).filter(Boolean).length;
+  const inRange = words >= 18 && words <= 22;
+
+  const save = async (changes: Partial<Scene>) => {
+    const next = { ...draft, ...changes };
+    setDraft(next);
+    const episodes = project.episodes.map(e => e.id !== episode.id ? e : { ...e, scenes: e.scenes.map(s => (s.id === scene.id ? next : s)) });
+    onChanged(await api.patch(project.id, { episodes }));
+  };
+
+  const toggleRef = (refId: string) => {
+    const has = draft.refIds.includes(refId);
+    save({ refIds: has ? draft.refIds.filter(r => r !== refId) : [...draft.refIds, refId] });
+  };
+
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      className={`rounded-lg border bg-neutral-900/50 overflow-hidden transition-colors ${isRunning ? "border-sky-700/70" : "border-neutral-800 hover:border-neutral-700"}`}>
+      <div className="flex items-start gap-3 p-3">
+        <motion.div whileHover={{ scale: 1.06 }} className={`grid h-14 w-10 shrink-0 place-items-center rounded ${scene.clipPath ? "bg-emerald-950/50" : "bg-neutral-800"}`}>
+          <Film size={16} className={scene.clipPath ? "text-emerald-400" : "text-neutral-600"} />
+        </motion.div>
+        <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(o => !o)}>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500">#{scene.number}</span>
+            <Badge status={isRunning ? "running" : scene.status} progress={running?.progress} />
+            {scene.durationS && <span className="text-[11px] text-neutral-500">{scene.durationS.toFixed(2)}s</span>}
+          </div>
+          <div className="mt-1 line-clamp-2 text-sm text-neutral-200">{scene.vo || <span className="text-neutral-600">No narration yet</span>}</div>
+        </button>
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => api.generateScene(project.id, scene.id)}
+          className="rounded-md border border-neutral-700 p-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white"
+          title={scene.clipPath ? "Render again" : "Render this scene"}>
+          {scene.clipPath ? <RefreshCw size={14} /> : <Play size={14} />}
+        </motion.button>
+      </div>
+
+      {isRunning && running?.progress && running.progress[1] > 0 && (
+        <div className="h-0.5 bg-neutral-800">
+          <motion.div className="h-full bg-sky-500" animate={{ width: `${(running.progress[0] / running.progress[1]) * 100}%` }} transition={{ ease: "linear" }} />
+        </div>
+      )}
+
+      {scene.error && (
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded border border-rose-900/60 bg-rose-950/30 px-2 py-1.5 text-[11px] text-rose-200">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {scene.error}
+        </div>
+      )}
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-neutral-800">
+            <div className="space-y-3 p-3">
+              <div>
+                <label className="flex justify-between text-[11px] text-neutral-500">
+                  <span className="flex items-center gap-1"><Mic size={10} /> Narration</span>
+                  <motion.span animate={{ color: inRange ? "rgb(52 211 153)" : "rgb(251 191 36)" }}>{words} words</motion.span>
+                </label>
+                <textarea className={`${field} h-16 resize-none text-xs`} value={draft.vo} onChange={e => setDraft({ ...draft, vo: e.target.value })} onBlur={() => save({ vo: draft.vo })} />
+              </div>
+              <div>
+                <label className="flex items-center gap-1 text-[11px] text-neutral-500"><Clapperboard size={10} /> Shot</label>
+                <textarea className={`${field} h-20 resize-none text-xs`} value={draft.shot} onChange={e => setDraft({ ...draft, shot: e.target.value })} onBlur={() => save({ shot: draft.shot })} />
+              </div>
+              <div>
+                <label className="text-[11px] text-neutral-500">On-screen text card</label>
+                <input className={`${field} text-xs`} value={draft.textCard} onChange={e => setDraft({ ...draft, textCard: e.target.value })} onBlur={() => save({ textCard: draft.textCard })} />
+              </div>
+              <div>
+                <label className="text-[11px] text-neutral-500">References, in Picture order</label>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {episode.refs.map(r => {
+                    const index = draft.refIds.indexOf(r.id);
+                    const on = index >= 0;
+                    return (
+                      <motion.button key={r.id} whileTap={{ scale: 0.95 }} onClick={() => toggleRef(r.id)}
+                        className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition ${on ? "border-sky-600 bg-sky-600/20 text-sky-200" : "border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}>
+                        {r.file && <img src={fileUrl(r.file)} alt="" className="h-3.5 w-3.5 rounded-sm object-cover" />}
+                        {on ? `${index + 1}. ` : ""}{r.name}{!r.file ? " (not rendered)" : ""}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="flex justify-between text-[11px] text-neutral-500">
+                  <span>Prompt sent to ComfyUI</span>
+                  {draft.promptEdited && <button className="text-sky-400 hover:underline" onClick={() => save({ promptEdited: false, promptText: "" })}>revert to generated</button>}
+                </label>
+                <textarea className={`${field} h-32 resize-none font-mono text-[11px]`} value={draft.promptText}
+                  placeholder="Built from the style lock, narrator, shot and references when you render."
+                  onChange={e => setDraft({ ...draft, promptText: e.target.value })}
+                  onBlur={() => save({ promptText: draft.promptText, promptEdited: !!draft.promptText.trim() })} />
+              </div>
+              {scene.clipPath && <video src={fileUrl(scene.clipPath)} controls className="max-h-72 w-full rounded bg-black" />}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+export function Board({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
+  const [openEpisode, setOpenEpisode] = React.useState<string | null>(project.episodes[0]?.id || null);
+  const running = project.running || null;
+
+  if (!project.episodes.length) {
+    return (
+      <div className="grid h-full place-items-center text-center">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-md space-y-2">
+          <motion.div animate={{ rotate: [0, -8, 8, 0] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}>
+            <Clapperboard size={32} className="mx-auto text-neutral-600" />
+          </motion.div>
+          <p className="text-sm text-neutral-400">No episodes yet.</p>
+          <p className="text-xs text-neutral-500">Go to Develop, talk the series through, then press "Build the episode plan".</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full space-y-3 overflow-y-auto pr-1">
+      <AnimatePresence>
+        {running && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="sticky top-0 z-10 flex items-center gap-3 rounded-lg border border-sky-900/60 bg-sky-950/70 px-3 py-2 backdrop-blur">
+            <Loader2 size={13} className="animate-spin text-sky-300" />
+            <span className="text-xs text-sky-200">{running.label}</span>
+            {running.progress && running.progress[1] > 0 && (
+              <div className="h-1.5 flex-1 overflow-hidden rounded bg-neutral-800">
+                <motion.div className="h-full rounded bg-gradient-to-r from-sky-500 to-cyan-400"
+                  animate={{ width: `${(running.progress[0] / running.progress[1]) * 100}%` }} transition={{ ease: "linear" }} />
+              </div>
+            )}
+            <button onClick={() => api.cancel(project.id)} className="flex items-center gap-1 rounded border border-neutral-700 px-2 py-1 text-[11px] text-neutral-300 hover:bg-neutral-800">
+              <X size={12} /> Cancel
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {project.episodes.map((ep, i) => {
+        const open = openEpisode === ep.id;
+        const scenesDone = ep.scenes.filter(s => s.status === "done").length;
+        const refsDone = ep.refs.filter(r => r.status === "done").length;
+        const pct = ep.scenes.length ? (scenesDone / ep.scenes.length) * 100 : 0;
+        return (
+          <motion.div key={ep.id} layout
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.2) }}
+            className="rounded-xl border border-neutral-800 bg-neutral-900/30 overflow-hidden">
+            <div className="flex items-center gap-3 p-3">
+              <button onClick={() => setOpenEpisode(open ? null : ep.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
+                  <ChevronRight size={16} className="text-neutral-500" />
+                </motion.span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-neutral-100">{ep.number}. {ep.title}</div>
+                  <div className="truncate text-[11px] text-neutral-500">{ep.era}</div>
+                </div>
+              </button>
+              <div className="hidden items-center gap-3 text-[11px] text-neutral-400 sm:flex">
+                <span>refs {refsDone}/{ep.refs.length}</span>
+                <span>scenes {scenesDone}/{ep.scenes.length}</span>
+              </div>
+              <div className="h-1.5 w-24 overflow-hidden rounded bg-neutral-800">
+                <motion.div className="h-full rounded bg-gradient-to-r from-emerald-500 to-teal-400"
+                  initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ type: "spring", stiffness: 120, damping: 20 }} />
+              </div>
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                onClick={() => api.generateEpisode(project.id, ep.id)}
+                className="rounded-lg bg-neutral-700 px-3 py-1.5 text-xs text-white hover:bg-neutral-600"
+                title="Queue every reference and scene this episode still needs">
+                Render what's missing
+              </motion.button>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {open && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                  <div className="grid gap-3 border-t border-neutral-800 p-3 lg:grid-cols-[300px_1fr]">
+                    <div className="space-y-2">
+                      <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">References</h4>
+                      <AnimatePresence initial={false}>
+                        {ep.refs.map(r => <RefCard key={r.id} project={project} episode={ep} ref_={r} running={running} onChanged={onChanged} />)}
+                      </AnimatePresence>
+                      <RefDrop project={project} episodeId={ep.id} onChanged={onChanged} compact />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">Scenes</h4>
+                      {[...ep.scenes].sort((a, b) => a.number - b.number).map(s => (
+                        <SceneCard key={s.id} project={project} episode={ep} scene={s} running={running} onChanged={onChanged} />
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}

@@ -21,6 +21,7 @@ import { MemoryView, SettingsView, EngineView } from "./components/tools/ExtraVi
 import { ConsoleView } from "./components/tools/ConsoleView";
 import { ImageGeneratorView } from "./components/tools/ImageGenerator";
 import { VideoGeneratorView } from "./components/tools/VideoGenerator";
+import { SeriesStudioView } from "./components/tools/series/SeriesStudio";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -467,6 +468,7 @@ export default function App() {
             {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
             <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
             <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
+            <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} /></div>
             {activeTab === "settings" && (
               <SettingsView
                 settings={settings}

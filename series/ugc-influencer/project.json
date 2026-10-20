@@ -1,0 +1,81 @@
+{
+  "id": "zxj9ufv3",
+  "title": "UGC Influencer",
+  "dir": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\ugc-influencer",
+  "createdAt": "2026-10-19T22:09:20.567Z",
+  "updatedAt": "2026-10-20T05:58:33.742Z",
+  "idea": {
+    "logline": "Fitcheck",
+    "audience": "girls, dress enthusiatsts, ecommerce websites, clothing brands, ",
+    "tone": "indoor, a living room setup",
+    "notes": "the model (girsl) shall be exactly liek the reference photo attached"
+  },
+  "discussion": [],
+  "styleLock": "Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field.",
+  "voiceLock": "a narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1)",
+  "settings": {
+    "comfyUrl": "http://127.0.0.1:8188",
+    "videoWorkflow": "",
+    "imageWorkflow": "",
+    "width": 544,
+    "height": 928,
+    "seconds": 7,
+    "steps": 12,
+    "fps": 24
+  },
+  "episodes": [
+    {
+      "id": "osotj3a1",
+      "number": 1,
+      "title": "Episode title",
+      "era": "a short-form video series for YouTube Shorts / Reels",
+      "hookOut": "closing line that pulls the viewer to the next episode",
+      "refs": [
+        {
+          "id": "io24kfzt",
+          "name": "style",
+          "role": "style",
+          "prompt": "a still photograph with lighting and a grade, to be used for the image prompt",
+          "negative": "",
+          "seed": 39788,
+          "file": null,
+          "status": "pending",
+          "error": null
+        },
+        {
+          "id": "yl84sqqn",
+          "name": "character",
+          "role": "character",
+          "prompt": "a model with a reference photo attached",
+          "negative": "",
+          "seed": 3277,
+          "file": null,
+          "status": "pending",
+          "error": null
+        }
+      ],
+      "exportPath": null,
+      "scenes": [
+        {
+          "id": "cjlzb2wd",
+          "number": 1,
+          "vo": "one narration line, 18-22 words",
+          "shot": "what the camera sees and does, one or two sentences",
+          "textCard": "optional on-screen text, or empty",
+          "refIds": [
+            "io24kfzt",
+            "yl84sqqn"
+          ],
+          "seed": 52992,
+          "promptText": "",
+          "promptEdited": false,
+          "status": "pending",
+          "clipPath": null,
+          "durationS": null,
+          "promptId": null,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

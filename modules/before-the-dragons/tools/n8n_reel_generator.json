@@ -1,0 +1,202 @@
+{
+  "name": "Reel Clip Generator (MiniMax H3)",
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-220, 300],
+      "parameters": {}
+    },
+    {
+      "id": "jobs",
+      "name": "Build Job List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "parameters": {
+        "jsCode": "// Every clip this run should render.\n// Edit this list to change what gets produced - it is the only place\n// you need to touch for a new episode.\n// refs are addressed as <Picture 1>..<Picture N> in the prompt, in this order.\n\nconst ROOT = 'D:/Claude/In_Progress/Claude_ConfyUI';\nconst R = ROOT + '/reels/pre-targaryen/refs';\n\nconst style1 = R + '/ep01_style_plate_00001_.png';\nconst child1 = R + '/ep01_child_forest_v3_00001_.png';\nconst men1   = R + '/ep01_first_men_00001_.png';\n\nconst style2 = R + '/ep02_style_plate_00001_.png';\nconst other  = R + '/ep02_other_00001_.png';\nconst wight  = R + '/ep02_wight_00001_.png';\nconst hero   = R + '/ep02_last_hero_00001_.png';\nconst wall   = R + '/ep02_wall_00001_.png';\n\nconst jobs = [\n  { name: 'ep01_clip07', seed: 107, width: 768, height: 1344, refs: [style1] },\n  { name: 'ep01_clip08', seed: 108, width: 768, height: 1344, refs: [style1, child1, men1] },\n  { name: 'ep02_clip01', seed: 201, width: 576, height: 1024, refs: [style2] },\n  { name: 'ep02_clip02', seed: 202, width: 576, height: 1024, refs: [style2] },\n  { name: 'ep02_clip03', seed: 203, width: 576, height: 1024, refs: [style2, other] },\n  { name: 'ep02_clip04', seed: 204, width: 576, height: 1024, refs: [style2, wight] },\n  { name: 'ep02_clip05', seed: 205, width: 576, height: 1024, refs: [style2, hero] },\n  { name: 'ep02_clip06', seed: 206, width: 576, height: 1024, refs: [style2, hero, child1] },\n  { name: 'ep02_clip07', seed: 207, width: 576, height: 1024, refs: [style2, wall] },\n  { name: 'ep02_clip08', seed: 208, width: 576, height: 1024, refs: [style2, wall] }\n];\n\nreturn jobs.map(j => ({ json: {\n  name: j.name,\n  seed: j.seed,\n  width: j.width,\n  height: j.height,\n  root: ROOT,\n  prompt: ROOT + '/reels/pre-targaryen/prompts/' + j.name + '.txt',\n  refArgs: j.refs.join(' '),\n  attempt: 0\n} }));"
+      }
+    },
+    {
+      "id": "loop",
+      "name": "Next Clip",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [220, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "health",
+      "name": "ComfyUI Alive?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 400],
+      "parameters": {
+        "url": "http://127.0.0.1:8188/system_stats",
+        "options": {
+          "timeout": 8000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "neverError + fullResponse so a dead server yields a status code instead of failing the run."
+    },
+    {
+      "id": "isup",
+      "name": "Server Up?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "operator": { "type": "number", "operation": "equals" },
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "startcomfy",
+      "name": "Start ComfyUI",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [660, 620],
+      "parameters": {
+        "command": "powershell -NoProfile -Command \"Start-Process -FilePath 'F:\\ComfyUI\\ComfyUI_windows_portable\\run_nvidia_gpu.bat' -WorkingDirectory 'F:\\ComfyUI\\ComfyUI_windows_portable'\""
+      },
+      "notes": "Watchdog: relaunches the server whenever the health check fails."
+    },
+    {
+      "id": "boot",
+      "name": "Wait For Boot",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [880, 620],
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "webhookId": "reelgen-boot-wait"
+    },
+    {
+      "id": "render",
+      "name": "Render Clip",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [880, 300],
+      "parameters": {
+        "command": "=cd /d {{ $json.root }} && python tools/comfy_h3.py video {{ $json.name }} {{ $json.prompt }} {{ $json.refArgs }} --seconds 8 --seed {{ $json.seed }} --steps 12 --width {{ $json.width }} --height {{ $json.height }}"
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Blocks for the whole render: ~17 min at 576x1024, ~85 min at 768x1344. Workflow timeout must be off."
+    },
+    {
+      "id": "ok",
+      "name": "Render OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c2",
+              "operator": { "type": "number", "operation": "equals" },
+              "leftValue": "={{ $json.exitCode }}",
+              "rightValue": 0
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cooldown",
+      "name": "Cooldown After Failure",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1100, 540],
+      "parameters": {
+        "amount": 90,
+        "unit": "seconds"
+      },
+      "webhookId": "reelgen-cooldown-wait",
+      "notes": "Failed render loops back to the health check, which restarts the server if it died."
+    },
+    {
+      "id": "stitch",
+      "name": "Stitch Episode 1",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [440, 140],
+      "parameters": {
+        "command": "\"C:\\Program Files\\Git\\bin\\bash.exe\" -c \"bash /d/Claude/In_Progress/Claude_ConfyUI/tools/stitch_ep01_now.sh\""
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Runs once the job list is exhausted. Skips harmlessly if Ep1 clips are incomplete."
+    }
+  ],
+  "connections": {
+    "Start": { "main": [[{ "node": "Build Job List", "type": "main", "index": 0 }]] },
+    "Build Job List": { "main": [[{ "node": "Next Clip", "type": "main", "index": 0 }]] },
+    "Next Clip": {
+      "main": [
+        [{ "node": "Stitch Episode 1", "type": "main", "index": 0 }],
+        [{ "node": "ComfyUI Alive?", "type": "main", "index": 0 }]
+      ]
+    },
+    "ComfyUI Alive?": { "main": [[{ "node": "Server Up?", "type": "main", "index": 0 }]] },
+    "Server Up?": {
+      "main": [
+        [{ "node": "Render Clip", "type": "main", "index": 0 }],
+        [{ "node": "Start ComfyUI", "type": "main", "index": 0 }]
+      ]
+    },
+    "Start ComfyUI": { "main": [[{ "node": "Wait For Boot", "type": "main", "index": 0 }]] },
+    "Wait For Boot": { "main": [[{ "node": "ComfyUI Alive?", "type": "main", "index": 0 }]] },
+    "Render Clip": { "main": [[{ "node": "Render OK?", "type": "main", "index": 0 }]] },
+    "Render OK?": {
+      "main": [
+        [{ "node": "Next Clip", "type": "main", "index": 0 }],
+        [{ "node": "Cooldown After Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Cooldown After Failure": { "main": [[{ "node": "ComfyUI Alive?", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "executionTimeout": -1
+  },
+  "pinData": {}
+}

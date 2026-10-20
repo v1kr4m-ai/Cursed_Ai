@@ -95,6 +95,7 @@ export function Sidebar({
     { id: "vision", label: "Vision", icon: Eye },
     { id: "image", label: "Image", icon: ImagePlus },
     { id: "video", label: "Video", icon: Clapperboard },
+    { id: "series", label: "Series", icon: Clapperboard },
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },

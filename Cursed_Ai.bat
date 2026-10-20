@@ -11,20 +11,23 @@ exit /b
 :run
 cd /d "%~dp0"
 set "CURSED_APP=1"
+rem Port: .port in this folder (used by parallel working copies), else 3000.
+set "PORT=3000"
+if exist "%~dp0.port" set /p PORT=<"%~dp0.port"
 set "LOG=%~dp0app.log"
 echo [%date% %time%] Cursed_Ai starting > "%LOG%"
 
 if not exist node_modules call npm install >> "%LOG%" 2>&1
 
 rem Free port 3000 if an old server is still running there.
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":3000 " ^| findstr LISTENING') do taskkill /PID %%p /F >nul 2>&1
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%PORT% " ^| findstr LISTENING') do taskkill /PID %%p /F >nul 2>&1
 
 start "" /b cmd /c "npm run dev >> "%LOG%" 2>&1"
 
 rem Wait (up to 4 minutes) until the server answers.
 set /a tries=0
 :wait
-curl -s -o nul http://localhost:3000/api/health
+curl -s -o nul http://localhost:%PORT%/api/health
 if not errorlevel 1 goto up
 set /a tries+=1
 if %tries% GEQ 240 goto fail
@@ -39,15 +42,15 @@ set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
 if not exist "%CHROME%" set "CHROME=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
 if not exist "%CHROME%" set "CHROME=%LocalAppData%\Google\Chrome\Application\chrome.exe"
 if exist "%CHROME%" goto chrome
-start "" http://localhost:3000
+start "" http://localhost:%PORT%
 exit /b
 
 :edge
-start "" "%EDGE%" --app=http://localhost:3000 --window-size=1500,950
+start "" "%EDGE%" --app=http://localhost:%PORT% --window-size=1500,950
 exit /b
 
 :chrome
-start "" "%CHROME%" --app=http://localhost:3000 --window-size=1500,950
+start "" "%CHROME%" --app=http://localhost:%PORT% --window-size=1500,950
 exit /b
 
 :fail
