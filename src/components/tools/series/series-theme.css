@@ -1,0 +1,132 @@
+/*
+ * Series Studio theme: frosted glass over an airy backdrop, charcoal cards for contrast.
+ * Two looks (light / dark) set variables on .series-root; the existing screens keep their layout and
+ * their dark-palette utility classes - in the light look those classes are remapped below.
+ */
+
+.series-root {
+  --s-frost: rgba(255, 255, 255, 0.07);
+  --s-frost-border: rgba(255, 255, 255, 0.1);
+  --s-fg: #f2f2f3;
+  --s-muted: #a1a1aa;
+  --s-dark: rgba(38, 38, 42, 0.88);
+  --s-dark-fg: #f6f6f7;
+  --s-border: rgba(255, 255, 255, 0.1);
+  --s-hover: rgba(255, 255, 255, 0.08);
+  position: relative;
+  color: var(--s-fg);
+}
+.series-root.series-light {
+  --s-frost: rgba(255, 255, 255, 0.58);
+  --s-frost-border: rgba(255, 255, 255, 0.75);
+  --s-fg: #16171a;
+  --s-muted: #62666d;
+  --s-dark: rgba(58, 60, 66, 0.93);
+  --s-dark-fg: #f7f7f8;
+  --s-border: rgba(20, 22, 26, 0.1);
+  --s-hover: rgba(255, 255, 255, 0.85);
+}
+
+/* ───────── the backdrop ───────── */
+.series-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 2rem;
+  pointer-events: none;
+  background: linear-gradient(160deg, #1b1c20 0%, #121316 55%, #0c0d0f 100%);
+}
+.series-light .series-stage {
+  background:
+    radial-gradient(1200px 520px at 78% -8%, rgba(255, 255, 255, 0.95), transparent 60%),
+    radial-gradient(900px 600px at 8% 30%, rgba(255, 255, 255, 0.7), transparent 62%),
+    linear-gradient(180deg, #e9ecef 0%, #dde1e6 55%, #cfd4da 100%);
+}
+/* soft vertical window frames, blurred, like the room behind the glass */
+.series-stage::before {
+  content: "";
+  position: absolute;
+  inset: -4%;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 11%, rgba(255, 255, 255, 0.05) 11% 12.2%);
+  filter: blur(6px);
+  opacity: 0.8;
+}
+.series-light .series-stage::before {
+  background: repeating-linear-gradient(90deg, transparent 0 13%, rgba(255, 255, 255, 0.55) 13% 14.5%);
+  opacity: 0.55;
+}
+/* a pale floor */
+.series-stage::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 34%;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.04));
+}
+.series-light .series-stage::after {
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.7));
+}
+
+/* ───────── dashboard tiles ───────── */
+.sd-frost {
+  background: var(--s-frost);
+  color: var(--s-fg);
+  border-color: var(--s-frost-border);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow: 0 10px 30px -14px rgba(20, 24, 32, 0.25);
+}
+.sd-dark {
+  background: var(--s-dark);
+  color: var(--s-dark-fg);
+  border-color: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 14px 34px -14px rgba(10, 12, 16, 0.55);
+}
+.series-light .sd-frost:is(button):hover { border-color: rgba(255, 255, 255, 1); }
+
+/* ───────── light look: the existing screens' dark utility classes, remapped ───────── */
+.series-light .text-neutral-100, .series-light .text-neutral-200 { color: var(--s-fg); }
+.series-light .text-neutral-300, .series-light .text-neutral-400 { color: #474c53; }
+.series-light .text-neutral-500, .series-light .text-neutral-600 { color: #7b8189; }
+.series-light .hover\:text-neutral-200:hover { color: var(--s-fg); }
+.series-light .hover\:text-white:hover { color: #000; }
+.series-light .text-violet-400, .series-light .text-violet-200 { color: #6d28d9; }
+.series-light .text-sky-400, .series-light .text-sky-300, .series-light .text-sky-200 { color: #0369a1; }
+.series-light .text-emerald-400, .series-light .text-emerald-300 { color: #047857; }
+.series-light .text-amber-400, .series-light .text-amber-300 { color: #b45309; }
+.series-light .text-rose-200, .series-light .text-rose-300, .series-light .text-rose-400, .series-light .hover\:text-rose-400:hover { color: #be123c; }
+.series-light .placeholder\:text-neutral-500::placeholder { color: #8a9098; }
+
+.series-light .bg-neutral-900\/30, .series-light .bg-neutral-900\/40, .series-light .bg-neutral-900\/50, .series-light .bg-neutral-900\/60,
+.series-light .bg-neutral-900\/70, .series-light .bg-neutral-800, .series-light .bg-neutral-800\/70, .series-light .bg-neutral-950 {
+  background-color: var(--s-frost);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.series-light .bg-neutral-700 { background-color: var(--s-dark); }
+.series-light .bg-neutral-700.text-white, .series-light .bg-neutral-700 .text-white { color: #fff; }
+.series-light .hover\:bg-neutral-800:hover, .series-light .hover\:bg-neutral-800\/60:hover, .series-light .hover\:bg-neutral-900\/70:hover { background-color: var(--s-hover); }
+.series-light .hover\:bg-neutral-600:hover { background-color: rgba(20, 22, 26, 0.9); }
+.series-light .bg-black { background-color: rgba(20, 22, 26, 0.35); }
+.series-light .bg-rose-950\/40 { background-color: rgba(255, 228, 232, 0.75); }
+
+.series-light .border-neutral-800, .series-light .border-neutral-700 { border-color: var(--s-border); }
+.series-light .hover\:border-neutral-700:hover { border-color: rgba(20, 22, 26, 0.22); }
+.series-light .focus\:border-neutral-500:focus { border-color: rgba(20, 22, 26, 0.4); }
+.series-light .border-rose-900\/60, .series-light .border-rose-800\/60, .series-light .border-rose-700\/50 { border-color: rgba(225, 29, 72, 0.35); }
+.series-light .border-sky-900\/60, .series-light .border-sky-700\/70, .series-light .border-sky-700, .series-light .border-sky-600\/50, .series-light .border-sky-600 { border-color: rgba(3, 105, 161, 0.4); }
+.series-light .border-emerald-700\/50 { border-color: rgba(4, 120, 87, 0.4); }
+.series-light .border-amber-700\/50 { border-color: rgba(180, 83, 9, 0.4); }
+.series-light .border-violet-900\/60 { border-color: rgba(109, 40, 217, 0.35); }
+
+.series-light .from-neutral-900\/60 { --tw-gradient-from: rgba(255, 255, 255, 0.72); }
+.series-light .from-neutral-900\/70 { --tw-gradient-from: rgba(255, 255, 255, 0.75); }
+.series-light .to-neutral-900\/20, .series-light .to-neutral-900\/30 { --tw-gradient-to: rgba(255, 255, 255, 0.35); }
+.series-light .shadow-emerald-950\/40, .series-light .shadow-violet-950\/40 { --tw-shadow-color: rgba(20, 24, 32, 0.25); }
+
+/* inputs and text areas read well on glass in both looks */
+.series-light input, .series-light textarea, .series-light select { color: var(--s-fg); }
+.series-light ::selection { background: rgba(109, 40, 217, 0.22); }

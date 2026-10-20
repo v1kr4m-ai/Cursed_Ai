@@ -442,6 +442,7 @@ export default function App() {
               <ChatWindow
                 chat={activeChat}
                 onOpenStudio={(req) => { setActiveTab(req.kind); requestStudio(req); }}
+                onNavigate={setActiveTab}
                 onUpdateChat={updateChat}
                 onArchiveChat={archiveChat}
                 onCreateChat={createNewChat}

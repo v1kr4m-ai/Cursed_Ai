@@ -44,6 +44,7 @@ import { MicModeButton } from "../voice/MicModeButton";
 import { cn } from "@/lib/utils";
 import { notify, notifyError, notifyWarning } from "../../lib/notify";
 import { parseStudioCommand, StudioIntent, StudioRequest } from "../../services/studioIntent";
+import { SeriesSummaryCard } from "./SeriesSummaryCard";
 import { makeUtterance } from "../../services/tts";
 import { ProgressBar } from "../layout/ProgressBar";
 import { fitFor, useSystemInfo } from "../../lib/ramFit";
@@ -61,6 +62,8 @@ interface ChatWindowProps {
   onSetVoiceEngine?: (pref: "auto" | "browser" | "whisper") => void;
   /** Open an Image / Video studio with a prompt (typed requests like "create an image of ..."). */
   onOpenStudio?: (req: StudioRequest) => void;
+  /** Go to another tab (the series card on the home screen). */
+  onNavigate?: (tab: string) => void;
 }
 
 /** Markdown code block with a copy button. */
@@ -78,7 +81,7 @@ function CodeBlock({ children }: { children?: React.ReactNode }) {
   );
 }
 
-export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings, onSetVoiceEngine, onOpenStudio }: ChatWindowProps) {
+export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, models, selectedModel, onSelectModel, settings, onSetVoiceEngine, onOpenStudio, onNavigate }: ChatWindowProps) {
   // A typed "create an image of ..." gets a one-click offer to open the studio (the model still answers as usual).
   const [studioHint, setStudioHint] = useState<StudioIntent | null>(null);
   const [input, setInput] = useState("");
@@ -591,6 +594,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
               </button>
             ))}
           </div>
+          {onNavigate && <SeriesSummaryCard onOpen={() => onNavigate("series")} />}
         </div>
 
         {/* Input bar pinned to the bottom of the main page, same as an active chat */}
