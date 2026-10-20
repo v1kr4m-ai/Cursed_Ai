@@ -3,6 +3,7 @@ import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
 import { registerComfyTool } from "./comfyTool/routes";
 import { registerSeriesTool } from "./seriesTool/routes";
+import { resetInterruptedJobs } from "./seriesTool/reconcile";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -1643,6 +1644,9 @@ async function startServer() {
     getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
     galleryDirs: { image: galleryDir("image"), video: galleryDir("video") },
   });
+
+  // Jobs from before this start can no longer be running: put their scenes and stills back to pending.
+  try { const r = resetInterruptedJobs(path.join(process.cwd(), "series")); if (r.reset) console.log(`[Series] Reset ${r.reset} interrupted render job(s) across ${r.projects} project(s).`); } catch (e: any) { console.log("[Series] Could not check for interrupted jobs: " + (e?.message || e)); }
 
   registerSeriesTool(app, {
     projectsRoot: path.join(process.cwd(), "series"),
