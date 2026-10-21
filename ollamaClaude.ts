@@ -172,7 +172,9 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
     if (allowed.length) args.push("--allowedTools", allowed.join(","));
     for (const d of Array.isArray(b.addDirs) ? b.addDirs : []) if (typeof d === "string" && fs.existsSync(d)) args.push("--add-dir", d);
     if (Number(b.maxTurns) > 0) args.push("--max-turns", String(Math.min(200, Math.round(Number(b.maxTurns)))));
-    if (typeof b.appendSystemPrompt === "string" && b.appendSystemPrompt.trim()) args.push("--append-system-prompt", b.appendSystemPrompt.trim());
+    // Smaller models guess the home folder for "a file called x" unless told where they are, and the write is then refused.
+    const where = `Your working directory is ${cwd}. Create and edit files inside it: use relative paths such as "hello.txt" or paths that start with this folder. Never write to the home folder or anywhere outside the working directory.`;
+    args.push("--append-system-prompt", [where, typeof b.appendSystemPrompt === "string" ? b.appendSystemPrompt.trim() : ""].filter(Boolean).join(" "));
     // Your own Claude settings add hooks and a long skill list - tens of thousands of tokens, which small local models cannot digest. Off unless asked for.
     if (b.userSettings !== true) args.push("--setting-sources", "project");
 
