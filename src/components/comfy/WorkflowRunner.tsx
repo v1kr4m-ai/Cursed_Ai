@@ -1,5 +1,5 @@
 import React from "react";
-import { ReorderGroup } from "../ui/Reorder";
+import { ReorderGroup, Reorderable } from "../ui/Reorder";
 import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2, Ruler, ArrowLeftRight, ListPlus, Minus } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
@@ -625,6 +625,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
         </ReorderGroup>
 
         {/* ───────── Canvas ───────── */}
+        <ReorderGroup id={`studio-${kind}-workflows-canvas`}>
         <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">
           {showHistory ? (
             <>
@@ -666,18 +667,18 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
             </div>
           )}
 
-          <PreviousResults kind={kind} prompt={prompt} refreshKey={history.length} activeUrl={stagePath} onShow={it => setViewPath(it.file)} />
+          <Reorderable id="previous"><PreviousResults kind={kind} prompt={prompt} refreshKey={history.length} activeUrl={stagePath} onShow={it => setViewPath(it.file)} /></Reorderable>
 
           {/* Job queue - always visible */}
-          <QueueList
+          <Reorderable id="queue"><QueueList
             kind={kind}
             rows={active.map(r => ({ id: r.runId, label: r.workflow + (r.ahead !== null ? ` (${r.ahead} ahead)` : ""), status: r.status, detail: r.progress ? `${r.progress[0]}/${r.progress[1]}` : undefined, pausable: !!r.pausable, cancellable: r.cancellable }))}
             onPause={pauseJob} onResume={resumeJob} onCancel={cancelOther} onRemove={dropJob}
-          />
+          /></Reorderable>
 
           {/* Filmstrip */}
           {history.length > 0 && (
-            <div>
+            <Reorderable id="recent">
               <p className={label}>Recent</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {history.slice(0, 24).map(h => (
@@ -686,10 +687,11 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                   </button>
                 ))}
               </div>
-            </div>
+            </Reorderable>
           )}
           </>)}
         </div>
+        </ReorderGroup>
       </div>
 
       <FolderPickerDialog
