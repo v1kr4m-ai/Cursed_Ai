@@ -124,3 +124,13 @@ export function cleanCues(raw: any): Cue[] {
     .filter(c => Number.isFinite(c.start) && Number.isFinite(c.end) && c.end > c.start)
     .sort((a, b) => a.start - b.start);
 }
+
+const srtTime = (s: number) => {
+  const ms = Math.max(0, Math.round(s * 1000));
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+};
+/** The cues as a standard .srt file (for uploading next to a video). */
+export function buildSrt(cues: Cue[]): string {
+  return cues.filter(c => c.text.trim() && c.end > c.start).map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text.trim()}\n`).join("\n");
+}

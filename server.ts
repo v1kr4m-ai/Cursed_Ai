@@ -2,6 +2,7 @@ import { registerHub, modelDirs } from "./hub";
 import { streamGemini } from "./geminiChat";
 import { registerLmStudio } from "./lmStudio";
 import { registerSubtitles } from "./seriesTool/subtitles";
+import { registerExport } from "./seriesTool/exportEpisodes";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
 import { registerComfyTool } from "./comfyTool/routes";
@@ -1668,6 +1669,7 @@ async function startServer() {
     projectsRoot: path.join(process.cwd(), "series"),
     getComfyUrl: () => COMFYUI_URL,
   });
+  registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     transcribe: async samples => {

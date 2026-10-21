@@ -3,6 +3,7 @@ import { Scissors, Loader2, FolderOpen, CheckCircle2, Circle } from "lucide-reac
 import { api, fileUrl, type Episode, type Project } from "./api";
 import { SubtitlesPanel } from "./Subtitles";
 import { notify, notifyError } from "../../../lib/notify";
+import { nativeFolder, postJson } from "../../comfy/types";
 
 /**
  * Stage 3. Join each episode's finished scenes into one file with ffmpeg, and show the checklist
@@ -118,6 +119,37 @@ function SubtitleAll({ project, onChanged }: { project: Project; onChanged: (p: 
   );
 }
 
+/** Copies the joined episodes (subtitled copies when they exist) to a folder, with .srt files and a series.json. */
+function ExportBar({ project }: { project: Project }) {
+  const [busy, setBusy] = React.useState(false);
+  const [subtitled, setSubtitled] = React.useState(true);
+  const [done, setDone] = React.useState<{ dir: string; episodes: number } | null>(null);
+  const last = (() => { try { return localStorage.getItem("cursed.series.exportDir") || ""; } catch { return ""; } })();
+  const joined = project.episodes.filter(e => e.exportPath).length;
+  if (!joined) return null;
+  async function run() {
+    const picked = await nativeFolder(last || undefined);
+    if (typeof picked !== "string") { if (picked === undefined) notifyError("The folder picker is not available - type a folder in config.", "series"); return; }
+    setBusy(true);
+    try {
+      const r = await api.exportEpisodes(project.id, picked, subtitled);
+      try { localStorage.setItem("cursed.series.exportDir", picked); } catch { /* storage blocked */ }
+      setDone({ dir: r.dir, episodes: r.episodes });
+      notify({ message: `Exported ${r.episodes} episode${r.episodes === 1 ? "" : "s"}`, tab: "series" });
+    } catch (e: any) { notifyError(e?.message || String(e), "series"); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/30 p-3 text-xs">
+      <span className="font-medium">Export finished episodes</span>
+      <label className="flex items-center gap-1.5"><input type="checkbox" checked={subtitled} onChange={e => setSubtitled(e.target.checked)} className="accent-sky-500" />Use the subtitled copy when there is one</label>
+      <button onClick={run} disabled={busy} className="flex items-center gap-1.5 rounded-md bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 px-3 py-1.5 font-medium text-white">{busy ? <Loader2 size={13} className="animate-spin" /> : <FolderOpen size={13} />}Export {joined} to a folder...</button>
+      {done && <button onClick={() => postJson("/api/series/reveal-folder", { path: done.dir }).catch(() => {})} className="truncate text-sky-400 hover:underline" title="Open the folder">{done.dir}</button>}
+      <span className="opacity-55">Numbered file names, an .srt next to each video, and a series.json.</span>
+    </div>
+  );
+}
+
 export function Assemble({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
   if (!project.episodes.length) {
     return <div className="grid place-items-center h-full text-sm text-neutral-500">Nothing to assemble yet.</div>;
@@ -128,6 +160,7 @@ export function Assemble({ project, onChanged }: { project: Project; onChanged: 
         Scenes are normalised to {project.settings.width}x{project.settings.height} at {project.settings.fps} fps before joining, so clips rendered at different sizes still cut together.
       </p>
       <SubtitleAll project={project} onChanged={onChanged} />
+      <ExportBar project={project} />
       {project.episodes.map(ep => <EpisodeRow key={ep.id} project={project} episode={ep} onChanged={onChanged} />)}
     </div>
   );

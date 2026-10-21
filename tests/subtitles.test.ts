@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assColor, buildAss, chunkWords, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan } from "../seriesTool/subtitlesCore";
+import { assColor, buildAss, buildSrt, chunkWords, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan } from "../seriesTool/subtitlesCore";
 
 describe("subtitles", () => {
   it("chunks words, breaking after punctuation", () => {
@@ -30,6 +30,10 @@ describe("subtitles", () => {
     expect(ass).toContain("Style: Default,Impact,");
     expect(ass).toContain(",8,"); // top alignment
     expect(ass).toContain("Dialogue: 0,0:00:00.00,0:00:01.50,Default,,0,0,0,,HI THERE");
+  });
+
+  it("writes a standard srt", () => {
+    expect(buildSrt([{ id: "a", start: 1.5, end: 3.25, text: "Hello" }, { id: "b", start: 3600.5, end: 3601, text: "Later" }])).toBe("1\n00:00:01,500 --> 00:00:03,250\nHello\n\n2\n01:00:00,500 --> 01:00:01,000\nLater\n");
   });
 
   it("drops broken cues from edits", () => {
