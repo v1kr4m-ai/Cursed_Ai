@@ -221,6 +221,21 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
     proc.stdin.end(prompt);
   });
 
+  /** Puts a file back as it was before Claude touched it. Only inside the working folder or a folder added to the session. */
+  app.post("/api/oclaude/undo", (req, res) => {
+    const b = req.body || {};
+    const cwd = typeof b.cwd === "string" ? b.cwd : "";
+    if (!cwd || typeof b.path !== "string" || !(b.before === null || typeof b.before === "string")) return res.status(400).json({ error: "Bad request" });
+    const target = path.resolve(cwd, b.path);
+    const roots = [cwd, ...(Array.isArray(b.addDirs) ? b.addDirs : [])].filter((d): d is string => typeof d === "string" && !!d).map(d => path.resolve(d));
+    if (!roots.some(r => target === r || target.startsWith(r + path.sep))) return res.status(403).json({ error: "That file is outside the session's folders." });
+    try {
+      if (b.before === null) fs.rmSync(target, { force: true });
+      else { fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, b.before, "utf8"); }
+      res.json({ ok: true, path: target });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   app.post("/api/oclaude/stop", (req, res) => {
     const proc = runs.get(String(req.body?.runId || ""));
     if (proc) killTree(proc);

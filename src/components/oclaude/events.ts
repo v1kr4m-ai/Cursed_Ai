@@ -4,9 +4,33 @@ export type Item =
   | { kind: "user"; id: string; text: string }
   | { kind: "text"; id: string; text: string }
   | { kind: "thinking"; id: string; text: string }
-  | { kind: "tool"; id: string; toolId: string; name: string; input: any; status: "running" | "done" | "error"; result?: string }
+  | { kind: "tool"; id: string; toolId: string; name: string; input: any; status: "running" | "done" | "error"; result?: string; change?: Change }
   | { kind: "notice"; id: string; tone: "info" | "warn" | "error"; text: string }
   | { kind: "result"; id: string; ok: boolean; turns: number; ms: number; denials: { tool: string; input: any }[] };
+
+/** A file Claude wrote or edited, with what it held before (null = it did not exist), so the change can be undone. */
+export interface Change { path: string; before: string | null; big?: boolean; undone?: boolean }
+const UNDO_LIMIT = 400_000;
+
+/** Write and Edit results carry the file's previous content; keep it. */
+function changeOf(r: any): Change | undefined {
+  if (!r || typeof r.filePath !== "string" || r.originalFile === undefined) return undefined;
+  const before: string | null = r.originalFile;
+  if (typeof before === "string" && before.length > UNDO_LIMIT) return { path: r.filePath, before: null, big: true };
+  return { path: r.filePath, before };
+}
+
+/** The files changed in a session, one row each: the oldest "before" wins, so undoing restores what was there at the start. */
+export function changedFiles(items: Item[]): { path: string; before: string | null; big: boolean; undone: boolean }[] {
+  const map = new Map<string, { path: string; before: string | null; big: boolean; undone: boolean }>();
+  for (const it of items) {
+    if (it.kind !== "tool" || !it.change) continue;
+    const c = it.change, prev = map.get(c.path);
+    if (prev) prev.undone = !!c.undone;
+    else map.set(c.path, { path: c.path, before: c.before, big: !!c.big, undone: !!c.undone });
+  }
+  return [...map.values()];
+}
 
 export interface InitInfo { model: string; tools: string[]; slashCommands: string[]; mcpServers: { name: string; status: string }[]; cwd: string }
 
@@ -76,7 +100,7 @@ export function applyEvent(items: Item[], live: Live, ev: any): Applied {
       let next = items;
       for (const b of blocks) {
         if (b.type !== "tool_result") continue;
-        next = next.map(it => (it.kind === "tool" && it.toolId === b.tool_use_id ? { ...it, status: b.is_error ? "error" : "done", result: resultText(b.content) } : it));
+        next = next.map(it => (it.kind === "tool" && it.toolId === b.tool_use_id ? { ...it, status: b.is_error ? "error" : "done", result: resultText(b.content), change: b.is_error ? undefined : changeOf(ev.tool_use_result) } : it));
       }
       return { items: next, live, patch: {} };
     }

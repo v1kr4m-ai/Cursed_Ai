@@ -2,12 +2,13 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion } from "motion/react";
-import { AlertTriangle, Archive, Bot, Brain, Check, CheckCircle2, ChevronDown, Cloud, Copy, Cpu, Download, FolderOpen, GitFork, Loader2, MoreVertical, Plus, Send, Settings2, ShieldCheck, Square, Trash2, X } from "lucide-react";
+import { AlertTriangle, Archive, Bot, Brain, Check, CheckCircle2, ChevronDown, Cloud, Copy, Cpu, Download, FolderOpen, GitFork, Loader2, MoreVertical, Plus, Send, Settings2, ShieldCheck, Square, Trash2, Undo2, X } from "lucide-react";
 import { AppSettings, MessageRole } from "../../types";
 import { cn } from "@/lib/utils";
 import { nativeFolder } from "../comfy/types";
 import { notify, notifyError } from "../../lib/notify";
 import { CodeBlock } from "../chat/ChatWindow";
+import { changedFiles } from "./events";
 import { ToolCard } from "./ToolCard";
 import { Chip, QuickBar } from "./QuickBar";
 import { applyEvent, emptyLive, loadSessions, newSession, noticeItem, saveSessions, titleFrom, toMarkdown, userItem, type Live, type Session } from "./events";
@@ -85,6 +86,24 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     const t = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
     return () => clearInterval(t);
   }, [running]);
+
+  const [filesOpen, setFilesOpen] = React.useState(false);
+  const undoFiles = async (paths: string[]) => {
+    if (!session) return;
+    const done: string[] = [];
+    // Newest first, so a file Claude touched twice ends up as it was at the start.
+    for (const f of changedFiles(session.items).filter(f => paths.includes(f.path) && !f.undone && !f.big).reverse()) {
+      try {
+        const r = await fetch("/api/oclaude/undo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cwd: session.cwd, addDirs: prefs.addDirs, path: f.path, before: f.before }) });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not undo");
+        done.push(f.path);
+      } catch (e: any) { notifyError(`${f.path}: ${e.message}`, "ollamaclaude"); }
+    }
+    if (done.length) {
+      update(session.id, s => ({ ...s, items: s.items.map(it => (it.kind === "tool" && it.change && done.includes(it.change.path) ? { ...it, change: { ...it.change, undone: true } } : it)) }));
+      notify({ message: `Put back ${done.length} file${done.length > 1 ? "s" : ""}`, tab: "ollamaclaude" });
+    }
+  };
 
   const startNew = (cwd?: string) => {
     const s = newSession(cwd || session?.cwd || status?.workspace || "", model);
@@ -400,6 +419,34 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
               <button onClick={() => copyCmd("setx OLLAMA_CONTEXT_LENGTH 32768")} className="flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-2.5 py-1 font-mono text-[11px] hover:bg-amber-500/30">{copied ? <Check size={11} /> : <Copy size={11} />}setx OLLAMA_CONTEXT_LENGTH 32768</button>
             </div>
           )}
+          {(() => {
+            const files = changedFiles(session.items);
+            if (!files.length) return null;
+            const open = files.filter(f => !f.undone && !f.big).map(f => f.path);
+            const name = (p: string) => p.split(/[\/]/).pop();
+            return (
+              <div className="mb-2 rounded-2xl border border-white/10 bg-white/5 text-xs text-zinc-300">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <button onClick={() => setFilesOpen(o => !o)} className="flex flex-1 items-center gap-2 text-left">
+                    <ChevronDown size={13} className={cn("transition-transform", !filesOpen && "-rotate-90")} />
+                    <span>Files changed <span className="text-zinc-500">({files.length})</span></span>
+                  </button>
+                  {open.length > 0 && <button onClick={() => undoFiles(open)} disabled={running} className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-40"><Undo2 size={12} />Undo all</button>}
+                </div>
+                {filesOpen && (
+                  <div className="space-y-0.5 border-t border-white/5 px-3 py-2">
+                    {files.map(f => (
+                      <div key={f.path} className="flex items-center gap-2">
+                        <span className={cn("min-w-0 flex-1 truncate font-mono", f.undone && "text-zinc-600 line-through")} title={f.path}>{name(f.path)}</span>
+                        <span className="text-[10px] text-zinc-500">{f.undone ? "put back" : f.before === null && !f.big ? "new" : f.big ? "too large to undo" : "edited"}</span>
+                        {!f.undone && !f.big && <button onClick={() => undoFiles([f.path])} disabled={running} title={f.before === null ? "Delete this new file" : "Restore the previous content"} className="rounded-md px-1.5 py-0.5 text-violet-300 hover:bg-white/10 disabled:opacity-40">Undo</button>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {prefs.showQuick && <QuickBar cwd={session.cwd} known={session.init?.slashCommands || []} mcp={session.init?.mcpServers || []} draft={input} onInsert={insert} />}
           <div className="flex items-end gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5 shadow-xl shadow-black/40 transition-all duration-300 ease-out focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
             <div className="mb-0.5 ml-0.5 flex shrink-0 gap-0.5">

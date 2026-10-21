@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEvent, emptyLive, resultText, type Item } from "../src/components/oclaude/events";
+import { applyEvent, changedFiles, emptyLive, resultText, type Item } from "../src/components/oclaude/events";
 
 describe("Ollama_Claude events", () => {
   it("takes the session id and tool list from init", () => {
@@ -46,5 +46,18 @@ describe("Ollama_Claude events", () => {
   it("flattens and shortens tool output", () => {
     expect(resultText([{ type: "text", text: "a" }, { type: "text", text: "b" }])).toBe("a\nb");
     expect(resultText("x".repeat(7000))).toContain("1000 more characters");
+  });
+
+  it("remembers what a file held before Claude changed it", () => {
+    const tool = (id: string, name: string): Item => ({ kind: "tool", id, toolId: id, name, input: {}, status: "running" });
+    const result = (id: string, r: any) => ({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content: "ok" }] }, tool_use_result: r });
+    let items: Item[] = [tool("a", "Write"), tool("b", "Edit"), tool("c", "Edit")];
+    items = applyEvent(items, emptyLive, result("a", { type: "create", filePath: "new.txt", originalFile: null })).items;
+    items = applyEvent(items, emptyLive, result("b", { filePath: "t.txt", originalFile: "one" })).items;
+    items = applyEvent(items, emptyLive, result("c", { filePath: "t.txt", originalFile: "two" })).items;
+    expect(changedFiles(items)).toEqual([
+      { path: "new.txt", before: null, big: false, undone: false },
+      { path: "t.txt", before: "one", big: false, undone: false },
+    ]);
   });
 });
