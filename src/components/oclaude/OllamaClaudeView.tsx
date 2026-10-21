@@ -115,7 +115,10 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     const id = session.id;
     const allowed = [...new Set([...session.allowed, ...extraAllowed])];
     if (!textOverride) setInput("");
-    update(id, s => ({ ...s, model, allowed, title: s.items.length ? s.title : titleFrom(text), items: [...s.items, userItem(text)], updatedAt: Date.now() }));
+    // The transcript is built here, outside React's state updater: updaters run twice in development and would double every streamed word.
+    const first = userItem(text);
+    let itemsNow = [...session.items, first];
+    update(id, s => ({ ...s, model, allowed, title: s.items.length ? s.title : titleFrom(text), items: itemsNow, updatedAt: Date.now() }));
     setRunning(true); setLive(emptyLive);
     const ctrl = new AbortController();
     abort.current = ctrl;
@@ -140,17 +143,16 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
           let ev: any;
           try { ev = JSON.parse(part.slice(6)); } catch { continue; }
           if (ev.type === "cursed_run") { runId.current = ev.runId; update(id, s => ({ ...s, fork: false })); continue; }
-          update(id, s => {
-            const a = applyEvent(s.items, liveNow, ev);
-            liveNow = a.live;
-            return { ...s, ...a.patch, items: a.items, updatedAt: Date.now() };
-          });
+          const a = applyEvent(itemsNow, liveNow, ev);
+          itemsNow = a.items; liveNow = a.live;
+          update(id, s => ({ ...s, ...a.patch, items: a.items, updatedAt: Date.now() }));
           setLive(liveNow);
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError") update(id, s => ({ ...s, items: [...s.items, noticeItem("error", e?.message || String(e))] }));
-      else update(id, s => ({ ...s, items: [...s.items, noticeItem("info", "Stopped.")] }));
+      itemsNow = [...itemsNow, e?.name !== "AbortError" ? noticeItem("error", e?.message || String(e)) : noticeItem("info", "Stopped.")];
+      const end = itemsNow;
+      update(id, s => ({ ...s, items: end }));
     } finally {
       setRunning(false); setLive(emptyLive); abort.current = null; runId.current = "";
     }
