@@ -98,7 +98,7 @@ export function Sidebar({
 
   const navItems = [
     { id: "chat", label: "Chat", icon: MessageSquare },
-    { id: "ollamaclaude", label: "Ollama_Claude", icon: Bot, sub: true },
+    { id: "ollamaclaude", label: "Ollama_Claude", icon: Bot },
     { id: "vision", label: "Vision", icon: Eye },
     { id: "image", label: "Image", icon: ImagePlus },
     { id: "video", label: "Video", icon: Clapperboard },
