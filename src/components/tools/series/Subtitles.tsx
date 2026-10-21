@@ -87,7 +87,6 @@ export function SubtitlesPanel({ project, episode, onChanged }: { project: Proje
               <video ref={video} src={fileUrl(episode.exportPath!)} controls onLoadedMetadata={measure} onTimeUpdate={e => setNow(e.currentTarget.currentTime)} onSeeked={e => setNow(e.currentTarget.currentTime)} className="block w-full" />
               {active && <div className="pointer-events-none absolute inset-x-0 flex justify-center" style={pos}><span style={overlayStyle}>{active.text}</span></div>}
             </div>
-            {episode.subtitles?.outPath && <video src={fileUrl(episode.subtitles.outPath)} controls className="mx-auto w-full max-w-[260px] rounded bg-black" title="The burned-in copy" />}
           </div>
 
           <div className="space-y-3 min-w-0">

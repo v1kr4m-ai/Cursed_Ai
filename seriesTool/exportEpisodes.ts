@@ -8,6 +8,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { createSeriesStore } from "./store";
 import { buildSrt } from "./subtitlesCore";
+import { pickFinal } from "./finishCore";
 
 const safe = (s: string) => s.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) || "episode";
 
@@ -27,7 +28,8 @@ export function registerExport(app: express.Express, opts: { projectsRoot: strin
       const files: string[] = [];
       const manifest: any[] = [];
       for (const e of ready) {
-        const burned = preferSubtitled && e.subtitles?.outPath && fs.existsSync(e.subtitles.outPath) ? e.subtitles.outPath : null;
+        const chosen = preferSubtitled ? pickFinal(e.exportPath!, e.outputs, e.finalKind) : null;
+        const burned = chosen && chosen !== e.exportPath && fs.existsSync(chosen) ? chosen : null;
         const base = `${String(e.number).padStart(2, "0")} - ${safe(e.title)}`;
         const video = path.join(dir, base + ".mp4");
         fs.copyFileSync(burned || e.exportPath!, video);

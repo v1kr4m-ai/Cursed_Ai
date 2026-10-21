@@ -22,9 +22,14 @@ export interface SubStyle {
 }
 export interface Subtitles { cues: Cue[]; style: SubStyle; source: string; outPath?: string; updatedAt: string }
 
+export interface AudioTrack { id: string; name: string; file: string; duration: number; offset: number; gain: number; fadeIn: number; fadeOut: number }
+export interface AudioMix { tracks: AudioTrack[]; keepOriginal: boolean; originalGain: number; updatedAt: string }
+export type OutputKind = "joined" | "subtitled" | "audio" | "final";
+export interface Output { kind: OutputKind; path: string; at: string }
+
 export interface Episode {
   id: string; number: number; title: string; era: string; hookOut: string;
-  refs: Ref[]; scenes: Scene[]; exportPath: string | null; subtitles?: Subtitles; exportedAt?: string;
+  refs: Ref[]; scenes: Scene[]; exportPath: string | null; subtitles?: Subtitles; exportedAt?: string; audio?: AudioMix; outputs?: Output[]; finalKind?: string;
 }
 
 export interface ProjectSettings {
@@ -81,6 +86,18 @@ export const api = {
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/burn`, { method: "POST" }),
   redoSceneSubtitles: (id: string, episodeId: string, sceneId: string, source: string) =>
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/scene`, { method: "POST", body: JSON.stringify({ sceneId, source }) }),
+  async uploadAudio(id: string, episodeId: string, file: File, offset = 0) {
+    const res = await fetch(`/api/series/projects/${id}/episodes/${episodeId}/audio/upload?name=${encodeURIComponent(file.name)}&offset=${offset}`, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not add that file.");
+    return data as Project;
+  },
+  saveAudio: (id: string, episodeId: string, body: { tracks?: AudioTrack[]; keepOriginal?: boolean; originalGain?: number }) =>
+    call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/audio`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteAudio: (id: string, episodeId: string, trackId: string) => call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/audio/${trackId}`, { method: "DELETE" }),
+  renderEpisode: (id: string, episodeId: string, what: { subtitles: boolean; audio: boolean }) =>
+    call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/render`, { method: "POST", body: JSON.stringify(what) }),
+  pinFinal: (id: string, episodeId: string, kind: OutputKind | null) => call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/final`, { method: "PUT", body: JSON.stringify({ kind }) }),
   exportEpisodes: (id: string, dir: string, subtitled: boolean) => call<{ dir: string; files: string[]; episodes: number }>(`/api/series/projects/${id}/export`, { method: "POST", body: JSON.stringify({ dir, subtitled }) }),
   comfyStatus: () => call<{ comfyUp: boolean; comfyUrl: string }>("/api/series/workflows"),
   async uploadSource(id: string, file: File) {

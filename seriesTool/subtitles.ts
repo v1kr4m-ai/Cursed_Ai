@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { probeDuration } from "./ffmpeg";
+import { upsertOutput } from "./finishCore";
 import { createSeriesStore } from "./store";
 import { buildAss, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan, type Cue, type SubStyle, type Subtitles } from "./subtitlesCore";
 
@@ -176,6 +177,7 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
         proc.on("close", code => (code === 0 ? resolve() : reject(new Error(tail.split(/\r?\n/).filter(Boolean).slice(-3).join(" ")))));
       });
       ep.subtitles.outPath = out;
+      ep.outputs = upsertOutput(ep.outputs, "subtitled", out);
       store.save(p);
       res.json(p);
     } catch (e: any) {

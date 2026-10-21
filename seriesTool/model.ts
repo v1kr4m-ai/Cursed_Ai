@@ -46,6 +46,7 @@ export interface Scene {
 }
 
 import type { Subtitles } from "./subtitlesCore";
+import type { AudioMix, Output } from "./finishCore";
 
 export interface Episode {
   id: string;
@@ -62,6 +63,12 @@ export interface Episode {
   subtitles?: Subtitles;
   /** When the episode was last exported to a folder. */
   exportedAt?: string;
+  /** Sound added to the episode and where it starts. */
+  audio?: AudioMix;
+  /** Every finished version of the video (joined, with subtitles, with audio, both) with when it was made. */
+  outputs?: Output[];
+  /** Which version the user pinned as the final one; otherwise the newest counts. */
+  finalKind?: string;
 }
 
 export interface ProjectSettings {
