@@ -31,7 +31,7 @@ export default defineConfig(({mode}) => {
         // (or while Series renders) was reloading the page and aborting replies.
         ignored: [
           '**/.code-review-graph/**', '**/node_modules/**', '**/*.gguf', '**/memory.json', '**/config.json',
-          under('models'), under('android'), under('dist'), under('series'), under('outputs'), under('modules'), under('GGUF'),
+          under('models'), under('android'), under('dist'), under('series'), under('outputs'), under('modules'), under('GGUF'), under('train'),
           '**/*.db', '**/*.db-*', '**/app.log', '**/chats.json', '**/comfy-tool*.json', '**/google.json', '**/recent-documents.json',
         ],
       },

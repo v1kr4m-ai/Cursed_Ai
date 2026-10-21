@@ -65,3 +65,6 @@ modules/**/*.jpg
 modules/**/*.jpeg
 modules/**/*.webp
 modules/**/*.zip
+
+# Fine-tuning workspace: Python env, base models, datasets, outputs
+/train/

@@ -37,7 +37,9 @@ export interface TrainPaths {
 }
 
 export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
-  const trainRoot = cfg.trainRoot || (fs.existsSync(DEFAULT_TRAIN_ROOT) ? DEFAULT_TRAIN_ROOT : path.join(appRoot, "train"));
+  // The app's own train/ folder (Python environment, base models, datasets, outputs) wins; the old folder is only a fallback.
+  const own = path.join(appRoot, "train");
+  const trainRoot = cfg.trainRoot || (fs.existsSync(path.join(own, "llm_finetune")) || !fs.existsSync(DEFAULT_TRAIN_ROOT) ? own : DEFAULT_TRAIN_ROOT);
   const fluxgymRoot = cfg.fluxgymRoot || DEFAULT_FLUXGYM;
   const llmRoot = path.join(trainRoot, "llm_finetune");
   const win = process.platform === "win32";

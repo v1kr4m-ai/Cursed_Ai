@@ -157,7 +157,7 @@ export function Sidebar({
       <div className="p-6 flex items-center justify-between">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg">S</div>
+            <img src="/logo.jpg" alt="Cursed_Ai" className="w-10 h-10 rounded-xl object-cover shadow-lg" />
             <div>
               <h1 className="font-bold tracking-tight text-xl text-white leading-none">Cursed_Ai</h1>
               <p className="text-[10px] opacity-50 uppercase tracking-widest mt-1">Offline AI Studio</p>
@@ -306,7 +306,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
   return (
     <div className="h-16 glass rounded-2xl flex items-center px-6 justify-between md:hidden mb-4 border-white/5 shadow-lg">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 flex items-center justify-center font-bold text-white text-sm shadow-lg">S</div>
+        <img src="/logo.jpg" alt="Cursed_Ai" className="w-9 h-9 rounded-xl object-cover shadow-lg" />
         <span className="font-bold text-white tracking-tight">Cursed_Ai</span>
       </div>
       
@@ -317,7 +317,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
         <SheetContent side="left" className="bg-[#050505]/95 backdrop-blur-2xl border-white/5 p-0 w-72">
            <div className="p-8">
              <div className="flex items-center gap-3 mb-10">
-               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg">S</div>
+               <img src="/logo.jpg" alt="Cursed_Ai" className="w-10 h-10 rounded-xl object-cover shadow-lg" />
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
