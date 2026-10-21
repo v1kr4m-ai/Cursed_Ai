@@ -40,6 +40,8 @@ export function registerExport(app: express.Express, opts: { projectsRoot: strin
         }
         manifest.push({ number: e.number, title: e.title, era: e.era, hookOut: e.hookOut, file: path.basename(video), subtitles: srt ? path.basename(srt) : null, burnedSubtitles: !!burned });
       }
+      for (const e of ready) e.exportedAt = new Date().toISOString();
+      store.save(p);
       const sidecar = path.join(dir, "series.json");
       fs.writeFileSync(sidecar, JSON.stringify({ title: p.title, logline: p.idea.logline, exportedAt: new Date().toISOString(), episodes: manifest }, null, 2));
       files.push(sidecar);

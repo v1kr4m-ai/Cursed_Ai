@@ -60,6 +60,8 @@ export interface Episode {
   exportPath: string | null;
   /** Captions for the joined episode: cues, their look, and the burned-in copy once made. */
   subtitles?: Subtitles;
+  /** When the episode was last exported to a folder. */
+  exportedAt?: string;
 }
 
 export interface ProjectSettings {

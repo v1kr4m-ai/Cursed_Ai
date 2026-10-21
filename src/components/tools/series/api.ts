@@ -24,7 +24,7 @@ export interface Subtitles { cues: Cue[]; style: SubStyle; source: string; outPa
 
 export interface Episode {
   id: string; number: number; title: string; era: string; hookOut: string;
-  refs: Ref[]; scenes: Scene[]; exportPath: string | null; subtitles?: Subtitles;
+  refs: Ref[]; scenes: Scene[]; exportPath: string | null; subtitles?: Subtitles; exportedAt?: string;
 }
 
 export interface ProjectSettings {
@@ -79,6 +79,8 @@ export const api = {
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles`, { method: "PUT", body: JSON.stringify(body) }),
   burnSubtitles: (id: string, episodeId: string) =>
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/burn`, { method: "POST" }),
+  redoSceneSubtitles: (id: string, episodeId: string, sceneId: string, source: string) =>
+    call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/scene`, { method: "POST", body: JSON.stringify({ sceneId, source }) }),
   exportEpisodes: (id: string, dir: string, subtitled: boolean) => call<{ dir: string; files: string[]; episodes: number }>(`/api/series/projects/${id}/export`, { method: "POST", body: JSON.stringify({ dir, subtitled }) }),
   comfyStatus: () => call<{ comfyUp: boolean; comfyUrl: string }>("/api/series/workflows"),
   async uploadSource(id: string, file: File) {

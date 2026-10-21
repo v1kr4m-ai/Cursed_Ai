@@ -320,7 +320,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                       {!project ? (
                         <div className="flex items-center gap-2 text-sm opacity-60"><Loader2 size={14} className="animate-spin" /> Loading...</div>
                       ) : stage === "dashboard" ? (
-                        <ProjectDashboard project={project} onGo={(st, episodeId) => { setFocusEpisode(episodeId || null); setStage(st); }} />
+                        <ProjectDashboard project={project} onChanged={setProject} onGo={(st, episodeId) => { setFocusEpisode(episodeId || null); setStage(st); }} />
                       ) : stage === "develop" ? (
                         <Develop project={project} modelId={modelId} models={models} onSaved={setProject} />
                       ) : stage === "produce" ? (

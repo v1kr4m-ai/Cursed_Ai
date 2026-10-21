@@ -40,6 +40,12 @@ export function SubtitlesPanel({ project, episode, onChanged }: { project: Proje
     setBusy(kind);
     try { return await fn(); } catch (e: any) { notifyError(e?.message || String(e), "series"); } finally { setBusy(""); }
   }
+  const redoScene = (sceneId: string) => run("gen", async () => { onChanged(await api.redoSceneSubtitles(project.id, episode.id, sceneId, source)); });
+  // Scene windows in the joined episode, so the list can be grouped and a scene redone on its own.
+  const windows = React.useMemo(() => {
+    let t = 0;
+    return [...episode.scenes].sort((a, b) => a.number - b.number).map(s => { const w = { id: s.id, number: s.number, from: t, to: t + (s.durationS || 7) }; t = w.to; return w; });
+  }, [episode.scenes]);
   const generate = () => run("gen", async () => { onChanged(await api.generateSubtitles(project.id, episode.id, source)); notify({ message: "Subtitles ready - check them below", tab: "series" }); });
   const save = () => run("save", async () => { onChanged(await api.saveSubtitles(project.id, episode.id, { cues, style })); setDirty(false); });
   const burn = () => run("burn", async () => {
@@ -111,15 +117,27 @@ export function SubtitlesPanel({ project, episode, onChanged }: { project: Proje
 
             {/* the words, editable */}
             <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
-              {cues.map((c, i) => (
-                <div key={c.id} className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 ${active?.id === c.id ? "bg-sky-500/15" : ""}`}>
+              {cues.map((c, i) => {
+                const win = windows.find(w => (c.start + c.end) / 2 >= w.from && (c.start + c.end) / 2 < w.to);
+                const first = win && cues.findIndex(x => { const m = (x.start + x.end) / 2; return m >= win.from && m < win.to; }) === i;
+                return (
+                <React.Fragment key={c.id}>
+                {first && win && (
+                  <div className="flex items-center gap-2 pt-1 text-[10px] opacity-60">
+                    <span className="font-semibold">Scene {win.number}</span><span className="font-mono">{fmt(win.from)}-{fmt(win.to)}</span>
+                    <button onClick={() => redoScene(win.id)} disabled={!!busy} title="Make the subtitles of this scene again with the source above; other scenes stay as they are" className="ml-auto rounded border border-neutral-700 px-2 py-0.5 hover:opacity-100 disabled:opacity-40">Redo this scene</button>
+                  </div>
+                )}
+                <div className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 ${active?.id === c.id ? "bg-sky-500/15" : ""}`}>
                   <button onClick={() => { if (video.current) { video.current.currentTime = c.start; video.current.play().catch(() => {}); } }} title="Jump to this line" className="w-12 shrink-0 text-left font-mono text-[10px] opacity-55 hover:opacity-100">{fmt(c.start)}</button>
                   <input type="number" step={0.05} value={c.start} onChange={e => edit(cues.map((x, j) => j === i ? { ...x, start: Number(e.target.value) } : x))} className={`${field} w-16`} title="Start (seconds)" />
                   <input type="number" step={0.05} value={c.end} onChange={e => edit(cues.map((x, j) => j === i ? { ...x, end: Number(e.target.value) } : x))} className={`${field} w-16`} title="End (seconds)" />
                   <input value={c.text} onChange={e => edit(cues.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} className={`${field} min-w-0 flex-1`} />
                   <button onClick={() => edit(cues.filter((_, j) => j !== i))} title="Delete this line" className="opacity-50 hover:opacity-100"><Trash2 size={12} /></button>
                 </div>
-              ))}
+                </React.Fragment>
+                );
+              })}
               <button onClick={() => { const t = video.current?.currentTime ?? 0; edit([...cues, { id: "n" + Date.now().toString(36), start: t, end: t + 1.5, text: "New line" }].sort((a, b) => a.start - b.start)); }} className="flex items-center gap-1 text-[11px] opacity-60 hover:opacity-100"><Plus size={12} /> Add a line at the playhead</button>
             </div>
 

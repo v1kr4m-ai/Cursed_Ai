@@ -20,6 +20,8 @@ const TILE_DEFS: TileDef[] = [
   { id: "clips", title: "Latest clips", x: 12, y: 30, w: 12, h: 24 },
   { id: "joined", title: "Stitched episodes", x: 0, y: 42, w: 12, h: 24 },
   { id: "refs", title: "Cast & references", x: 12, y: 54, w: 12, h: 24 },
+  { id: "publish", title: "Publish checklist", x: 0, y: 66, w: 12, h: 18 },
+  { id: "redo", title: "Redo a scene", x: 12, y: 78, w: 12, h: 22 },
 ];
 
 const SCENE_COLOR: Record<Scene["status"], string> = {
@@ -30,7 +32,91 @@ const SCENE_COLOR: Record<Scene["status"], string> = {
  * The board you land on when a series is open: where it stands, what is rendering, what is next - every card opens the part
  * of the studio it summarises.
  */
-export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go }) {
+/** What each episode still needs before it can be posted: rendered, joined, subtitled, exported. */
+function PublishCard({ project, onGo }: { project: Project; onGo: Go }) {
+  const steps = (e: Project["episodes"][number]) => {
+    const rendered = e.scenes.length > 0 && e.scenes.every(s => s.status === "done" && s.clipPath);
+    return [
+      { label: "Rendered", ok: rendered, go: "produce" as const },
+      { label: "Joined", ok: !!e.exportPath, go: "assemble" as const },
+      { label: "Subtitled", ok: !!e.subtitles?.outPath, go: "assemble" as const },
+      { label: "Exported", ok: !!e.exportedAt, go: "assemble" as const },
+    ];
+  };
+  const all = project.episodes.map(e => ({ e, s: steps(e) }));
+  const ready = all.filter(x => x.s.every(y => y.ok)).length;
+  return (
+    <>
+      <p className="mb-2 text-[11px] opacity-60">{ready} of {all.length} episodes done and exported</p>
+      {all.length === 0 ? <p className="text-xs opacity-50">Build a plan in Develop to see each episode here.</p> : (
+        <div className="space-y-1">
+          {all.map(({ e, s }) => (
+            <div key={e.id} className="flex items-center gap-2 text-[11px]">
+              <span className="w-40 shrink-0 truncate opacity-75" title={e.title}>{e.number}. {e.title}</span>
+              <div className="flex flex-1 flex-wrap gap-1">
+                {s.map(y => (
+                  <button key={y.label} onClick={() => onGo(y.go, e.id)} title={y.ok ? y.label + " - done" : y.label + " - still to do"}
+                    className={"rounded-full px-2 py-0.5 text-[10px] transition-colors " + (y.ok ? "bg-emerald-500/20 text-emerald-600" : "bg-current/10 opacity-60 hover:opacity-100")}>
+                    {y.ok ? "✓ " : ""}{y.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Pick any scene, change what it shows or says, and render just that one again. */
+function RedoCard({ project, onChanged, onGo }: { project: Project; onChanged?: (p: Project) => void; onGo: Go }) {
+  const eps = project.episodes.filter(e => e.scenes.length);
+  const [epId, setEpId] = React.useState(eps[0]?.id || "");
+  const ep = eps.find(e => e.id === epId) || eps[0];
+  const scenes = ep ? [...ep.scenes].sort((a, b) => a.number - b.number) : [];
+  const [sceneId, setSceneId] = React.useState("");
+  const scene = scenes.find(s => s.id === sceneId) || scenes[0];
+  const [shot, setShot] = React.useState("");
+  const [vo, setVo] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [note, setNote] = React.useState("");
+  React.useEffect(() => { setShot(scene?.shot || ""); setVo(scene?.vo || ""); setNote(""); }, [scene?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!ep || !scene) return <p className="text-xs opacity-50">Plan the episodes first; then any scene can be redone from here.</p>;
+  const changed = shot !== scene.shot || vo !== scene.vo;
+  async function redo() {
+    setBusy(true); setNote("");
+    try {
+      if (changed) {
+        const episodes = project.episodes.map(e => e.id !== ep!.id ? e : { ...e, scenes: e.scenes.map(s => s.id !== scene!.id ? s : { ...s, shot, vo, ...(s.promptEdited ? {} : { promptText: "" }) }) });
+        onChanged?.(await api.patch(project.id, { episodes }));
+      }
+      await api.generateScene(project.id, scene!.id);
+      setNote("Queued. When it finishes, join the episode again and redo this scene's subtitles in Assemble.");
+    } catch (e: any) { notifyError(e?.message || String(e), "series"); }
+    finally { setBusy(false); }
+  }
+  const sel = "min-w-0 rounded-md border border-current/20 bg-transparent px-2 py-1 text-xs [&_*]:bg-white [&_*]:text-black";
+  return (
+    <div className="space-y-2 text-xs" onPointerDown={e => e.stopPropagation()}>
+      <div className="flex gap-2">
+        <select value={ep.id} onChange={e => { setEpId(e.target.value); setSceneId(""); }} className={sel + " flex-1"}>{eps.map(e => <option key={e.id} value={e.id}>{e.number}. {e.title}</option>)}</select>
+        <select value={scene.id} onChange={e => setSceneId(e.target.value)} className={sel}>{scenes.map(s => <option key={s.id} value={s.id}>Scene {s.number}{s.status === "done" ? "" : " (" + s.status + ")"}</option>)}</select>
+      </div>
+      <textarea value={shot} onChange={e => setShot(e.target.value)} rows={2} placeholder="What the camera sees" className="w-full resize-none rounded-md border border-current/20 bg-transparent px-2 py-1" />
+      <textarea value={vo} onChange={e => setVo(e.target.value)} rows={2} placeholder="Narration line" className="w-full resize-none rounded-md border border-current/20 bg-transparent px-2 py-1" />
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={redo} disabled={busy || scene.status === "running"} className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 font-semibold text-white disabled:opacity-40">
+          {busy ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} className="fill-current" />}{changed ? "Save and re-render" : "Re-render"}
+        </button>
+        <button onClick={() => onGo("produce", ep.id)} className="opacity-60 hover:opacity-100">Open the board</button>
+        {note && <span className="opacity-70">{note}</span>}
+      </div>
+    </div>
+  );
+}
+
+export function ProjectDashboard({ project, onGo, onChanged }: { project: Project; onGo: Go; onChanged?: (p: Project) => void }) {
   const [comfy, setComfy] = React.useState<{ comfyUp: boolean; comfyUrl: string } | null>(null);
   const [busy, setBusy] = React.useState(false);
   React.useEffect(() => {
@@ -239,6 +325,14 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
               ))}
             </div>
           )}
+        </Tile>
+
+        <Tile id="publish" delay={0.4} heading="Publish checklist" aside={<Scissors size={15} className="opacity-60" />}>
+          <PublishCard project={project} onGo={onGo} />
+        </Tile>
+
+        <Tile id="redo" delay={0.42} heading="Redo a scene" aside={<Film size={15} className="opacity-60" />}>
+          <RedoCard project={project} onChanged={onChanged} onGo={onGo} />
         </Tile>
 
         {/* references */}

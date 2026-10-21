@@ -67,6 +67,49 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
   };
   const base = "/api/series/projects/:id/episodes/:episodeId/subtitles";
 
+  /** Cues for one scene's clip, placed at its offset in the joined episode. */
+  async function cuesForScene(s: { clipPath: string | null; vo: string }, offset: number, dur: number, source: string, style: SubStyle, key?: string): Promise<Cue[]> {
+    let samples: Float32Array | null = null;
+    let text = "";
+    // Timing always comes from the audio when there is some: speech does not fill the whole clip.
+    try { samples = await audioSamples(s.clipPath!); } catch { samples = null; }
+    if (source === "offline" && samples && samples.length) text = (await opts.transcribe(samples)).trim();
+    else if (source === "online" && samples && samples.length) text = await geminiTranscribe(key!, samples);
+    if (!text) text = s.vo || "";
+    const span = samples && samples.length ? speechSpan(samples) : { start: 0, end: dur };
+    return makeCues(text, offset + span.start, offset + Math.min(span.end, dur), style.maxWords);
+  }
+
+  /** Redo the subtitles of one scene only (the rest, and any edits to them, stay as they are). */
+  app.post(`${base}/scene`, async (req, res) => {
+    const found = find(req.params.id, req.params.episodeId);
+    if (!found) return bad(res, 404, "No such episode.");
+    const { p, ep } = found;
+    const source = req.body?.source === "offline" || req.body?.source === "online" ? req.body.source : "script";
+    const key = opts.geminiKey();
+    if (source === "online" && !key) return bad(res, 400, "Online subtitles need a Gemini key - add one in Settings > Integrations.");
+    const scenes = [...ep.scenes].sort((a, b) => a.number - b.number);
+    if (scenes.some(s => !s.clipPath || !fs.existsSync(s.clipPath))) return bad(res, 400, "Every scene needs a finished clip first.");
+    const target = scenes.findIndex(s => s.id === req.body?.sceneId);
+    if (target < 0) return bad(res, 404, "No such scene.");
+    try {
+      let offset = 0, from = 0, to = 0;
+      for (let i = 0; i <= target; i++) {
+        const dur = (await probeDuration(scenes[i].clipPath!)) || scenes[i].durationS || 7;
+        if (i === target) { from = offset; to = offset + dur; } else offset += dur;
+      }
+      const prev: Subtitles = ep.subtitles || { cues: [], style: { ...DEFAULT_SUB_STYLE }, source, updatedAt: "" };
+      const fresh = await cuesForScene(scenes[target], from, to - from, source, { ...DEFAULT_SUB_STYLE, ...prev.style }, key);
+      const mid = (c: Cue) => (c.start + c.end) / 2;
+      const kept = prev.cues.filter(c => !(mid(c) >= from && mid(c) < to));
+      ep.subtitles = { ...prev, cues: [...kept, ...fresh].sort((a, b) => a.start - b.start), updatedAt: new Date().toISOString() };
+      store.save(p);
+      res.json(p);
+    } catch (e: any) {
+      bad(res, 500, e?.message || String(e));
+    }
+  });
+
   /** Make cues from the episode's finished clips. */
   app.post(`${base}/generate`, async (req, res) => {
     const found = find(req.params.id, req.params.episodeId);
@@ -85,15 +128,7 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
       let offset = 0;
       for (const s of scenes) {
         const dur = (await probeDuration(s.clipPath!)) || s.durationS || 7;
-        let samples: Float32Array | null = null;
-        let text = "";
-        // Timing always comes from the audio when there is some: speech does not fill the whole clip.
-        try { samples = await audioSamples(s.clipPath!); } catch { samples = null; }
-        if (source === "offline" && samples && samples.length) text = (await opts.transcribe(samples)).trim();
-        else if (source === "online" && samples && samples.length) text = await geminiTranscribe(key!, samples);
-        if (!text) text = s.vo || "";
-        const span = samples && samples.length ? speechSpan(samples) : { start: 0, end: dur };
-        cues.push(...makeCues(text, offset + span.start, offset + Math.min(span.end, dur), style.maxWords));
+        cues.push(...(await cuesForScene(s, offset, dur, source, style, key)));
         offset += dur;
       }
       ep.subtitles = { cues, style, source, updatedAt: new Date().toISOString() };
