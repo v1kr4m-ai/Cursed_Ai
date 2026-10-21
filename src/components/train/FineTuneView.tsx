@@ -2,6 +2,7 @@ import React from "react";
 import { BookOpen, Check, Cloud, Download, FileText, GraduationCap, Globe, ImagePlus, Link2, Loader2, Play, Plus, Settings2, Sparkles, Trash2, Upload } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, useJob, useTrainStatus } from "./trainApi";
+import { GuideButton, FineTuneGuide } from "./Guide";
 import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField } from "./ui";
 
 type Tab = "dataset" | "train";
@@ -40,6 +41,7 @@ function parseCsv(text: string): Example[] {
 
 /** Fine-tune a language model on your own examples (Unsloth QLoRA), then send it to Ollama. */
 export function FineTuneView() {
+  const [guide, setGuide] = React.useState(false);
   const [status, reload] = useTrainStatus();
   const [tab, setTab] = React.useState<Tab>("dataset");
   const [f, setF] = React.useState<Form>(load);
@@ -127,12 +129,14 @@ export function FineTuneView() {
 
   return (
     <div className="glass flex h-full flex-1 flex-col overflow-hidden rounded-[2.5rem]">
+      {guide && <FineTuneGuide onClose={() => setGuide(false)} />}
       <div className="flex h-20 shrink-0 items-center justify-between gap-4 border-b border-white/5 px-8">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5"><GraduationCap size={22} className="text-violet-400" /></div>
           <div className="min-w-0"><h1 className="text-lg font-bold leading-none tracking-tight text-white">FineTune LLM</h1><p className="mt-1 truncate text-[11px] text-zinc-500">Teach a small model your own material, then use it in Ollama</p></div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          <GuideButton onClick={() => setGuide(true)} />
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: "dataset", label: "1  Dataset", busy: pairs.running }, { id: "train", label: "2  Fine-tune", busy: llm.running }]} />
           <Badge ok={status.llm.ready} title={status.llm.ready ? "Unsloth environment found" : "Not found at " + status.paths.llmPython}>{status.llm.ready ? "Unsloth ready" : "Unsloth missing"}</Badge>
           <Badge ok={status.ollama.running} title="Writes the pairs, and receives the finished model">Ollama {status.ollama.running ? "on" : "off"}</Badge>

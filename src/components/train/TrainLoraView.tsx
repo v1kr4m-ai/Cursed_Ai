@@ -2,6 +2,7 @@ import React from "react";
 import { Camera, Check, ExternalLink, ImagePlus, Loader2, Palette, Pencil, Play, Settings2, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, imgUrl, useJob, useTrainStatus } from "./trainApi";
+import { GuideButton, LoraGuide } from "./Guide";
 import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField } from "./ui";
 
 type Tab = "dataset" | "train";
@@ -23,6 +24,7 @@ interface Img { name: string; path: string; caption: string }
 
 /** Train a character LoRA for Flux: build the image dataset, caption it, train it. Drives FluxGym's kohya sd-scripts. */
 export function TrainLoraView() {
+  const [guide, setGuide] = React.useState(false);
   const [status, reload] = useTrainStatus();
   const [tab, setTab] = React.useState<Tab>("dataset");
   const [f, setF] = React.useState<Form>(() => load(DEFAULTS));
@@ -92,12 +94,14 @@ export function TrainLoraView() {
 
   return (
     <div className="glass flex h-full flex-1 flex-col overflow-hidden rounded-[2.5rem]">
+      {guide && <LoraGuide onClose={() => setGuide(false)} />}
       <div className="flex h-20 shrink-0 items-center justify-between gap-4 border-b border-white/5 px-8">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5"><Palette size={22} className="text-violet-400" /></div>
           <div className="min-w-0"><h1 className="text-lg font-bold leading-none tracking-tight text-white">Train LoRA</h1><p className="mt-1 truncate text-[11px] text-zinc-500">Character LoRA for Flux - from pictures to a trained .safetensors</p></div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          <GuideButton onClick={() => setGuide(true)} />
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: "dataset", label: "1  Dataset", busy: sketch.running || caption.running }, { id: "train", label: "2  Train", busy: lora.running }]} />
           <Badge ok={ready ?? null} title={ready ? "FluxGym, kohya and the Flux files were found" : "Missing: " + status.lora.missing.join(", ")}>{ready ? "FluxGym ready" : "FluxGym missing"}</Badge>
           <Badge ok={status.comfy.running} title="Used for the character sketch">ComfyUI {status.comfy.running ? "on" : "off"}</Badge>
