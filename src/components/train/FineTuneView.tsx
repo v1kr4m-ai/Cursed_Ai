@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Check, Cloud, Download, FileText, GraduationCap, Globe, ImagePlus, Link2, Loader2, Play, Plus, Settings2, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Cloud, Download, FileText, GraduationCap, Globe, ImagePlus, Link2, Loader2, Play, Plus, Settings2, Sparkles, Trash2, Upload } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, useJob, useTrainStatus } from "./trainApi";
 import { GuideButton, FineTuneGuide } from "./Guide";
@@ -243,13 +243,6 @@ export function FineTuneView() {
                 </Card>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button onClick={() => run("llm", "/api/train/llm/start", { baseModelDir: f.baseModelDir, datasetFile: f.datasetFile, outputDir: f.outputDir, rank: f.rank, alpha: f.alpha, epochs: f.epochs, learningRate: f.learningRate, batchSize: f.batchSize, maxSeqLength: f.maxSeqLength, exportGguf: f.exportGguf, ollamaName: f.ollamaName })} disabled={!!trainReason || busy} title={trainReason} className={btnPrimary}>{llm.running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}Start fine-tune</button>
-                {llm.running && <button onClick={llm.stop} className={btnDanger}>Stop</button>}
-                {trainReason && <span className="text-[11px] text-amber-400">{trainReason}</span>}
-                {!trainReason && <span className="text-[11px] text-zinc-500">Ollama's and ComfyUI's models are unloaded first so training has the GPU to itself.</span>}
-              </div>
-
               <Card title="Finished models" icon={<Check size={15} />} note={`In ${status.llm.outputDir}. The adapter is the small trained layer; a GGUF is the whole model, ready for Ollama.`} right={<button onClick={reload} className="text-[11px] text-zinc-500 hover:text-white">Refresh</button>}>
                 {!status.llm.outputs.length ? <p className="text-xs text-zinc-600">Nothing trained yet.</p> : (
                   <div className="space-y-2">{status.llm.outputs.map(o => (
@@ -283,6 +276,20 @@ export function FineTuneView() {
 
       <div className="shrink-0 border-t border-white/5 p-4">
         <div className="mx-auto max-w-6xl">
+          {tab === "dataset" && (
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <button onClick={() => setTab("train")} className={btnPrimary}>Next: Fine-tune<ArrowRight size={14} /></button>
+              <span className="text-[11px] text-zinc-500">When the examples look right, go to the Fine-tune tab and press Start.</span>
+            </div>
+          )}
+          {tab === "train" && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <button onClick={() => run("llm", "/api/train/llm/start", { baseModelDir: f.baseModelDir, datasetFile: f.datasetFile, outputDir: f.outputDir, rank: f.rank, alpha: f.alpha, epochs: f.epochs, learningRate: f.learningRate, batchSize: f.batchSize, maxSeqLength: f.maxSeqLength, exportGguf: f.exportGguf, ollamaName: f.ollamaName })} disabled={!!trainReason || busy} title={trainReason} className={btnPrimary}>{llm.running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}Start fine-tune</button>
+          {llm.running && <button onClick={llm.stop} className={btnDanger}>Stop</button>}
+          {trainReason && <span className="text-[11px] text-amber-400">{trainReason}</span>}
+          {!trainReason && <span className="text-[11px] text-zinc-500">Ollama's and ComfyUI's models are unloaded first so training has the GPU to itself.</span>}
+        </div>
+          )}
           <div className="mb-2 flex items-center gap-1.5">{([["pairs", "Pairs"], ["llm", "Fine-tune"], ["download", "Downloads"]] as const).map(([k, l]) => <button key={k} onClick={() => setConsoleKind(k)} className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${consoleKind === k ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-300"}`}>{l}{jobs[k].running ? " ..." : ""}</button>)}</div>
           <div className="h-48"><JobConsole job={jobs[consoleKind]} title={consoleKind === "llm" ? "Fine-tune" : consoleKind === "pairs" ? "Writing pairs" : "Downloads and Ollama"} /></div>
         </div>

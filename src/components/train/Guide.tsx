@@ -187,12 +187,12 @@ export function LoraGuide({ onClose }: { onClose: () => void }) {
         <AdapterDiagram big="Flux model" small="LoRA add-on" result="Flux + your LoRA" noun="character" />
       </Section>
 
-      <Section title="The whole job in five steps" lead="The app has two tabs. Steps 1-3 happen in Dataset, steps 4-5 in Train.">
+      <Section title="The whole job in five steps" lead="The app has two tabs. Steps 1-2 happen on the Dataset tab, steps 3-5 on the Train tab. Click Next: Train at the bottom to switch.">
         <Flow steps={[
           { title: "Collect pictures", text: "15-30 images of ONE character. No picture yet? Make a sketch with ComfyUI and use it as the first one.", tone: "sky" },
           { title: "Caption each", text: "A short text per picture. The captioner (Florence-2 or an Ollama vision model) writes them, you fix them.", tone: "sky" },
-          { title: "Pick a trigger word", text: "A made-up word like zzchar. It becomes the name you use in prompts to summon the character.", tone: "violet" },
-          { title: "Train", text: "Press Start. The GPU repeats every picture many times; the log shows progress and loss.", tone: "amber" },
+          { title: "Pick a trigger word", text: "A made-up word like zzchar, typed on the Train tab. It becomes the name you use in prompts to summon the character.", tone: "violet" },
+          { title: "Train", text: "Open the Train tab, type the trigger word, pick the dataset and press the purple Start LoRA training button at the bottom. The log shows progress and loss.", tone: "amber" },
           { title: "Use it", text: "Copy to ComfyUI, load it with a LoRA node, put the trigger word in your prompt.", tone: "emerald" },
         ]} />
       </Section>
@@ -240,12 +240,12 @@ export function FineTuneGuide({ onClose }: { onClose: () => void }) {
         <AdapterDiagram big="Base model" small="LoRA adapter" result="Your model" noun="material" />
       </Section>
 
-      <Section title="The whole job in five steps" lead="Steps 1-2 are the Dataset tab, steps 3-5 are the Fine-tune tab.">
+      <Section title="The whole job in five steps" lead="Steps 1-2 are the Dataset tab, steps 3-5 the Fine-tune tab. Click Next: Fine-tune at the bottom to switch.">
         <Flow steps={[
           { title: "Gather material", text: "Drop PDFs, Word files, web pages or pasted text. Or just type examples by hand.", tone: "sky" },
           { title: "Make question/answer pairs", text: "A helper model reads each chunk and writes Q&A pairs. You review and edit them.", tone: "sky" },
           { title: "Choose a base model", text: "A small 4-bit model (1B-8B). Bigger knows more but needs more memory.", tone: "violet" },
-          { title: "Train", text: "Press Start. A few epochs over the pairs; the log shows loss going down.", tone: "amber" },
+          { title: "Train", text: "Open the Fine-tune tab, pick the base model and dataset, then press the purple Start fine-tune button at the bottom. The log shows loss going down.", tone: "amber" },
           { title: "Add to Ollama", text: "Export as GGUF and register it. It now shows up in Chat like any other model.", tone: "emerald" },
         ]} />
       </Section>
