@@ -381,5 +381,5 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
     </>
   );
 
-  return <StudioFrame toolbar={toolbar} controls={controls} actionBar={actionBar} canvas={canvas} />;
+  return <StudioFrame toolbar={toolbar} controls={controls} actionBar={actionBar} canvas={canvas} reorderKey={`studio-${kind}-${engine}`} />;
 }

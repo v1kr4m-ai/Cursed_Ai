@@ -1,4 +1,5 @@
 import React from "react";
+import { ReorderGroup } from "../ui/Reorder";
 import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2, Ruler, ArrowLeftRight, ListPlus, Minus } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
@@ -400,8 +401,9 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
 
       <div className="flex-1 min-h-0 grid gap-4 lg:grid-cols-[minmax(340px,420px)_1fr] overflow-y-auto lg:overflow-hidden">
         {/* ───────── Controls ───────── */}
+        <ReorderGroup id={`studio-${kind}-workflows`}>
         <div className="glass rounded-3xl border-white/5 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-white/5">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             {/* Workflow */}
             <Section title="Workflow" icon={<Layers size={14} />} accent={a.text} badge={wf ? wf.name : undefined} defaultOpen>
               <div className="flex gap-2">
@@ -620,6 +622,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
             {wf?.isRunnable && (wf.needsPrompt && !prompt.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""} (or bypass optional ones).</p> : null)}
           </div>
         </div>
+        </ReorderGroup>
 
         {/* ───────── Canvas ───────── */}
         <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">

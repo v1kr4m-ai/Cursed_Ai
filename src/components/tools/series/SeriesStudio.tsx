@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles } from "lucide-react";
 import { api, fileUrl, type Project, type ProjectSummary } from "./api";
 import "./series-theme.css";
-import { Ring, Tile, PageTitle } from "./DashKit";
+import { Ring, Tile, TileBoard, PageTitle, type TileDef } from "./DashKit";
 import { Develop } from "./Develop";
 import { Board } from "./Board";
 import { Assemble } from "./Assemble";
@@ -63,6 +63,11 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
     refresh();
   }
 
+  const homeDefs: TileDef[] = [
+    { id: "summary", x: 0, y: 0, w: 8, h: 17 },
+    { id: "new", x: 8, y: 0, w: 16, h: 17 },
+    ...projects.map((p, i): TileDef => ({ id: "p:" + p.id, x: (i % 3) * 8, y: 17 + Math.floor(i / 3) * 21, w: 8, h: 21 })),
+  ];
   const total = projects.reduce((a, p) => ({ eps: a.eps + p.episodes, scenes: a.scenes + p.scenes, done: a.done + p.scenesDone, joined: a.joined + p.exports }), { eps: 0, scenes: 0, done: 0, joined: 0 });
   const overall = total.scenes ? Math.round((total.done / total.scenes) * 100) : 0;
 
@@ -71,8 +76,8 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
       <PageTitle>Series</PageTitle>
       {error && <div className="mb-3 rounded-xl border border-rose-900/60 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</div>}
 
-      <div className="grid gap-3 grid-cols-1 md:grid-cols-6 xl:grid-cols-12">
-        <Tile tone="dark" delay={0.02} className="md:col-span-3 xl:col-span-4 min-h-[11rem]" heading="All series">
+      <TileBoard id="series-home" defs={homeDefs} hideable={false}>
+        <Tile id="summary" tone="dark" delay={0.02} className="min-h-[11rem]" heading="All series">
           <div className="flex items-center gap-5">
             <Ring pct={overall} size={92} stroke={6} sub="of scenes" />
             <div className="text-[11px] opacity-75 space-y-1">
@@ -83,7 +88,7 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
           </div>
         </Tile>
 
-        <Tile delay={0.06} className="md:col-span-3 xl:col-span-8 min-h-[11rem]" heading="Start a new series" aside={<Sparkles size={15} className="opacity-60" />}>
+        <Tile id="new" delay={0.06} className="min-h-[11rem]" heading="Start a new series" aside={<Sparkles size={15} className="opacity-60" />}>
           <p className="text-[11px] opacity-60 mb-3">Name it - the next screen is a conversation about what it should be.</p>
           <div className="flex items-center gap-2 max-w-xl">
             <input className={field} placeholder="New series title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && create()} />
@@ -92,21 +97,14 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
           </div>
         </Tile>
 
-        {loading && <div className="md:col-span-6 xl:col-span-12 flex items-center gap-2 text-sm opacity-60"><Loader2 size={14} className="animate-spin" /> Loading projects...</div>}
-        {!loading && !projects.length && (
-          <Tile delay={0.1} className="md:col-span-6 xl:col-span-12 text-center py-12" heading="">
-            <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}><Film size={30} className="mx-auto opacity-40" /></motion.div>
-            <p className="mt-3 text-sm opacity-70">No series yet.</p>
-          </Tile>
-        )}
 
         {projects.map((p, i) => {
           const d = full[p.id];
           const pct = p.scenes ? Math.round((p.scenesDone / p.scenes) * 100) : 0;
           const stills = d ? d.episodes.flatMap(e => e.refs).filter(r => r.file).slice(0, 3) : [];
           return (
-            <div key={p.id} className="md:col-span-3 xl:col-span-4 group relative">
-              <Tile delay={0.1 + i * 0.05} className="min-h-[15rem] flex flex-col" onClick={() => onOpen(p.id)} title={`Open ${p.title}`}>
+            <React.Fragment key={p.id}>
+              <Tile id={"p:" + p.id} delay={0.1 + i * 0.05} className="min-h-[15rem] flex flex-col group" onClick={() => onOpen(p.id)} title={`Open ${p.title}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-lg font-light tracking-tight truncate">{p.title}</p>
@@ -134,12 +132,19 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
                     ))}
                   </div>
                 )}
+                <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); remove(p.id, p.title); }} className="absolute right-4 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Delete series"><Trash2 size={14} /></span>
               </Tile>
-              <button onClick={() => remove(p.id, p.title)} className="absolute right-4 bottom-4 z-10 opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Delete series"><Trash2 size={14} /></button>
-            </div>
+            </React.Fragment>
           );
         })}
-      </div>
+      </TileBoard>
+        {loading && <div className="mt-3 flex items-center gap-2 text-sm opacity-60"><Loader2 size={14} className="animate-spin" /> Loading projects...</div>}
+        {!loading && !projects.length && (
+          <Tile delay={0.1} className="mt-3 text-center py-12" heading="">
+            <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}><Film size={30} className="mx-auto opacity-40" /></motion.div>
+            <p className="mt-3 text-sm opacity-70">No series yet.</p>
+          </Tile>
+        )}
 
       {root && <p className="mt-6 text-center text-[11px] opacity-45">Series are folders under {root}</p>}
     </div>

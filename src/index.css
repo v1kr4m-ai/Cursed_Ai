@@ -276,6 +276,12 @@ html body {
   color: var(--t-text, #e5e5e5);
 }
 
+/* Long-press reordering (ui/Reorder.tsx): blocks wiggle, the dragged one lifts. */
+@keyframes ri-wiggle { 0% { rotate: -0.6deg; } 100% { rotate: 0.6deg; } }
+.ri-wiggle { animation: ri-wiggle 0.16s ease-in-out infinite alternate; }
+.ri-drag { scale: 1.03; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); }
+@media (prefers-reduced-motion: reduce) { .ri-wiggle { animation: none; } }
+
 /* A module with its own theme paints its own backdrop over the page. */
 main[data-override] {
   background-image: var(--t-atmo, none), var(--t-page, none);

@@ -2,6 +2,7 @@ import React from "react";
 import { AlertTriangle, ChevronDown, Film, ImageIcon as ImageIconLucide, Loader2, Pause, RotateCw, X } from "lucide-react";
 import { ProgressBar } from "../layout/ProgressBar";
 import { ACCENT, Kind, fileUrl } from "./types";
+import { ReorderGroup, useReorderItem, Reorderable } from "../ui/Reorder";
 
 /** Look shared by every mode of the Image / Video studio, so Cloud, Quick and Workflows feel like one tool. */
 export const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
@@ -22,8 +23,9 @@ export function MediaView({ src, className, kind }: { src: string; className?: s
 /** One collapsible block of the control panel: icon + title on the left, a short summary on the right. */
 export function Section({ title, icon, accent, badge, defaultOpen = false, children }: { title: string; icon: React.ReactNode; accent: string; badge?: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = React.useState(defaultOpen);
+  const { className: ri = "", style, ...bind } = useReorderItem(title);
   return (
-    <section>
+    <section {...bind} style={style} className={"border-b border-white/5 " + ri}>
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-white/[0.03] transition-colors text-left">
         <span className={accent}>{icon}</span>
         <span className="text-[11px] font-black uppercase tracking-[0.18em] text-zinc-300">{title}</span>
@@ -36,15 +38,17 @@ export function Section({ title, icon, accent, badge, defaultOpen = false, child
 }
 
 /** Two panes filling the page: controls (scrolling, with a pinned action bar) on the left, canvas on the right. */
-export function StudioFrame({ toolbar, controls, actionBar, canvas }: { toolbar: React.ReactNode; controls: React.ReactNode; actionBar: React.ReactNode; canvas: React.ReactNode }) {
+export function StudioFrame({ toolbar, controls, actionBar, canvas, reorderKey = "studio" }: { toolbar: React.ReactNode; controls: React.ReactNode; actionBar: React.ReactNode; canvas: React.ReactNode; reorderKey?: string }) {
   return (
     <div className="h-full flex flex-col gap-3 min-h-0">
       {toolbar}
       <div className="flex-1 min-h-0 grid gap-4 lg:grid-cols-[minmax(340px,420px)_1fr] overflow-y-auto lg:overflow-hidden">
-        <div className="glass rounded-3xl border-white/5 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-white/5">{controls}</div>
-          <div className="shrink-0 border-t border-white/5 p-4 space-y-2 bg-black/20">{actionBar}</div>
-        </div>
+        <ReorderGroup id={reorderKey}>
+          <div className="glass rounded-3xl border-white/5 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">{controls}</div>
+            <div className="shrink-0 border-t border-white/5 p-4 space-y-2 bg-black/20">{actionBar}</div>
+          </div>
+        </ReorderGroup>
         <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">{canvas}</div>
       </div>
     </div>
