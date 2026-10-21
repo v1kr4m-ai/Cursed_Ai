@@ -22,6 +22,9 @@ import { ConsoleView } from "./components/tools/ConsoleView";
 import { ImageGeneratorView } from "./components/tools/ImageGenerator";
 import { VideoGeneratorView } from "./components/tools/VideoGenerator";
 import { SeriesStudioView } from "./components/tools/series/SeriesStudio";
+import { OllamaClaudeView } from "./components/oclaude/OllamaClaudeView";
+import { TrainLoraView } from "./components/train/TrainLoraView";
+import { FineTuneView } from "./components/train/FineTuneView";
 import { ThemeQuick } from "./components/tools/ThemeSettings";
 import { effectiveTheme, themeById } from "./lib/themes";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
@@ -483,6 +486,10 @@ export default function App() {
             {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
             <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
             <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
+            {/* Kept mounted so a running Claude Code task keeps streaming while you look at another page. */}
+            <div className={activeTab === "ollamaclaude" ? "contents" : "hidden"}><OllamaClaudeView settings={settings} /></div>
+            <div className={activeTab === "trainlora" ? "contents" : "hidden"}><TrainLoraView /></div>
+            <div className={activeTab === "finetune" ? "contents" : "hidden"}><FineTuneView /></div>
             <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} models={models} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
             {activeTab === "settings" && (
               <SettingsView

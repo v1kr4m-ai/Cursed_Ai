@@ -68,7 +68,7 @@ interface ChatWindowProps {
 }
 
 /** Markdown code block with a copy button. */
-function CodeBlock({ children }: { children?: React.ReactNode }) {
+export function CodeBlock({ children }: { children?: React.ReactNode }) {
   const ref = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
   return (

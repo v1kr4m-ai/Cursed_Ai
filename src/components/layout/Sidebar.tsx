@@ -21,7 +21,10 @@ import {
   Pencil,
   Trash2,
   Pin,
-  ChevronDown
+  ChevronDown,
+  Bot,
+  Palette,
+  GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -95,10 +98,13 @@ export function Sidebar({
 
   const navItems = [
     { id: "chat", label: "Chat", icon: MessageSquare },
+    { id: "ollamaclaude", label: "Ollama_Claude", icon: Bot, sub: true },
     { id: "vision", label: "Vision", icon: Eye },
     { id: "image", label: "Image", icon: ImagePlus },
     { id: "video", label: "Video", icon: Clapperboard },
     { id: "series", label: "Series", icon: Clapperboard },
+    { id: "trainlora", label: "Train LoRA", icon: Palette },
+    { id: "finetune", label: "FineTune LLM", icon: GraduationCap },
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
@@ -197,14 +203,14 @@ export function Sidebar({
             <Button
               key={item.id}
               variant="ghost"
-              className={`w-full justify-start gap-3 h-11 rounded-xl transition-all ${
+              className={`justify-start gap-3 rounded-xl transition-all ${(item as any).sub && !isCollapsed ? "ml-5 h-9 w-[calc(100%-1.25rem)]" : "h-11 w-full"} ${
                 activeTab === item.id 
                   ? "bg-white/10 text-violet-400 border border-white/5" 
                   : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
               onClick={() => setActiveTab(item.id)}
             >
-              <item.icon size={18} />
+              <item.icon size={(item as any).sub ? 15 : 18} />
               {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
               {!isCollapsed && item.id === "chat" && chats.some(c => c.unread && !c.archived) && (
                 <Badge variant="outline" title="Chats with a reply you have not seen" className="ml-auto bg-violet-600 border-violet-500/50 text-[10px] text-white font-bold">
@@ -315,7 +321,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "vision", "image", "video", "models", "memory", "engine", "console", "settings"].map((tab) => (
+               {["chat", "ollamaclaude", "vision", "image", "video", "series", "trainlora", "finetune", "models", "memory", "engine", "console", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

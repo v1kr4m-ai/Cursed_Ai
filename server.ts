@@ -4,6 +4,9 @@ import { registerLmStudio } from "./lmStudio";
 import { registerSubtitles } from "./seriesTool/subtitles";
 import { registerExport } from "./seriesTool/exportEpisodes";
 import { registerFinish } from "./seriesTool/finish";
+import { registerOllamaClaude } from "./ollamaClaude";
+import { registerTrainTool } from "./trainTool/routes";
+import type { TrainConfig } from "./trainTool/paths";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
 import { registerComfyTool } from "./comfyTool/routes";
@@ -197,7 +200,7 @@ async function startServer() {
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
   interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
-  interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; customDirs?: string[]; disabledSources?: string[] }
+  interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -1669,6 +1672,13 @@ async function startServer() {
   registerSeriesTool(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     getComfyUrl: () => COMFYUI_URL,
+  });
+  registerOllamaClaude(app, { ollamaUrl: OLLAMA_URL });
+  registerTrainTool(app, {
+    appRoot: process.cwd(), dataDir: process.cwd(),
+    getConfig: () => serverConfig.train || {}, setConfig: c => { serverConfig.train = c; saveConfig(); },
+    comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL, geminiKey: () => geminiKey(),
+    getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath,
   });
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });

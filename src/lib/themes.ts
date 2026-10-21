@@ -168,10 +168,13 @@ export const themeById = (id: string | undefined | null): Theme => THEMES.find(t
 /** The parts of the app that can have their own theme. */
 export const THEME_MODULES: { id: string; label: string }[] = [
   { id: "chat", label: "Chat" },
+  { id: "ollamaclaude", label: "Ollama_Claude" },
   { id: "vision", label: "Vision" },
   { id: "image", label: "Image" },
   { id: "video", label: "Video" },
   { id: "series", label: "Series" },
+  { id: "trainlora", label: "Train LoRA" },
+  { id: "finetune", label: "FineTune LLM" },
   { id: "models", label: "Models" },
   { id: "memory", label: "Memory" },
   { id: "engine", label: "Engine" },
