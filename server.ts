@@ -1,5 +1,7 @@
 import { registerHub, modelDirs } from "./hub";
 import { streamGemini } from "./geminiChat";
+import { registerLmStudio } from "./lmStudio";
+import { registerSubtitles } from "./seriesTool/subtitles";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
 import { registerComfyTool } from "./comfyTool/routes";
@@ -193,7 +195,7 @@ async function startServer() {
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
   interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
-  interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; customDirs?: string[]; disabledSources?: string[] }
+  interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -1476,6 +1478,8 @@ async function startServer() {
     }
   });
 
+  registerLmStudio(app, { url: LMSTUDIO_URL, getPath: () => serverConfig.lmstudioPath, setPath: p => { serverConfig.lmstudioPath = p; saveConfig(); } });
+
   // API Route: List installed checkpoints, straight from ComfyUI's own
   // node-info introspection - real, live, reflects whatever's actually in
   // your models/checkpoints folder right now.
@@ -1663,6 +1667,15 @@ async function startServer() {
   registerSeriesTool(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     getComfyUrl: () => COMFYUI_URL,
+  });
+  registerSubtitles(app, {
+    projectsRoot: path.join(process.cwd(), "series"),
+    transcribe: async samples => {
+      const t = await ensureTranscriber();
+      const result = await t(samples, { return_timestamps: false, chunk_length_s: 30 });
+      return (Array.isArray(result) ? result.map((r: any) => r.text).join(" ") : result.text) || "";
+    },
+    geminiKey: () => geminiKey(),
   });
 
   // An unknown /api route must answer 404 here. Without this the Vite middleware's dev proxy (/api -> localhost:3000, i.e. this very

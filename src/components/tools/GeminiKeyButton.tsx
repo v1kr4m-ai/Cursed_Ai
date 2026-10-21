@@ -32,14 +32,14 @@ export function GeminiKeyButton({ tab, accent }: { tab: string; accent: "pink" |
       const r = await fetch("/api/gemini-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Could not save the key");
-      setState(d); setKey(""); setShow(false); setOpen(false);
+      setState(d); setKey(""); setShow(false); setOpen(false); window.dispatchEvent(new Event("cursed:models-changed"));
       notify({ message: "Gemini key saved", tab });
     } catch (e: any) { notifyError(e.message, tab); }
     finally { setBusy(false); }
   };
   const clear = async () => {
     setBusy(true);
-    try { setState(await (await fetch("/api/gemini-key", { method: "DELETE" })).json()); notify({ message: "Gemini key removed", tab }); }
+    try { setState(await (await fetch("/api/gemini-key", { method: "DELETE" })).json()); window.dispatchEvent(new Event("cursed:models-changed")); notify({ message: "Gemini key removed", tab }); }
     catch (e: any) { notifyError(e.message, tab); }
     finally { setBusy(false); }
   };

@@ -1,6 +1,7 @@
 import React from "react";
 import { Scissors, Loader2, FolderOpen, CheckCircle2, Circle } from "lucide-react";
 import { api, fileUrl, type Episode, type Project } from "./api";
+import { SubtitlesPanel } from "./Subtitles";
 
 /**
  * Stage 3. Join each episode's finished scenes into one file with ffmpeg, and show the checklist
@@ -77,6 +78,8 @@ function EpisodeRow({ project, episode, onChanged }: { project: Project; episode
           </div>
         </div>
       )}
+
+      {episode.exportPath && <SubtitlesPanel project={project} episode={episode} onChanged={onChanged} />}
     </div>
   );
 }

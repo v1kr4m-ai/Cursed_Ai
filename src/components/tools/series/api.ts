@@ -15,9 +15,16 @@ export interface Scene {
   promptId: string | null; error: string | null;
 }
 
+export interface Cue { id: string; start: number; end: number; text: string }
+export interface SubStyle {
+  font: string; size: number; color: string; outlineColor: string; outlineWidth: number; bold: boolean; italic: boolean; uppercase: boolean;
+  position: "bottom" | "middle" | "top"; box: boolean; boxOpacity: number; maxWords: number;
+}
+export interface Subtitles { cues: Cue[]; style: SubStyle; source: string; outPath?: string; updatedAt: string }
+
 export interface Episode {
   id: string; number: number; title: string; era: string; hookOut: string;
-  refs: Ref[]; scenes: Scene[]; exportPath: string | null;
+  refs: Ref[]; scenes: Scene[]; exportPath: string | null; subtitles?: Subtitles;
 }
 
 export interface ProjectSettings {
@@ -66,6 +73,12 @@ export const api = {
     call<{ queued: number }>(`/api/series/projects/${id}/episodes/${episodeId}/generate`, { method: "POST", body: JSON.stringify({ redo }) }),
   cancel: (id: string) => call(`/api/series/projects/${id}/cancel`, { method: "POST" }),
   stitch: (id: string, episodeId: string) => call<{ file: string }>(`/api/series/projects/${id}/episodes/${episodeId}/stitch`, { method: "POST" }),
+  generateSubtitles: (id: string, episodeId: string, source: string) =>
+    call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/generate`, { method: "POST", body: JSON.stringify({ source }) }),
+  saveSubtitles: (id: string, episodeId: string, body: { cues?: Cue[]; style?: SubStyle }) =>
+    call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles`, { method: "PUT", body: JSON.stringify(body) }),
+  burnSubtitles: (id: string, episodeId: string) =>
+    call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/burn`, { method: "POST" }),
   comfyStatus: () => call<{ comfyUp: boolean; comfyUrl: string }>("/api/series/workflows"),
   async uploadSource(id: string, file: File) {
     const res = await fetch(`/api/series/projects/${id}/sources?name=${encodeURIComponent(file.name)}`, {

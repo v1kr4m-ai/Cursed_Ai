@@ -66,16 +66,13 @@ const FILL_INSTRUCTION = `From our discussion, fill in the series details and re
 Use what we actually agreed. Use an empty string for anything we have not discussed.`;
 
 const TALK_MODEL_KEY = "cursed.series.talkModel";
-const GEMINI_ONLINE = [{ id: "gemini:gemini-2.5-flash", name: "Gemini 2.5 Flash" }, { id: "gemini:gemini-2.5-pro", name: "Gemini 2.5 Pro" }];
 
 export function Develop({ project, modelId, models, onSaved }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void }) {
   const [talkModel, setTalkModel] = React.useState<string>(() => { try { return localStorage.getItem(TALK_MODEL_KEY) || ""; } catch { return ""; } });
-  const [geminiSet, setGeminiSet] = React.useState(false);
-  React.useEffect(() => { fetch("/api/gemini-key").then(r => r.json()).then(d => setGeminiSet(!!d?.set)).catch(() => {}); }, []);
   const ready = (models || []).filter(m => m.isDownloaded);
-  const isOnline = (m: AIModel) => /[:-]cloud$/i.test(m.id) || !!m.tags?.some(t => /^cloud$/i.test(t));
+  const isOnline = (m: AIModel) => /[:-]cloud$/i.test(m.id) || m.source === "gemini" || !!m.tags?.some(t => /^cloud$/i.test(t));
   const offline = ready.filter(m => !isOnline(m)).map(m => ({ id: m.id, name: m.name }));
-  const online = [...ready.filter(isOnline).map(m => ({ id: m.id, name: m.name })), ...(geminiSet ? GEMINI_ONLINE : [])];
+  const online = ready.filter(isOnline).map(m => ({ id: m.id, name: m.name }));
   const known = [...offline, ...online].some(m => m.id === talkModel);
   const model = known && talkModel ? talkModel : modelId;
   const pickModel = (id: string) => { setTalkModel(id); try { localStorage.setItem(TALK_MODEL_KEY, id); } catch { /* storage blocked */ } };

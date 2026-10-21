@@ -7,6 +7,7 @@ import { MicTest } from "./MicTest";
 import { VoiceSpeechSettings } from "./VoiceSpeechSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { ThemeSettings } from "./ThemeSettings";
+import { LmStudioControl } from "./LmStudioControl";
 import { GoogleConnectPanel, useGoogleStatus } from "../comfy/google";
 import { nativeFolder, postJson, api } from "../comfy/types";
 
@@ -118,9 +119,9 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
   };
   const resetDest = async (kind: "image" | "video") => { await postJson("/api/tool/state", { kind, destination: "" }); loadDest(); };
   const saveGemini = async () => {
-    try { const r = await fetch("/api/gemini-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: geminiKey }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); setGemini(d); setGeminiKey(""); notify({ message: "Gemini key saved", tab: "settings" }); } catch (e: any) { notifyError(e.message, "settings"); }
+    try { const r = await fetch("/api/gemini-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: geminiKey }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); setGemini(d); setGeminiKey(""); window.dispatchEvent(new Event("cursed:models-changed")); notify({ message: "Gemini key saved", tab: "settings" }); } catch (e: any) { notifyError(e.message, "settings"); }
   };
-  const removeGemini = async () => { setGemini(await (await fetch("/api/gemini-key", { method: "DELETE" })).json()); };
+  const removeGemini = async () => { setGemini(await (await fetch("/api/gemini-key", { method: "DELETE" })).json()); window.dispatchEvent(new Event("cursed:models-changed")); };
   const confirmAnd = async (msg: string, fn: () => Promise<any>, done: string) => { if (!window.confirm(msg)) return; try { await fn(); notify({ message: done, tab: "settings" }); } catch (e: any) { notifyError(e.message || "Failed", "settings"); } };
 
   /* ───────── the sections ───────── */
@@ -259,7 +260,7 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
     { id: "services", cat: "integrations", title: "Services", keywords: "ollama lm studio comfyui address url service", node: (
       <Group title="Other services" note="Ollama and LM Studio are found on their default addresses (11434 and 1234). The ComfyUI address and start-at-launch are on the Engine page.">
         <Row title="Ollama" note="Models appear in the Models tab when it is running."><span className="text-xs text-zinc-500 font-mono">http://127.0.0.1:11434</span></Row>
-        <Row title="LM Studio" note="Its local server must be switched on."><span className="text-xs text-zinc-500 font-mono">http://127.0.0.1:1234</span></Row>
+        <Row title="LM Studio" note="Starts its local server (http://127.0.0.1:1234) so its models show up under Models."><LmStudioControl /></Row>
       </Group>) },
 
     { id: "data", cat: "privacy", title: "Data", keywords: "data storage chats export import delete folder size backup", node: (

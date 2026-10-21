@@ -435,7 +435,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       <button
         onClick={() => setShowModelPicker(v => !v)}
         title="Select model"
-        className="h-9 px-2 sm:px-2.5 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 border border-white/5 max-w-[45%]"
+        className="h-9 px-2 sm:px-2.5 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5 border border-white/5 max-w-[9.5rem]"
       >
         <Cpu size={16} className="text-violet-400 shrink-0" />
         <span className="hidden sm:inline text-xs font-bold max-w-[110px] truncate">{selectedModel.name}</span>
@@ -465,7 +465,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
                 <div>
                   <p className="text-sm font-bold">{m.name}</p>
                   <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
-                    {m.isDownloaded ? m.type : "Not downloaded"}
+                    {m.source === "gemini" ? (m.isDownloaded ? "Online - Gemini" : "Online - add a Gemini key in Settings") : m.isDownloaded ? (/[:-]cloud$/i.test(m.id) ? "Online - " + m.type : m.type) : "Not downloaded"}
                   </p>
                 </div>
                 {selectedModel.id === m.id && <CheckCircle2 size={16} className="text-violet-400 shrink-0" />}

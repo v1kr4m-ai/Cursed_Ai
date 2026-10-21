@@ -45,6 +45,8 @@ export interface Scene {
   error: string | null;
 }
 
+import type { Subtitles } from "./subtitlesCore";
+
 export interface Episode {
   id: string;
   number: number;
@@ -56,6 +58,8 @@ export interface Episode {
   refs: Ref[];
   scenes: Scene[];
   exportPath: string | null;
+  /** Captions for the joined episode: cues, their look, and the burned-in copy once made. */
+  subtitles?: Subtitles;
 }
 
 export interface ProjectSettings {

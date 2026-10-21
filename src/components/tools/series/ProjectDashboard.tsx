@@ -3,10 +3,11 @@ import { motion } from "motion/react";
 import { ArrowUpRight, CircleDot, Film, Image as ImageIcon, LayoutGrid, Loader2, MessagesSquare, Play, Scissors, Settings2, Square, Timer } from "lucide-react";
 import { notify, notifyError } from "../../../lib/notify";
 import { api, fileUrl, type Project, type Scene } from "./api";
-import { Ring, Tile, hours, PageTitle } from "./DashKit";
+import { Ring, Tile, TileBoard, HoverVideo, hours, PageTitle } from "./DashKit";
 
 export type DashStage = "develop" | "produce" | "assemble" | "settings";
 type Go = (stage: DashStage, episodeId?: string) => void;
+const TILE_IDS = ["hero","episodes","progress","queue","glance","pipeline","engine","estimate","clips","joined","refs"];
 
 const SCENE_COLOR: Record<Scene["status"], string> = {
   done: "bg-emerald-500", running: "bg-sky-500 animate-pulse", queued: "bg-amber-500", failed: "bg-rose-500", pending: "bg-current/15",
@@ -74,14 +75,15 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
   ];
   const clips = [...eps].reverse().flatMap(e => [...e.scenes].reverse().filter(s => s.status === "done" && s.clipPath).map(s => ({ s, e }))).slice(0, 6);
   const stills = refs.filter(r => r.file).slice(0, 8);
+  const joinedEps = eps.filter(e => e.exportPath);
   const maxScenes = Math.max(1, ...eps.map(e => e.scenes.length));
 
   return (
     <div className="h-full overflow-y-auto pr-1 pb-24">
       <PageTitle>Dashboard</PageTitle>
-      <div className="relative grid gap-3 grid-cols-1 md:grid-cols-6 xl:grid-cols-12">
+      <TileBoard id="dashboard" ids={TILE_IDS}>
         {/* hero */}
-        <Tile id="hero" tone="dark" delay={0.02} className="md:col-span-3 xl:col-span-3 xl:row-span-2 min-h-[22rem] flex flex-col" onClick={() => onGo(next.stage)} title={next.label}
+        <Tile id="hero" tone="dark" delay={0.02} span={3} className="min-h-[22rem] flex flex-col" onClick={() => onGo(next.stage)} title={next.label}
           heading="Series" aside={<ArrowUpRight size={16} className="opacity-60" />}>
           <p className="text-xl font-light leading-tight tracking-tight">{project.title}</p>
           <p className="text-[11px] opacity-60 mt-1 line-clamp-3">{project.idea.logline || "No logline yet - the Develop stage turns your idea into one."}</p>
@@ -112,7 +114,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* episodes bars */}
-        <Tile id="episodes" delay={0.06} className="md:col-span-3 xl:col-span-4 min-h-[11rem]" heading="Episodes at work" aside={<span className="text-2xl font-extralight tracking-tight">{scenesDone}<span className="text-xs opacity-50"> / {scenes.length} scenes</span></span>}>
+        <Tile id="episodes" delay={0.06} span={4} className="min-h-[11rem]" heading="Episodes at work" aside={<span className="text-2xl font-extralight tracking-tight">{scenesDone}<span className="text-xs opacity-50"> / {scenes.length} scenes</span></span>}>
           {eps.length === 0 ? <p className="text-xs opacity-50">No episodes yet.</p> : (
             <div className="flex items-end justify-between gap-1.5 h-24">
               {eps.map(e => {
@@ -132,7 +134,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* rings */}
-        <Tile id="progress" delay={0.1} className="md:col-span-3 xl:col-span-3 min-h-[11rem]" heading="Progress" onClick={() => onGo("produce")} title="Open the production board">
+        <Tile id="progress" delay={0.1} span={3} className="min-h-[11rem]" heading="Progress" onClick={() => onGo("produce")} title="Open the production board">
           <div className="flex items-center justify-between gap-2">
             <Ring pct={overall} size={74} stroke={5} sub="scenes" />
             <Ring pct={pct(refsDone, refs.length)} size={74} stroke={5} sub="refs" />
@@ -141,7 +143,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* queue */}
-        <Tile id="queue" tone="dark" delay={0.14} className="md:col-span-3 xl:col-span-2 min-h-[11rem]" heading="Render queue" onClick={() => onGo("produce")} title="Open the production board">
+        <Tile id="queue" tone="dark" delay={0.14} span={2} className="min-h-[11rem]" heading="Render queue" onClick={() => onGo("produce")} title="Open the production board">
           <div className="space-y-2">
             {[["Queued", queued, "bg-amber-400"], ["Failed", failed, "bg-rose-400"], ["Left", remaining, "bg-white/60"]].map(([l, n, c]) => (
               <div key={l as string} className="flex items-center justify-between rounded-full bg-black/30 px-3 py-1.5 text-xs"><span className="flex items-center gap-2 opacity-80"><span className={`w-1.5 h-1.5 rounded-full ${c}`} />{l}</span><span className="font-light text-base">{n}</span></div>
@@ -150,7 +152,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* timeline */}
-        <Tile id="glance" delay={0.18} className="md:col-span-6 xl:col-span-6" heading="Episodes at a glance" aside={<div className="flex gap-2 text-[10px] opacity-60">{(["done", "queued", "failed", "pending"] as const).map(s => <span key={s} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${SCENE_COLOR[s].split(" ")[0]}`} />{s}</span>)}</div>}>
+        <Tile id="glance" delay={0.18} span={6} mdFull className="" heading="Episodes at a glance" aside={<div className="flex gap-2 text-[10px] opacity-60">{(["done", "queued", "failed", "pending"] as const).map(s => <span key={s} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${SCENE_COLOR[s].split(" ")[0]}`} />{s}</span>)}</div>}>
           {eps.length === 0 ? <p className="text-xs opacity-50">Build a plan in Develop and every episode shows up here, scene by scene.</p> : (
             <div className="space-y-1.5">
               {eps.map(e => (
@@ -167,7 +169,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* pipeline */}
-        <Tile id="pipeline" tone="dark" delay={0.22} className="md:col-span-3 xl:col-span-3" heading="Pipeline">
+        <Tile id="pipeline" tone="dark" delay={0.22} span={3} className="" heading="Pipeline">
           <div className="space-y-2.5">
             {pipeline.map(p => (
               <button key={p.label} onClick={() => onGo(p.stage)} className="block w-full text-left group">
@@ -179,7 +181,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* engine */}
-        <Tile id="engine" delay={0.26} className="md:col-span-3 xl:col-span-2" heading="Render engine" onClick={() => onGo("settings")} title="Open the settings" aside={<Settings2 size={15} className="opacity-60" />}>
+        <Tile id="engine" delay={0.26} span={2} className="" heading="Render engine" onClick={() => onGo("settings")} title="Open the settings" aside={<Settings2 size={15} className="opacity-60" />}>
           <p className="flex items-center gap-2 text-sm"><CircleDot size={13} className={comfy?.comfyUp ? "text-emerald-500" : "text-rose-500"} />{comfy ? (comfy.comfyUp ? "ComfyUI is running" : "ComfyUI is not answering") : "Checking..."}</p>
           <p className="hidden @[14rem]:block text-[11px] opacity-50 mt-1 truncate">{comfy?.comfyUrl}</p>
           <p className="text-[11px] opacity-70 mt-2">{w}×{h} · {secs} s · {project.settings.steps} steps · {project.settings.fps} fps</p>
@@ -187,7 +189,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* estimate */}
-        <Tile id="estimate" tone="dark" delay={0.3} className="md:col-span-3 xl:col-span-3" heading="Time left to render" onClick={() => onGo("settings")} title="Measured on this PC; a bigger size or longer clip costs more. Open the settings to change them." aside={<Timer size={15} className="opacity-60" />}>
+        <Tile id="estimate" tone="dark" delay={0.3} span={3} className="" heading="Time left to render" onClick={() => onGo("settings")} title="Measured on this PC; a bigger size or longer clip costs more. Open the settings to change them." aside={<Timer size={15} className="opacity-60" />}>
           <div className="flex flex-wrap items-center gap-3">
             <Ring pct={overall} size={64} stroke={5} label={remaining ? hours(remaining * perClip) : "Done"} sub={remaining ? "estimate" : ""} />
             <div className="text-[11px] opacity-70 space-y-0.5 min-w-[7rem] flex-1">
@@ -198,14 +200,12 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* recent clips */}
-        <Tile id="clips" delay={0.34} className="md:col-span-3 xl:col-span-4" heading="Latest clips" aside={<Film size={15} className="opacity-60" />}>
+        <Tile id="clips" delay={0.34} span={4} className="" heading="Latest clips" aside={<Film size={15} className="opacity-60" />}>
           {clips.length === 0 ? <p className="text-xs opacity-50">Rendered scenes appear here.</p> : (
             <div className="grid grid-cols-3 gap-2">
               {clips.map(({ s, e }) => (
-                <button key={s.id} onClick={() => onGo("produce", e.id)} title={`Episode ${e.number}, scene ${s.number}`} className="relative aspect-[9/14] rounded-xl overflow-hidden bg-black/40 group"
-                  onMouseEnter={ev => { const v = ev.currentTarget.querySelector("video"); if (v) { v.currentTime = 0; v.play().catch(() => {}); } }}
-                  onMouseLeave={ev => { const v = ev.currentTarget.querySelector("video"); if (v) { v.pause(); v.currentTime = 0.4; } }}>
-                  <video src={`${fileUrl(s.clipPath!)}#t=0.4`} muted loop playsInline preload="metadata" className="w-full h-full object-cover" />
+                <button key={s.id} onClick={() => onGo("produce", e.id)} title={`Episode ${e.number}, scene ${s.number}`} className="relative aspect-[9/14] rounded-xl overflow-hidden bg-black/40 group">
+                  <HoverVideo src={fileUrl(s.clipPath!)} className="w-full h-full object-cover" />
                   <span className="absolute left-1.5 bottom-1 text-[10px] font-semibold text-white drop-shadow">E{e.number}·{s.number}</span>
                   <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                 </button>
@@ -214,8 +214,22 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
           )}
         </Tile>
 
+        {/* joined episodes */}
+        <Tile id="joined" delay={0.36} span={4} className="min-h-[11rem]" heading="Stitched episodes" aside={<span className="text-2xl font-extralight tracking-tight">{joined}<span className="text-xs opacity-50"> / {eps.length}</span></span>}>
+          {joinedEps.length === 0 ? <p className="text-xs opacity-50">Episodes you join into one file appear here - hover one to preview it.</p> : (
+            <div className="grid grid-cols-3 gap-2">
+              {joinedEps.map(e => (
+                <button key={e.id} onClick={() => onGo("assemble", e.id)} title={`Episode ${e.number}: ${e.title}`} className="relative aspect-[9/14] rounded-xl overflow-hidden bg-black/40 group">
+                  <HoverVideo src={fileUrl(e.exportPath!)} className="w-full h-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 pt-4 pb-1 text-[10px] font-semibold text-white truncate">E{e.number} {e.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Tile>
+
         {/* references */}
-        <Tile id="refs" delay={0.38} className="md:col-span-6 xl:col-span-4" heading="Cast & references" aside={<ImageIcon size={15} className="opacity-60" />} onClick={() => onGo("produce")} title="Open the production board">
+        <Tile id="refs" delay={0.38} span={4} mdFull className="" heading="Cast & references" aside={<ImageIcon size={15} className="opacity-60" />} onClick={() => onGo("produce")} title="Open the production board">
           {stills.length === 0 ? <p className="text-xs opacity-50">Reference stills appear here once they are rendered or dropped in.</p> : (
             <div className="grid grid-cols-4 gap-2">
               {stills.map(r => (
@@ -227,7 +241,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
             </div>
           )}
         </Tile>
-      </div>
+      </TileBoard>
 
       {/* floating shortcuts, like a dock */}
       <div className="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 z-30">

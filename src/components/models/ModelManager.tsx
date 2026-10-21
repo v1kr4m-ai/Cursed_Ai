@@ -46,6 +46,7 @@ const PALETTE = [
 function accentFor(m: AIModel) {
   if (m.source === "ollama") return PALETTE[3];
   if (m.source === "lmstudio") return PALETTE[5];
+  if (m.source === "gemini") return PALETTE[4];
   let h = 0;
   for (const ch of m.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return PALETTE[h % 3 === 0 ? 0 : h % 3 === 1 ? 1 : 2];
@@ -53,6 +54,7 @@ function accentFor(m: AIModel) {
 function sourceLabel(m: AIModel) {
   if (m.source === "ollama") return "Ollama";
   if (m.source === "lmstudio") return "LM Studio";
+  if (m.source === "gemini") return "Online - Gemini";
   if (m.origin === "ollama") return "Ollama folder";
   if (m.origin === "lmstudio") return "LM Studio folder";
   if (m.origin === "custom") return "Custom folder";
@@ -169,11 +171,11 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                     <Button
                       className={`flex-1 h-9 rounded-xl gap-2 text-xs font-bold text-white ${c.btn} disabled:opacity-40 disabled:bg-white/5 disabled:text-zinc-500`}
                       disabled={!model.downloadUrl}
-                      title={!model.downloadUrl ? "Not wired up in this build yet" : undefined}
+                      title={model.source === "gemini" ? "Add a Gemini API key in Settings > Integrations" : !model.downloadUrl ? "Not wired up in this build yet" : undefined}
                       onClick={() => onDownloadModel(model.id)}
                     >
                       <Download size={14} />
-                      {model.downloadUrl ? "Download" : "Not supported yet"}
+                      {model.source === "gemini" ? "Needs a Gemini key" : model.downloadUrl ? "Download" : "Not supported yet"}
                     </Button>
                   ) : (
                     <>
@@ -184,7 +186,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
                       >
                         {active ? "Active" : "Use this model"}
                       </Button>
-                      {model.source !== "ollama" && model.source !== "lmstudio" && (!model.origin || model.origin === "download") && (
+                      {model.source !== "ollama" && model.source !== "lmstudio" && model.source !== "gemini" && (!model.origin || model.origin === "download") && (
                         <Button
                           variant="ghost" size="icon"
                           className="w-9 h-9 rounded-xl bg-black/25 hover:bg-red-500/20 hover:text-red-400 text-zinc-400"
