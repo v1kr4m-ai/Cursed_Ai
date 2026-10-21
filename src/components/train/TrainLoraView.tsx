@@ -1,5 +1,5 @@
 import React from "react";
-import { Camera, Check, ExternalLink, ImagePlus, Loader2, Palette, Pencil, Play, Settings2, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
+import { ArrowRight, Camera, Check, ExternalLink, ImagePlus, Loader2, Palette, Pencil, Play, Settings2, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, imgUrl, useJob, useTrainStatus } from "./trainApi";
 import { GuideButton, LoraGuide } from "./Guide";
@@ -204,13 +204,6 @@ export function TrainLoraView() {
                 </Card>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button onClick={() => start("lora", "/api/train/lora/start", { triggerWord: f.trigger, datasetDir: f.datasetDir, outputDir: f.outputDir, baseModelPath: f.baseModelPath, resolution: f.resolution, batchSize: f.batchSize, numRepeats: f.numRepeats, networkDim: f.networkDim, networkAlpha: f.networkAlpha, learningRate: f.learningRate, epochs: f.epochs, vramPreset: f.vramPreset, seed: f.seed })} disabled={!!trainReason || busy} title={trainReason} className={btnPrimary}>{lora.running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}Start LoRA training</button>
-                {lora.running && <button onClick={lora.stop} className={btnDanger}>Stop</button>}
-                {trainReason && <span className="text-[11px] text-amber-400">{trainReason}</span>}
-                {!trainReason && <span className="text-[11px] text-zinc-500">ComfyUI's and Ollama's models are unloaded first so training has the GPU to itself.</span>}
-              </div>
-
               <Card title="Trained LoRAs" icon={<Check size={15} />} note={outDir ? `In ${outDir}. One file is saved per epoch.` : "Set a trigger word to see where they are saved."} right={<button onClick={refreshFiles} className="text-[11px] text-zinc-500 hover:text-white">Refresh</button>}>
                 {!files.length ? <p className="text-xs text-zinc-600">Nothing trained here yet.</p> : (
                   <div className="space-y-1.5">{files.map(file => (
@@ -228,6 +221,20 @@ export function TrainLoraView() {
 
       <div className="shrink-0 border-t border-white/5 p-4">
         <div className="mx-auto max-w-6xl">
+        {tab === "dataset" && (
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <button onClick={() => setTab("train")} className={btnPrimary}>Next: Train<ArrowRight size={14} /></button>
+            <span className="text-[11px] text-zinc-500">When the pictures and captions look right, go to the Train tab and press Start.</span>
+          </div>
+        )}
+          {tab === "train" && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <button onClick={() => start("lora", "/api/train/lora/start", { triggerWord: f.trigger, datasetDir: f.datasetDir, outputDir: f.outputDir, baseModelPath: f.baseModelPath, resolution: f.resolution, batchSize: f.batchSize, numRepeats: f.numRepeats, networkDim: f.networkDim, networkAlpha: f.networkAlpha, learningRate: f.learningRate, epochs: f.epochs, vramPreset: f.vramPreset, seed: f.seed })} disabled={!!trainReason || busy} title={trainReason} className={btnPrimary}>{lora.running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}Start LoRA training</button>
+          {lora.running && <button onClick={lora.stop} className={btnDanger}>Stop</button>}
+          {trainReason && <span className="text-[11px] text-amber-400">{trainReason}</span>}
+          {!trainReason && <span className="text-[11px] text-zinc-500">ComfyUI's and Ollama's models are unloaded first so training has the GPU to itself.</span>}
+        </div>
+          )}
           <div className="mb-2 flex items-center gap-1.5">{([["sketch", "Sketch"], ["caption", "Captions"], ["lora", "Training"]] as const).map(([k, l]) => <button key={k} onClick={() => setConsoleKind(k)} className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${consoleKind === k ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-300"}`}>{l}{jobs[k].running ? " ..." : ""}</button>)}</div>
           <div className="h-48"><JobConsole job={jobs[consoleKind]} title={consoleKind === "lora" ? "Training" : consoleKind === "sketch" ? "Character sketch" : "Captioning"} /></div>
         </div>
