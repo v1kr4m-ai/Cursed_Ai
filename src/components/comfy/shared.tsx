@@ -49,7 +49,9 @@ export function StudioFrame({ toolbar, controls, actionBar, canvas, reorderKey =
             <div className="shrink-0 border-t border-white/5 p-4 space-y-2 bg-black/20">{actionBar}</div>
           </div>
         </ReorderGroup>
-        <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">{canvas}</div>
+        <ReorderGroup id={reorderKey + "-canvas"}>
+          <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">{canvas}</div>
+        </ReorderGroup>
       </div>
     </div>
   );

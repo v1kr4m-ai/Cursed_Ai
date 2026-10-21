@@ -1,4 +1,5 @@
 import React from "react";
+import { Reorderable } from "../ui/Reorder";
 import { AlertTriangle, Dices, SlidersHorizontal, Minus, ListPlus, CornerUpLeft, Cpu, ExternalLink, Film, ImageIcon, Loader2, Play, Plus, Trash2, Type, X, Layers } from "lucide-react";
 import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { notify, notifyError } from "../../lib/notify";
@@ -364,10 +365,10 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
           {stageFile && <button onClick={removeResult} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>}
         </div>
       )}
-      <PreviousResults kind={kind} prompt={prompt} refreshKey={refreshKey} activeUrl={stageSrc} onShow={it => setView({ url: it.url, file: it.file.split(String.fromCharCode(92)).join("/").split("/").pop(), prompt: it.prompt })} />
-      <QueueList kind={kind} rows={rows} onPause={pause} onResume={resume} onCancel={cancel} onRemove={remove} />
+      <Reorderable id="previous"><PreviousResults kind={kind} prompt={prompt} refreshKey={refreshKey} activeUrl={stageSrc} onShow={it => setView({ url: it.url, file: it.file.split(String.fromCharCode(92)).join("/").split("/").pop(), prompt: it.prompt })} /></Reorderable>
+      <Reorderable id="queue"><QueueList kind={kind} rows={rows} onPause={pause} onResume={resume} onCancel={cancel} onRemove={remove} /></Reorderable>
       {gallery.length > 0 && (
-        <div>
+        <Reorderable id="recent">
           <p className={label}>Recent</p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {gallery.slice(0, 24).map(g => (
@@ -376,7 +377,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
               </button>
             ))}
           </div>
-        </div>
+        </Reorderable>
       )}
     </>
   );
