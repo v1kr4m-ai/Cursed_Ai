@@ -24,6 +24,7 @@ export interface Subtitles { cues: Cue[]; style: SubStyle; source: string; outPa
 
 export interface AudioTrack { id: string; name: string; file: string; duration: number; offset: number; gain: number; fadeIn: number; fadeOut: number }
 export interface AudioMix { tracks: AudioTrack[]; keepOriginal: boolean; originalGain: number; updatedAt: string }
+export type ExportKind = "joined" | "subtitled" | "audio" | "final" | "best";
 export type OutputKind = "joined" | "subtitled" | "audio" | "final";
 export interface Output { kind: OutputKind; path: string; at: string }
 
@@ -98,7 +99,8 @@ export const api = {
   renderEpisode: (id: string, episodeId: string, what: { subtitles: boolean; audio: boolean }) =>
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/render`, { method: "POST", body: JSON.stringify(what) }),
   pinFinal: (id: string, episodeId: string, kind: OutputKind | null) => call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/final`, { method: "PUT", body: JSON.stringify({ kind }) }),
-  exportEpisodes: (id: string, dir: string, subtitled: boolean) => call<{ dir: string; files: string[]; episodes: number }>(`/api/series/projects/${id}/export`, { method: "POST", body: JSON.stringify({ dir, subtitled }) }),
+  exportEpisodes: (id: string, dir: string, opts: { kind: ExportKind; episodeIds?: string[] }) => call<{ dir: string; files: string[]; episodes: number; skipped: { number: number; title: string }[] }>(`/api/series/projects/${id}/export`, { method: "POST", body: JSON.stringify({ dir, ...opts }) }),
+  masterVideo: (id: string, dir: string, kind: ExportKind) => call<{ file: string; dir: string; episodes: number; skipped: { number: number; title: string }[] }>(`/api/series/projects/${id}/master`, { method: "POST", body: JSON.stringify({ dir, kind }) }),
   comfyStatus: () => call<{ comfyUp: boolean; comfyUrl: string }>("/api/series/workflows"),
   async uploadSource(id: string, file: File) {
     const res = await fetch(`/api/series/projects/${id}/sources?name=${encodeURIComponent(file.name)}`, {

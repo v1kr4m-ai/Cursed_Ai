@@ -1,9 +1,10 @@
 import React from "react";
-import { Star, FolderOpen } from "lucide-react";
+import { Star, FolderOpen, Download } from "lucide-react";
 import { api, fileUrl, type Episode, type Output, type OutputKind, type Project } from "./api";
+import { nativeFolder } from "../../comfy/types";
 import { HoverVideo } from "./DashKit";
 import { postJson } from "../../comfy/types";
-import { notifyError } from "../../../lib/notify";
+import { notify, notifyError } from "../../../lib/notify";
 
 export const KINDS: Record<OutputKind, { label: string; note: string; chip: string }> = {
   joined: { label: "Joined", note: "The scenes cut together - no subtitles, no added sound", chip: "bg-neutral-500 text-white" },
@@ -31,6 +32,16 @@ export function outdated(ep: Episode, o: Output): boolean {
   const aud = (o.kind === "audio" || o.kind === "final") && !!ep.audio?.updatedAt && ep.audio.updatedAt > o.at;
   return subs || aud;
 }
+/** Asks for a folder (Windows' own dialog), remembering the last one. Returns null when cancelled. */
+export async function chooseExportFolder(): Promise<string | null> {
+  let last = "";
+  try { last = localStorage.getItem("cursed.series.exportDir") || ""; } catch { /* storage blocked */ }
+  const picked = await nativeFolder(last || undefined);
+  if (typeof picked !== "string") { if (picked === undefined) notifyError("The folder picker is not available.", "series"); return null; }
+  try { localStorage.setItem("cursed.series.exportDir", picked); } catch { /* storage blocked */ }
+  return picked;
+}
+
 const ago = (iso: string) => {
   if (!iso) return "";
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -47,6 +58,15 @@ export function OutputStage({ project, episode, onChanged }: { project: Project;
   const shown = (picked && all.find(o => o.kind === picked)) || fin || newest;
   if (!shown) return null;
   const pinned = !!episode.finalKind && shown.kind === episode.finalKind;
+  const exportThis = async () => {
+    const dir = await chooseExportFolder();
+    if (!dir) return;
+    try {
+      const r = await api.exportEpisodes(project.id, dir, { kind: shown.kind, episodeIds: [episode.id] });
+      notify({ message: "Exported " + KINDS[shown.kind].label + " to " + r.dir, tab: "series" });
+      postJson("/api/series/reveal-folder", { path: r.dir }).catch(() => {});
+    } catch (e: any) { notifyError(e?.message || String(e), "series"); }
+  };
   const pin = async (kind: OutputKind | null) => {
     try { onChanged(await api.pinFinal(project.id, episode.id, kind)); } catch (e: any) { notifyError(e?.message || String(e), "series"); }
   };
@@ -67,6 +87,7 @@ export function OutputStage({ project, episode, onChanged }: { project: Project;
           {pinned
             ? <button onClick={() => pin(null)} className="rounded-md border border-neutral-700 px-2.5 py-1 hover:opacity-80">Unpin (use the newest)</button>
             : <button onClick={() => pin(shown.kind)} className="flex items-center gap-1 rounded-md bg-emerald-600/80 px-2.5 py-1 font-medium text-white hover:bg-emerald-600"><Star size={11} />Use this as the final</button>}
+          <button onClick={exportThis} className="flex items-center gap-1 rounded-md border border-neutral-700 px-2.5 py-1 hover:opacity-80" title="Copy this version (and its .srt) to a folder"><Download size={11} />Export this version...</button>
           <button onClick={() => postJson("/api/series/reveal-folder", { path: shown.path.replace(/[\\/][^\\/]+$/, "") }).catch(() => {})} className="flex items-center gap-1 opacity-60 hover:opacity-100" title={shown.path}><FolderOpen size={12} />Show the file</button>
           <span className="truncate opacity-40">{shown.path.split(/[\\/]/).pop()}</span>
         </div>

@@ -1,12 +1,12 @@
 import React from "react";
-import { Scissors, Loader2, FolderOpen, ChevronDown } from "lucide-react";
-import { api, fileUrl, type Episode, type Project } from "./api";
+import { Scissors, Loader2, ChevronDown, Download, Film } from "lucide-react";
+import { api, fileUrl, type Episode, type ExportKind, type Project } from "./api";
 import { SubtitlesPanel } from "./Subtitles";
 import { AudioPanel } from "./AudioPanel";
-import { OutputStage, KINDS, finalOutput, listOutputs } from "./Outputs";
+import { OutputStage, KINDS, finalOutput, listOutputs, chooseExportFolder } from "./Outputs";
 import { HoverVideo } from "./DashKit";
 import { notify, notifyError } from "../../../lib/notify";
-import { nativeFolder, postJson } from "../../comfy/types";
+import { postJson } from "../../comfy/types";
 
 /**
  * Stage 3. Join each episode's finished scenes into one file with ffmpeg, and show the checklist
@@ -122,33 +122,73 @@ function SubtitleAll({ project, onChanged }: { project: Project; onChanged: (p: 
   );
 }
 
-/** Copies the joined episodes (subtitled copies when they exist) to a folder, with .srt files and a series.json. */
-function ExportBar({ project }: { project: Project }) {
-  const [busy, setBusy] = React.useState(false);
-  const [subtitled, setSubtitled] = React.useState(true);
-  const [done, setDone] = React.useState<{ dir: string; episodes: number } | null>(null);
-  const last = (() => { try { return localStorage.getItem("cursed.series.exportDir") || ""; } catch { return ""; } })();
-  const joined = project.episodes.filter(e => e.exportPath).length;
-  if (!joined) return null;
-  async function run() {
-    const picked = await nativeFolder(last || undefined);
-    if (typeof picked !== "string") { if (picked === undefined) notifyError("The folder picker is not available - type a folder in config.", "series"); return; }
-    setBusy(true);
+const EXPORT_KINDS: { kind: ExportKind; label: string; note: string }[] = [
+  { kind: "joined", label: "Raw", note: "the plain joined videos" },
+  { kind: "subtitled", label: "Subtitled", note: "subtitles burned in" },
+  { kind: "audio", label: "Music added", note: "your audio mixed in" },
+  { kind: "final", label: "Subtitles + music", note: "both" },
+  { kind: "best", label: "Best version of each", note: "the pinned (or newest) one" },
+];
+
+/** At the end of the page: copy every joined episode to a folder, or cut them all into one master video. A drop-up picks the version. */
+function ExportAll({ project }: { project: Project }) {
+  const [menu, setMenu] = React.useState(false);
+  const [busy, setBusy] = React.useState("");
+  const [done, setDone] = React.useState<{ dir: string; text: string } | null>(null);
+  const joined = project.episodes.filter(e => e.exportPath);
+  if (!joined.length) return null;
+  const have = (kind: ExportKind) => joined.filter(e => kind === "best" || kind === "joined" ? true : listOutputs(e).some(o => o.kind === kind)).length;
+
+  async function go(master: boolean, kind: ExportKind) {
+    setMenu(false);
+    const dir = await chooseExportFolder();
+    if (!dir) return;
+    const label = EXPORT_KINDS.find(k => k.kind === kind)!.label.toLowerCase();
+    setBusy(master ? "Joining the master video..." : "Copying...");
     try {
-      const r = await api.exportEpisodes(project.id, picked, subtitled);
-      try { localStorage.setItem("cursed.series.exportDir", picked); } catch { /* storage blocked */ }
-      setDone({ dir: r.dir, episodes: r.episodes });
-      notify({ message: `Exported ${r.episodes} episode${r.episodes === 1 ? "" : "s"}`, tab: "series" });
+      if (master) {
+        const r = await api.masterVideo(project.id, dir, kind);
+        setDone({ dir: r.dir, text: `Master video (${label}) - ${r.episodes} episode${r.episodes === 1 ? "" : "s"}${r.skipped.length ? `, skipped ${r.skipped.length} without that version` : ""}` });
+      } else {
+        const r = await api.exportEpisodes(project.id, dir, { kind });
+        setDone({ dir: r.dir, text: `Exported ${r.episodes} episode${r.episodes === 1 ? "" : "s"} (${label})${r.skipped.length ? `, skipped ${r.skipped.length} without that version` : ""}` });
+      }
+      notify({ message: master ? "Master video saved" : "Episodes exported", tab: "series" });
     } catch (e: any) { notifyError(e?.message || String(e), "series"); }
-    finally { setBusy(false); }
+    finally { setBusy(""); }
   }
+
+  const item = "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-left hover:bg-white/10";
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/30 p-3 text-xs">
-      <span className="font-medium">Export finished episodes</span>
-      <label className="flex items-center gap-1.5"><input type="checkbox" checked={subtitled} onChange={e => setSubtitled(e.target.checked)} className="accent-sky-500" />Use the final version (pinned, or the newest) rather than the plain join</label>
-      <button onClick={run} disabled={busy} className="flex items-center gap-1.5 rounded-md bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 px-3 py-1.5 font-medium text-white">{busy ? <Loader2 size={13} className="animate-spin" /> : <FolderOpen size={13} />}Export {joined} to a folder...</button>
-      {done && <button onClick={() => postJson("/api/series/reveal-folder", { path: done.dir }).catch(() => {})} className="truncate text-sky-400 hover:underline" title="Open the folder">{done.dir}</button>}
-      <span className="opacity-55">Numbered file names, an .srt next to each video, and a series.json.</span>
+    <div className="relative flex flex-wrap items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900/30 p-3 text-xs">
+      <div className="relative">
+        <button onClick={() => setMenu(m => !m)} disabled={!!busy} className="flex items-center gap-2 rounded-lg bg-emerald-600/80 px-4 py-2 font-medium text-white hover:bg-emerald-600 disabled:opacity-50">
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{busy || `Export ${joined.length} joined`}<ChevronDown size={13} className={"transition-transform " + (menu ? "" : "rotate-180")} />
+        </button>
+        {menu && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
+            <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-2xl border bg-zinc-900 p-1.5 text-white shadow-2xl">
+              <p className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider opacity-50">Export every episode as</p>
+              {EXPORT_KINDS.map(k => (
+                <button key={k.kind} onClick={() => go(false, k.kind)} disabled={!have(k.kind)} className={item + " disabled:opacity-35"}>
+                  <span>{k.label}<span className="block text-[10px] opacity-50">{k.note}</span></span><span className="text-[10px] opacity-60">{have(k.kind)}/{joined.length}</span>
+                </button>
+              ))}
+              <div className="my-1 border-t border-white/10" />
+              <p className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider opacity-50">Master video - all in one file</p>
+              {EXPORT_KINDS.map(k => (
+                <button key={"m" + k.kind} onClick={() => go(true, k.kind)} disabled={!have(k.kind)} className={item + " disabled:opacity-35"}>
+                  <span className="flex items-center gap-2"><Film size={12} className="opacity-60" />Master - {k.label.toLowerCase()}</span><span className="text-[10px] opacity-60">{have(k.kind)}/{joined.length}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      {done ? (
+        <span className="flex min-w-0 items-center gap-2"><span className="opacity-70">{done.text}</span><button onClick={() => postJson("/api/series/reveal-folder", { path: done.dir }).catch(() => {})} className="truncate text-sky-400 hover:underline" title="Open the folder">{done.dir}</button></span>
+      ) : <span className="opacity-55">Numbered files with an .srt beside each, plus a series.json - or one master video of the whole series.</span>}
     </div>
   );
 }
@@ -166,13 +206,13 @@ export function Assemble({ project, onChanged }: { project: Project; onChanged: 
         Scenes are normalised to {project.settings.width}x{project.settings.height} at {project.settings.fps} fps before joining, so clips rendered at different sizes still cut together.
       </p>
       <SubtitleAll project={project} onChanged={onChanged} />
-      <ExportBar project={project} />
       <div className="flex items-center gap-2 text-[11px] text-neutral-500">
         <button onClick={() => setOpen(project.episodes.map(e => e.id))} className="hover:text-neutral-300">Open all</button>
         <span>-</span>
         <button onClick={() => setOpen([])} className="hover:text-neutral-300">Close all</button>
       </div>
       {project.episodes.map(ep => <EpisodeRow key={ep.id} project={project} episode={ep} onChanged={onChanged} open={openIds.includes(ep.id)} onToggle={() => setOpen(openIds.includes(ep.id) ? openIds.filter(x => x !== ep.id) : [...openIds, ep.id])} />)}
+      <ExportAll project={project} />
     </div>
   );
 }
