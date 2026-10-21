@@ -11,6 +11,9 @@ interface Api {
   dragId: string | null;
   register: (id: string) => () => void;
   indexOf: (id: string) => number;
+  hidden: string[];
+  hide: (id: string) => void;
+  show: (id: string) => void;
   enter: () => void;
   startDrag: (id: string, e: { clientX: number; clientY: number }, el: HTMLElement) => void;
 }
@@ -22,6 +25,10 @@ export function ReorderGroup({ id, className = "", children }: { id: string; cla
   const key = "cursed.reorder." + id;
   const [saved, setSaved] = React.useState<string[]>(() => read(key));
   const [known, setKnown] = React.useState<string[]>([]);
+  const hiddenKey = key + ".hidden";
+  const [hidden, setHidden] = React.useState<string[]>(() => read(hiddenKey));
+  const [menu, setMenu] = React.useState(false);
+  const setHiddenSaved = (next: string[]) => { setHidden(next); try { localStorage.setItem(hiddenKey, JSON.stringify(next)); } catch { /* storage blocked */ } };
   const [edit, setEdit] = React.useState(false);
   const [dragId, setDragId] = React.useState<string | null>(null);
   const drag = React.useRef<{ el: HTMLElement; gx: number; gy: number; x: number; y: number } | null>(null);
@@ -77,6 +84,7 @@ export function ReorderGroup({ id, className = "", children }: { id: string; cla
     group: id, edit, dragId, startDrag, enter: () => setEdit(true),
     register: rid => { setKnown(k => (k.includes(rid) ? k : [...k, rid])); return () => setKnown(k => k.filter(x => x !== rid)); },
     indexOf: rid => order.indexOf(rid),
+    hidden, hide: rid => setHiddenSaved([...hidden.filter(x => x !== rid), rid]), show: rid => setHiddenSaved(hidden.filter(x => x !== rid)),
   };
   return (
     <Ctx.Provider value={api}>
@@ -84,8 +92,16 @@ export function ReorderGroup({ id, className = "", children }: { id: string; cla
         {edit && (
           <div className="fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-zinc-900/90 px-3 py-1.5 text-[11px] text-zinc-200 shadow-2xl backdrop-blur">
             <span className="opacity-70">Drag a block to reorder</span>
-            <button onClick={() => { try { localStorage.removeItem(key); } catch { /* storage blocked */ } setSaved([]); }} className="rounded-full bg-white/10 px-2.5 py-0.5 hover:bg-white/20">Reset</button>
-            <button onClick={() => setEdit(false)} className="rounded-full bg-white px-3 py-0.5 font-semibold text-zinc-900">Done</button>
+            <div className="relative">
+              <button onClick={() => setMenu(m => !m)} className="rounded-full bg-white/10 px-2.5 py-0.5 hover:bg-white/20">Blocks ({known.length - hidden.filter(h => known.includes(h)).length}/{known.length})</button>
+              {menu && (
+                <div className="absolute bottom-full left-1/2 mb-2 w-52 -translate-x-1/2 rounded-2xl border border-white/15 bg-zinc-900 p-2 shadow-2xl">
+                  {order.map(b => { const on = !hidden.includes(b); return <label key={b} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10"><input type="checkbox" checked={on} onChange={() => (on ? api.hide(b) : api.show(b))} className="accent-sky-500" />{b}</label>; })}
+                </div>
+              )}
+            </div>
+            <button onClick={() => { try { localStorage.removeItem(key); } catch { /* storage blocked */ } setSaved([]); setHiddenSaved([]); }} className="rounded-full bg-white/10 px-2.5 py-0.5 hover:bg-white/20">Reset</button>
+            <button onClick={() => { setMenu(false); setEdit(false); }} className="rounded-full bg-white px-3 py-0.5 font-semibold text-zinc-900">Done</button>
           </div>
         )}
         {children}
@@ -106,7 +122,7 @@ export function useReorderItem(id: string): Record<string, any> {
   const dragging = g.dragId === id;
   return {
     ref, "data-ri": id, "data-rg": g.group,
-    style: { order: g.indexOf(id), position: "relative", ...(dragging ? { zIndex: 40 } : {}) },
+    style: { order: g.indexOf(id), position: "relative", ...(dragging ? { zIndex: 40 } : {}), ...(g.hidden.includes(id) ? { display: "none" } : {}) },
     className: (g.edit ? (dragging ? "ri-drag" : "ri-wiggle") + " select-none touch-none" : ""),
     onPointerDown: (e: React.PointerEvent) => {
       suppress.current = false;
@@ -118,12 +134,19 @@ export function useReorderItem(id: string): Record<string, any> {
     },
     onPointerUp: cancel, onPointerLeave: cancel,
     onPointerMove: (e: React.PointerEvent) => { const p = press.current; if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) cancel(); },
-    onClickCapture: (e: React.MouseEvent) => { if (g.edit || suppress.current) { e.preventDefault(); e.stopPropagation(); suppress.current = false; } },
+    onClickCapture: (e: React.MouseEvent) => { if ((e.target as HTMLElement).closest("[data-rh]")) return; if (g.edit || suppress.current) { e.preventDefault(); e.stopPropagation(); suppress.current = false; } },
   };
 }
 
-/** A plain block that can be reordered. */
+/** The minus on a block while reordering; put it inside the block. */
+export function ReorderHide({ id }: { id: string }) {
+  const g = React.useContext(Ctx);
+  if (!g || !g.edit) return null;
+  return <span role="button" data-rh title="Hide this block (bring it back from Blocks)" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); g.hide(id); }} className="absolute right-2 top-2 z-20 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/50 text-[11px] font-bold leading-none text-white hover:bg-rose-600">-</span>;
+}
+
+/** A plain block that can be reordered and hidden. */
 export function Reorderable({ id, className = "", children }: { id: string; className?: string; children: React.ReactNode }) {
   const { className: extra = "", ...bind } = useReorderItem(id);
-  return <div {...bind} className={className + " " + extra}>{children}</div>;
+  return <div {...bind} className={className + " " + extra}><ReorderHide id={id} />{children}</div>;
 }

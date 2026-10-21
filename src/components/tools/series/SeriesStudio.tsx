@@ -64,9 +64,9 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
   }
 
   const homeDefs: TileDef[] = [
-    { id: "summary", x: 0, y: 0, w: 8, h: 17 },
-    { id: "new", x: 8, y: 0, w: 16, h: 17 },
-    ...projects.map((p, i): TileDef => ({ id: "p:" + p.id, x: (i % 3) * 8, y: 17 + Math.floor(i / 3) * 21, w: 8, h: 21 })),
+    { id: "summary", title: "All series", x: 0, y: 0, w: 8, h: 17 },
+    { id: "new", title: "Start a new series", x: 8, y: 0, w: 16, h: 17 },
+    ...projects.map((p, i): TileDef => ({ id: "p:" + p.id, title: p.title, x: (i % 3) * 8, y: 17 + Math.floor(i / 3) * 21, w: 8, h: 21 })),
   ];
   const total = projects.reduce((a, p) => ({ eps: a.eps + p.episodes, scenes: a.scenes + p.scenes, done: a.done + p.scenesDone, joined: a.joined + p.exports }), { eps: 0, scenes: 0, done: 0, joined: 0 });
   const overall = total.scenes ? Math.round((total.done / total.scenes) * 100) : 0;
@@ -76,7 +76,7 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
       <PageTitle>Series</PageTitle>
       {error && <div className="mb-3 rounded-xl border border-rose-900/60 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</div>}
 
-      <TileBoard id="series-home" defs={homeDefs} hideable={false}>
+      <TileBoard id="series-home" defs={homeDefs}>
         <Tile id="summary" tone="dark" delay={0.02} className="min-h-[11rem]" heading="All series">
           <div className="flex items-center gap-5">
             <Ring pct={overall} size={92} stroke={6} sub="of scenes" />

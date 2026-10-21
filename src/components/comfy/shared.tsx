@@ -2,7 +2,7 @@ import React from "react";
 import { AlertTriangle, ChevronDown, Film, ImageIcon as ImageIconLucide, Loader2, Pause, RotateCw, X } from "lucide-react";
 import { ProgressBar } from "../layout/ProgressBar";
 import { ACCENT, Kind, fileUrl } from "./types";
-import { ReorderGroup, useReorderItem, Reorderable } from "../ui/Reorder";
+import { ReorderGroup, useReorderItem, Reorderable, ReorderHide } from "../ui/Reorder";
 
 /** Look shared by every mode of the Image / Video studio, so Cloud, Quick and Workflows feel like one tool. */
 export const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2 block";
@@ -26,6 +26,7 @@ export function Section({ title, icon, accent, badge, defaultOpen = false, child
   const { className: ri = "", style, ...bind } = useReorderItem(title);
   return (
     <section {...bind} style={style} className={"border-b border-white/5 " + ri}>
+      <ReorderHide id={title} />
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-white/[0.03] transition-colors text-left">
         <span className={accent}>{icon}</span>
         <span className="text-[11px] font-black uppercase tracking-[0.18em] text-zinc-300">{title}</span>
