@@ -81,7 +81,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
       <PageTitle>Dashboard</PageTitle>
       <div className="relative grid gap-3 grid-cols-1 md:grid-cols-6 xl:grid-cols-12">
         {/* hero */}
-        <Tile tone="dark" delay={0.02} className="md:col-span-3 xl:col-span-3 xl:row-span-2 min-h-[22rem] flex flex-col" onClick={() => onGo(next.stage)} title={next.label}
+        <Tile id="hero" tone="dark" delay={0.02} className="md:col-span-3 xl:col-span-3 xl:row-span-2 min-h-[22rem] flex flex-col" onClick={() => onGo(next.stage)} title={next.label}
           heading="Series" aside={<ArrowUpRight size={16} className="opacity-60" />}>
           <p className="text-xl font-light leading-tight tracking-tight">{project.title}</p>
           <p className="text-[11px] opacity-60 mt-1 line-clamp-3">{project.idea.logline || "No logline yet - the Develop stage turns your idea into one."}</p>
@@ -112,7 +112,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* episodes bars */}
-        <Tile delay={0.06} className="md:col-span-3 xl:col-span-4 min-h-[11rem]" heading="Episodes at work" aside={<span className="text-2xl font-extralight tracking-tight">{scenesDone}<span className="text-xs opacity-50"> / {scenes.length} scenes</span></span>}>
+        <Tile id="episodes" delay={0.06} className="md:col-span-3 xl:col-span-4 min-h-[11rem]" heading="Episodes at work" aside={<span className="text-2xl font-extralight tracking-tight">{scenesDone}<span className="text-xs opacity-50"> / {scenes.length} scenes</span></span>}>
           {eps.length === 0 ? <p className="text-xs opacity-50">No episodes yet.</p> : (
             <div className="flex items-end justify-between gap-1.5 h-24">
               {eps.map(e => {
@@ -132,7 +132,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* rings */}
-        <Tile delay={0.1} className="md:col-span-3 xl:col-span-3 min-h-[11rem]" heading="Progress" onClick={() => onGo("produce")} title="Open the production board">
+        <Tile id="progress" delay={0.1} className="md:col-span-3 xl:col-span-3 min-h-[11rem]" heading="Progress" onClick={() => onGo("produce")} title="Open the production board">
           <div className="flex items-center justify-between gap-2">
             <Ring pct={overall} size={74} stroke={5} sub="scenes" />
             <Ring pct={pct(refsDone, refs.length)} size={74} stroke={5} sub="refs" />
@@ -141,7 +141,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* queue */}
-        <Tile tone="dark" delay={0.14} className="md:col-span-3 xl:col-span-2 min-h-[11rem]" heading="Render queue" onClick={() => onGo("produce")} title="Open the production board">
+        <Tile id="queue" tone="dark" delay={0.14} className="md:col-span-3 xl:col-span-2 min-h-[11rem]" heading="Render queue" onClick={() => onGo("produce")} title="Open the production board">
           <div className="space-y-2">
             {[["Queued", queued, "bg-amber-400"], ["Failed", failed, "bg-rose-400"], ["Left", remaining, "bg-white/60"]].map(([l, n, c]) => (
               <div key={l as string} className="flex items-center justify-between rounded-full bg-black/30 px-3 py-1.5 text-xs"><span className="flex items-center gap-2 opacity-80"><span className={`w-1.5 h-1.5 rounded-full ${c}`} />{l}</span><span className="font-light text-base">{n}</span></div>
@@ -150,7 +150,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* timeline */}
-        <Tile delay={0.18} className="md:col-span-6 xl:col-span-6" heading="Episodes at a glance" aside={<div className="flex gap-2 text-[10px] opacity-60">{(["done", "queued", "failed", "pending"] as const).map(s => <span key={s} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${SCENE_COLOR[s].split(" ")[0]}`} />{s}</span>)}</div>}>
+        <Tile id="glance" delay={0.18} className="md:col-span-6 xl:col-span-6" heading="Episodes at a glance" aside={<div className="flex gap-2 text-[10px] opacity-60">{(["done", "queued", "failed", "pending"] as const).map(s => <span key={s} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${SCENE_COLOR[s].split(" ")[0]}`} />{s}</span>)}</div>}>
           {eps.length === 0 ? <p className="text-xs opacity-50">Build a plan in Develop and every episode shows up here, scene by scene.</p> : (
             <div className="space-y-1.5">
               {eps.map(e => (
@@ -167,7 +167,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* pipeline */}
-        <Tile tone="dark" delay={0.22} className="md:col-span-3 xl:col-span-3" heading="Pipeline">
+        <Tile id="pipeline" tone="dark" delay={0.22} className="md:col-span-3 xl:col-span-3" heading="Pipeline">
           <div className="space-y-2.5">
             {pipeline.map(p => (
               <button key={p.label} onClick={() => onGo(p.stage)} className="block w-full text-left group">
@@ -179,32 +179,33 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* engine */}
-        <Tile delay={0.26} className="md:col-span-3 xl:col-span-3" heading="Render engine" onClick={() => onGo("settings")} title="Open the settings" aside={<Settings2 size={15} className="opacity-60" />}>
+        <Tile id="engine" delay={0.26} className="md:col-span-3 xl:col-span-2" heading="Render engine" onClick={() => onGo("settings")} title="Open the settings" aside={<Settings2 size={15} className="opacity-60" />}>
           <p className="flex items-center gap-2 text-sm"><CircleDot size={13} className={comfy?.comfyUp ? "text-emerald-500" : "text-rose-500"} />{comfy ? (comfy.comfyUp ? "ComfyUI is running" : "ComfyUI is not answering") : "Checking..."}</p>
-          <p className="text-[11px] opacity-50 mt-1 truncate">{comfy?.comfyUrl}</p>
-          <p className="text-[11px] opacity-70 mt-3">{w}×{h} · {secs} s · {project.settings.steps} steps · {project.settings.fps} fps</p>
-          <p className="text-[11px] opacity-45 mt-1 truncate">{project.settings.videoWorkflow ? project.settings.videoWorkflow.split(/[\\/]/).pop() : "No scene workflow set"}</p>
+          <p className="hidden @[14rem]:block text-[11px] opacity-50 mt-1 truncate">{comfy?.comfyUrl}</p>
+          <p className="text-[11px] opacity-70 mt-2">{w}×{h} · {secs} s · {project.settings.steps} steps · {project.settings.fps} fps</p>
+          <p className="hidden @[14rem]:block text-[11px] opacity-45 mt-1 truncate">{project.settings.videoWorkflow ? project.settings.videoWorkflow.split(/[\\/]/).pop() : "No scene workflow set"}</p>
         </Tile>
 
         {/* estimate */}
-        <Tile tone="dark" delay={0.3} className="md:col-span-3 xl:col-span-4" heading="Time left to render" onClick={() => onGo("settings")} title="Size and length change the estimate" aside={<Timer size={15} className="opacity-60" />}>
-          <div className="flex items-center gap-5">
-            <Ring pct={overall} size={96} stroke={6} label={remaining ? hours(remaining * perClip) : "Done"} sub={remaining ? "estimate" : ""} />
-            <div className="text-[11px] opacity-70 space-y-1">
+        <Tile id="estimate" tone="dark" delay={0.3} className="md:col-span-3 xl:col-span-3" heading="Time left to render" onClick={() => onGo("settings")} title="Measured on this PC; a bigger size or longer clip costs more. Open the settings to change them." aside={<Timer size={15} className="opacity-60" />}>
+          <div className="flex flex-wrap items-center gap-3">
+            <Ring pct={overall} size={64} stroke={5} label={remaining ? hours(remaining * perClip) : "Done"} sub={remaining ? "estimate" : ""} />
+            <div className="text-[11px] opacity-70 space-y-0.5 min-w-[7rem] flex-1">
               <p>{remaining} scene{remaining === 1 ? "" : "s"} left</p>
               <p>≈ {hours(perClip)} per clip at {w}×{h}</p>
-              <p className="opacity-60">Measured on this PC; a bigger size or longer clip costs more.</p>
             </div>
           </div>
         </Tile>
 
         {/* recent clips */}
-        <Tile delay={0.34} className="md:col-span-3 xl:col-span-4" heading="Latest clips" aside={<Film size={15} className="opacity-60" />}>
+        <Tile id="clips" delay={0.34} className="md:col-span-3 xl:col-span-4" heading="Latest clips" aside={<Film size={15} className="opacity-60" />}>
           {clips.length === 0 ? <p className="text-xs opacity-50">Rendered scenes appear here.</p> : (
             <div className="grid grid-cols-3 gap-2">
               {clips.map(({ s, e }) => (
-                <button key={s.id} onClick={() => onGo("produce", e.id)} title={`Episode ${e.number}, scene ${s.number}`} className="relative aspect-[9/14] rounded-xl overflow-hidden bg-black/40 group">
-                  <video src={`${fileUrl(s.clipPath!)}#t=0.4`} muted preload="metadata" className="w-full h-full object-cover" />
+                <button key={s.id} onClick={() => onGo("produce", e.id)} title={`Episode ${e.number}, scene ${s.number}`} className="relative aspect-[9/14] rounded-xl overflow-hidden bg-black/40 group"
+                  onMouseEnter={ev => { const v = ev.currentTarget.querySelector("video"); if (v) { v.currentTime = 0; v.play().catch(() => {}); } }}
+                  onMouseLeave={ev => { const v = ev.currentTarget.querySelector("video"); if (v) { v.pause(); v.currentTime = 0.4; } }}>
+                  <video src={`${fileUrl(s.clipPath!)}#t=0.4`} muted loop playsInline preload="metadata" className="w-full h-full object-cover" />
                   <span className="absolute left-1.5 bottom-1 text-[10px] font-semibold text-white drop-shadow">E{e.number}·{s.number}</span>
                   <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                 </button>
@@ -214,7 +215,7 @@ export function ProjectDashboard({ project, onGo }: { project: Project; onGo: Go
         </Tile>
 
         {/* references */}
-        <Tile delay={0.38} className="md:col-span-6 xl:col-span-4" heading="Cast & references" aside={<ImageIcon size={15} className="opacity-60" />} onClick={() => onGo("produce")} title="Open the production board">
+        <Tile id="refs" delay={0.38} className="md:col-span-6 xl:col-span-4" heading="Cast & references" aside={<ImageIcon size={15} className="opacity-60" />} onClick={() => onGo("produce")} title="Open the production board">
           {stills.length === 0 ? <p className="text-xs opacity-50">Reference stills appear here once they are rendered or dropped in.</p> : (
             <div className="grid grid-cols-4 gap-2">
               {stills.map(r => (

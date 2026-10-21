@@ -1,4 +1,5 @@
 import { registerHub, modelDirs } from "./hub";
+import { streamGemini } from "./geminiChat";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
 import { registerComfyTool } from "./comfyTool/routes";
@@ -570,6 +571,17 @@ async function startServer() {
     try {
       isInferenceRunning = true;
       lastEngineUse = Date.now();
+      const cloud = /^gemini:(.+)$/.exec(modelName || "");
+      if (cloud) {
+        const key = geminiKey();
+        if (!key) throw new Error("No Gemini API key - add one in Settings > Integrations.");
+        await streamGemini(key, cloud[1], messages || [{ role: "user", content: prompt }], options, res, abortController.signal);
+        res.write(`data: [DONE]
+
+`);
+        res.end();
+        return;
+      }
       const ext = /^(ollama|lmstudio):(.+)$/.exec(modelName || "");
       if (ext) {
         console.log(`[External] Chat via ${ext[1]}: ${ext[2]}`);

@@ -26,7 +26,7 @@ export default defineConfig(({mode}) => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         // Only source changes should reload the page; tool/db/model/android
         // files changing mid-chat was reloading the page and aborting replies.
-        ignored: ['**/.code-review-graph/**', '**/models/**', '**/android/**', '**/node_modules/**', '**/*.gguf', '**/memory.json', '**/config.json', '**/dist/**'],
+        ignored: ['**/.code-review-graph/**', '**/models/**', '**/android/**', '**/node_modules/**', '**/*.gguf', '**/memory.json', '**/config.json', '**/dist/**', '**/series/**', '**/outputs/**', '**/modules/**', '**/GGUF/**', '**/*.db', '**/*.db-*', '**/app.log', '**/chats.json', '**/comfy-tool*.json', '**/google.json', '**/recent-documents.json'],
       },
     },
   };

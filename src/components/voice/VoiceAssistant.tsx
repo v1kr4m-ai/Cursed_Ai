@@ -404,23 +404,36 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     if (d.mode === "fab" && !d.moved) setOpen(true);
   };
 
-  if (!open) {
-    return (
-      <button
-        onPointerDown={(e) => beginDrag(e, "fab")}
-        onPointerMove={moveDrag}
-        onPointerUp={endDrag}
-        title="Cursed_Pirate"
-        style={{ left: fab.x, top: fab.y }}
-        className="fixed z-40 h-11 w-11 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center hover:scale-110 transition-transform touch-none cursor-grab active:cursor-grabbing"
-      >
-        <Bot size={20} />
-      </button>
-    );
-  }
+  // Like a MacBook window: the panel flows out of the icon and is sucked back into it. Its transform origin is the icon's centre.
+  const originX = fab.x + FAB / 2 - panelLeft, originY = fab.y + FAB / 2 - panelTop;
+  const genie = {
+    initial: { opacity: 0, scaleX: 0.08, scaleY: 0.04, skewX: 14 },
+    animate: { opacity: 1, scaleX: 1, scaleY: 1, skewX: 0, transition: { type: "spring" as const, stiffness: 190, damping: 20, mass: 0.9 } },
+    exit: { opacity: 0, scaleX: [1, 0.55, 0.06], scaleY: [1, 0.9, 0.03], skewX: [0, -10, 12], transition: { duration: 0.34, ease: [0.5, 0, 0.9, 0.4] as [number, number, number, number], times: [0, 0.45, 1] } },
+  };
 
   return (
-    <div ref={panelRef} style={{ left: panelLeft, top: panelTop, width: panelW, height: panelH }} className="fixed z-40 flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
+    <>
+      <AnimatePresence>
+        {!open && (
+          <motion.button
+            key="fab"
+            initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.2, type: "spring", stiffness: 400, damping: 20 } }} exit={{ scale: 0, opacity: 0, transition: { duration: 0.12 } }}
+            whileHover={{ scale: 1.1 }}
+            onPointerDown={(e) => beginDrag(e, "fab")}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            title="Cursed_Pirate"
+            style={{ left: fab.x, top: fab.y }}
+            className="fixed z-40 h-11 w-11 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+          >
+            <Bot size={20} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {open && (
+    <motion.div key="panel" {...genie} ref={panelRef} style={{ left: panelLeft, top: panelTop, width: panelW, height: panelH, transformOrigin: `${originX}px ${originY}px` }} className="fixed z-40 flex flex-col bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 overflow-hidden shadow-2xl">
       <div
         onPointerDown={(e) => beginDrag(e, "panel")} onPointerMove={moveDrag} onPointerUp={endDrag}
         className="flex items-center justify-between mb-4 shrink-0 cursor-grab active:cursor-grabbing touch-none select-none">
@@ -528,6 +541,9 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
           </Button>
         )}
       </div>
-    </div>
+    </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

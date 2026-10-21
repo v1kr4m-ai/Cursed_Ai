@@ -1,6 +1,8 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText } from "lucide-react";
+import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush } from "lucide-react";
+import type { AIModel } from "../../../types";
+import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
 import { savedSetting } from "../../../lib/settingsStore";
@@ -51,8 +53,36 @@ const IDEA_FIELDS = [
   { key: "tone" as const, icon: Palette, color: "text-violet-400", placeholder: "Tone (e.g. cold documentary)" },
 ];
 
-export function Develop({ project, modelId, onSaved }: { project: Project; modelId?: string; onSaved: (p: Project) => void }) {
+const FILL_INSTRUCTION = `From our discussion, fill in the series details and reply with JSON only - no commentary.
+{
+  "title": "short series title",
+  "niche": "the niche or subject area, a few words",
+  "logline": "what the series is, in one line",
+  "audience": "who it is for",
+  "tone": "tone / mood in a few words",
+  "style": "the visual style: look, lighting, colour grade, camera feel - one or two sentences",
+  "notes": "constraints, things to avoid, anything else we agreed"
+}
+Use what we actually agreed. Use an empty string for anything we have not discussed.`;
+
+const TALK_MODEL_KEY = "cursed.series.talkModel";
+const GEMINI_ONLINE = [{ id: "gemini:gemini-2.5-flash", name: "Gemini 2.5 Flash" }, { id: "gemini:gemini-2.5-pro", name: "Gemini 2.5 Pro" }];
+
+export function Develop({ project, modelId, models, onSaved }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void }) {
+  const [talkModel, setTalkModel] = React.useState<string>(() => { try { return localStorage.getItem(TALK_MODEL_KEY) || ""; } catch { return ""; } });
+  const [geminiSet, setGeminiSet] = React.useState(false);
+  React.useEffect(() => { fetch("/api/gemini-key").then(r => r.json()).then(d => setGeminiSet(!!d?.set)).catch(() => {}); }, []);
+  const ready = (models || []).filter(m => m.isDownloaded);
+  const isOnline = (m: AIModel) => /[:-]cloud$/i.test(m.id) || !!m.tags?.some(t => /^cloud$/i.test(t));
+  const offline = ready.filter(m => !isOnline(m)).map(m => ({ id: m.id, name: m.name }));
+  const online = [...ready.filter(isOnline).map(m => ({ id: m.id, name: m.name })), ...(geminiSet ? GEMINI_ONLINE : [])];
+  const known = [...offline, ...online].some(m => m.id === talkModel);
+  const model = known && talkModel ? talkModel : modelId;
+  const pickModel = (id: string) => { setTalkModel(id); try { localStorage.setItem(TALK_MODEL_KEY, id); } catch { /* storage blocked */ } };
   const [idea, setIdea] = React.useState(project.idea);
+  const [title, setTitle] = React.useState(project.title);
+  const [style, setStyle] = React.useState(project.styleLock || "");
+  const [filling, setFilling] = React.useState(false);
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState(project.discussion);
   const [streaming, setStreaming] = React.useState("");
@@ -100,7 +130,7 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
       let acc = "";
       const answer = await askModel(
         [{ role: "system", content: systemPrompt }, ...next.map(m => ({ role: m.role, content: m.content }))],
-        modelId,
+        model,
         t => { acc += t; setStreaming(acc); },
       );
       const withReply = [...next, { role: "assistant" as const, content: answer, at: new Date().toISOString() }];
@@ -132,7 +162,7 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
         }
         const digest = await digestDocument(
           s.text,
-          prompt => askModel([{ role: "user", content: prompt }], modelId),
+          prompt => askModel([{ role: "user", content: prompt }], model),
           (p: DigestProgress) => setDigesting({ name: s.name, done: p.done, total: p.total }),
         );
         await api.setSourceDigest(project.id, s.id, digest);
@@ -152,7 +182,7 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
           ...messages.map(m => ({ role: m.role, content: m.content })),
           { role: "user", content: PLAN_INSTRUCTION },
         ],
-        modelId,
+        model,
       );
       setRawPlan(answer);
       const episodes = extractJson(answer);
@@ -165,6 +195,39 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
       setPlanning(false);
       setDigesting(null);
     }
+  }
+
+  async function saveDetails(next: { title?: string; style?: string; idea?: typeof idea }) {
+    const patch: Record<string, unknown> = { discussion: messages };
+    if (next.idea) patch.idea = next.idea;
+    if (next.title !== undefined && next.title.trim()) patch.title = next.title.trim();
+    if (next.style !== undefined) patch.styleLock = next.style;
+    onSaved(await api.patch(project.id, patch as any));
+  }
+
+  /** Reads the discussion back and puts title, niche, logline, audience, tone, style and notes into the fields. */
+  async function fillFromDiscussion() {
+    setFilling(true);
+    setError(null);
+    try {
+      const answer = await askModel(
+        [
+          { role: "system", content: systemPrompt },
+          ...sources.map(s => ({ role: "user", content: `Source document "${s.name}":\n\n${(s.digest || s.text).slice(0, 12000)}` })),
+          ...messages.map(m => ({ role: m.role, content: m.content })),
+          { role: "user", content: FILL_INSTRUCTION },
+        ],
+        model,
+      );
+      const d = extractJson(answer);
+      if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("The model did not return the details.");
+      const pick = (v: unknown, keep: string) => (typeof v === "string" && v.trim() ? v.trim() : keep);
+      const nextIdea = { ...idea, niche: pick(d.niche, idea.niche || ""), logline: pick(d.logline, idea.logline), audience: pick(d.audience, idea.audience), tone: pick(d.tone, idea.tone), notes: pick(d.notes, idea.notes) };
+      const nextTitle = pick(d.title, title), nextStyle = pick(d.style, style);
+      setIdea(nextIdea); setTitle(nextTitle); setStyle(nextStyle);
+      await saveDetails({ title: nextTitle, style: nextStyle, idea: nextIdea });
+    } catch (e: any) { setError(e?.message || String(e)); }
+    finally { setFilling(false); }
   }
 
   async function savePastedPlan() {
@@ -186,6 +249,14 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
           <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
             <Lightbulb size={14} className="text-amber-400" /> The idea
           </h3>
+          <div className="relative">
+            <Type size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 pointer-events-none" />
+            <input className={`${field} pl-8`} placeholder="Series title" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => saveDetails({ title })} />
+          </div>
+          <div className="relative">
+            <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none" />
+            <input className={`${field} pl-8`} placeholder="Niche (e.g. ancient history, true crime)" value={idea.niche || ""} onChange={e => setIdea({ ...idea, niche: e.target.value })} onBlur={() => saveIdea()} />
+          </div>
           {IDEA_FIELDS.map(({ key, icon: Icon, color, placeholder }) => (
             <div key={key} className="relative">
               <Icon size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${color} pointer-events-none`} />
@@ -193,11 +264,20 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
             </div>
           ))}
           <div className="relative">
+            <Brush size={13} className="absolute left-3 top-3 text-fuchsia-400 pointer-events-none" />
+            <textarea className={`${field} pl-8 h-16 resize-none`} placeholder="Visual style (look, lighting, colour grade)" value={style} onChange={e => setStyle(e.target.value)} onBlur={() => saveDetails({ style })} />
+          </div>
+          <div className="relative">
             <StickyNote size={13} className="absolute left-3 top-3 text-emerald-400 pointer-events-none" />
             <textarea className={`${field} pl-8 h-24 resize-none`} placeholder="Constraints, sources, things to avoid" value={idea.notes} onChange={e => setIdea({ ...idea, notes: e.target.value })} onBlur={() => saveIdea()} />
           </div>
         </motion.div>
 
+        <button onClick={fillFromDiscussion} disabled={filling || busy || !planReady} title={planReady ? "Reads the conversation and fills in the title, niche, style and the rest" : "Talk it through first"}
+          className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900/60 hover:bg-neutral-800/80 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-neutral-100 transition">
+          {filling ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} className="text-fuchsia-400" />}
+          {filling ? "Filling in the details..." : "Fill the details from our discussion"}
+        </button>
         <motion.button
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           whileHover={{ scale: planning || busy || !planReady ? 1 : 1.015 }}
@@ -299,6 +379,17 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
 
       {/* right: the conversation */}
       <div className="flex flex-col min-h-0 rounded-xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
+        <div className="flex items-center gap-2 border-b border-neutral-800 px-3 py-2">
+          <Cpu size={13} className="text-violet-400 shrink-0" />
+          <span className="text-[11px] text-neutral-400 shrink-0">Talking with</span>
+          <select value={known ? talkModel : ""} onChange={e => pickModel(e.target.value)} title="The model used for this conversation, filling in the details and building the plan"
+            className="min-w-0 flex-1 max-w-xs rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
+            <option value="">App's selected model</option>
+            {offline.length > 0 && <optgroup label="Offline (on this PC)">{offline.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
+            {online.length > 0 && <optgroup label="Online">{online.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
+          </select>
+          {model?.startsWith("gemini:") || /[:-]cloud$/i.test(model || "") ? <span className="flex items-center gap-1 text-[10px] text-sky-400"><Cloud size={11} /> online</span> : <span className="text-[10px] text-emerald-400">offline</span>}
+        </div>
         <div ref={scroller} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && !streaming && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid h-full place-items-center text-center">
@@ -341,6 +432,7 @@ export function Develop({ project, modelId, onSaved }: { project: Project; model
         </div>
 
         <div className="border-t border-neutral-800 p-3">
+          <MicStatus phase={dictation.phase} level={dictation.level} />
           <div className="flex items-end gap-2">
             <div className="relative flex-1">
               <input

@@ -29,7 +29,7 @@ export interface Source { id: string; name: string; text: string; addedAt: strin
 
 export interface Project {
   id: string; title: string; dir: string; createdAt: string; updatedAt: string;
-  idea: { logline: string; audience: string; tone: string; notes: string };
+  idea: { logline: string; audience: string; tone: string; notes: string; niche?: string };
   discussion: { role: "user" | "assistant"; content: string; at: string }[];
   styleLock: string; voiceLock: string;
   settings: ProjectSettings; episodes: Episode[]; sources?: Source[];

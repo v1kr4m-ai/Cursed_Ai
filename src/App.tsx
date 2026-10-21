@@ -477,7 +477,7 @@ export default function App() {
             {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
             <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
             <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
-            <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
+            <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} models={models} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
             {activeTab === "settings" && (
               <SettingsView
                 settings={settings}

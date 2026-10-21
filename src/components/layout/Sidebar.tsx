@@ -20,7 +20,8 @@ import {
   Clapperboard,
   Pencil,
   Trash2,
-  Pin
+  Pin,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -65,6 +66,8 @@ export function Sidebar({
 }: SidebarProps) {
   const gpu = useGpuInfo();
   const [historySearch, setHistorySearch] = React.useState("");
+  const [historyOpen, setHistoryOpen] = React.useState(() => { try { return localStorage.getItem("cursed.historyOpen") !== "0"; } catch { return true; } });
+  const toggleHistory = () => setHistoryOpen(o => { try { localStorage.setItem("cursed.historyOpen", o ? "0" : "1"); } catch { /* storage blocked */ } return !o; });
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const q = historySearch.trim().toLowerCase();
@@ -214,8 +217,11 @@ export function Sidebar({
 
         {!isCollapsed && activeTab === "chat" && (
           <div className="mt-8">
-            <h3 className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-3">History</h3>
-            {chats.length > 0 && (
+            <button onClick={toggleHistory} aria-expanded={historyOpen} className="w-full px-4 mb-3 flex items-center justify-between text-[10px] font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-[0.2em]">
+              <span>History{!historyOpen && chats.length > 0 ? ` (${chats.length})` : ""}</span>
+              <ChevronDown size={12} className={`transition-transform ${historyOpen ? "" : "-rotate-90"}`} />
+            </button>
+            {historyOpen && chats.length > 0 && (
               <div className="px-1 mb-2">
                 <input
                   value={historySearch}
@@ -225,7 +231,7 @@ export function Sidebar({
                 />
               </div>
             )}
-            <div className="space-y-1 px-1">
+            <div className={`space-y-1 px-1 ${historyOpen ? "" : "hidden"}`}>
               {chats.length > 0 && shownChats.length === 0 && <p className="px-3 py-2 text-xs text-zinc-600">No chats match.</p>}
               {groups.map(g => (
                 <div key={g.name || "results"} className="space-y-1">

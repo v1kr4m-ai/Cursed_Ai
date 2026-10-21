@@ -8,6 +8,7 @@ import { Develop } from "./Develop";
 import { Board } from "./Board";
 import { Assemble } from "./Assemble";
 import { ProjectDashboard } from "./ProjectDashboard";
+import type { AIModel } from "../../../types";
 
 /**
  * Series Studio: take an idea from a conversation to finished episodes without leaving the app.
@@ -210,7 +211,7 @@ const store = {
   set: (k: string, v: string | null) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* storage blocked */ } },
 };
 
-export function SeriesStudioView({ modelId, look }: { modelId?: string; look?: "light" | "dark" }) {
+export function SeriesStudioView({ modelId, models, look }: { modelId?: string; models?: AIModel[]; look?: "light" | "dark" }) {
   // Opens straight into the series you were last in, as an immersive board; "All series" goes back to the list.
   const [projectId, setProjectId] = React.useState<string | null>(() => store.get(LAST_KEY));
   const [project, setProject] = React.useState<Project | null>(null);
@@ -316,7 +317,7 @@ export function SeriesStudioView({ modelId, look }: { modelId?: string; look?: "
                       ) : stage === "dashboard" ? (
                         <ProjectDashboard project={project} onGo={(st, episodeId) => { setFocusEpisode(episodeId || null); setStage(st); }} />
                       ) : stage === "develop" ? (
-                        <Develop project={project} modelId={modelId} onSaved={setProject} />
+                        <Develop project={project} modelId={modelId} models={models} onSaved={setProject} />
                       ) : stage === "produce" ? (
                         <Board project={project} onChanged={setProject} focusEpisodeId={focusEpisode} />
                       ) : stage === "assemble" ? (

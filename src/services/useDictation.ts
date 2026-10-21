@@ -10,6 +10,7 @@ import React from "react";
 import { LocalVoiceRecorder } from "./localVoice";
 import { isOnline, micBlockedReason, resolveEngine, speechErrorText, speechInputAvailable, type VoiceEnginePref } from "./voiceEngine";
 import { notifyError, notifyWarning } from "../lib/notify";
+import { micPhase, type MicPhase } from "../components/voice/MicStatus";
 
 export interface Dictation {
   supported: boolean;
@@ -17,6 +18,8 @@ export interface Dictation {
   transcribing: boolean;
   /** 0..1 loudness while the offline recorder is listening, for the button's ring. */
   level: number;
+  /** Loading / waiting / hearing / transcribing, or null when the mic is off. */
+  phase: MicPhase | null;
   engine: "browser" | "whisper";
   toggle: () => void;
 }
@@ -29,6 +32,8 @@ export function useDictation(value: string, onText: (next: string) => void, pref
   const [listening, setListening] = React.useState(false);
   const [transcribing, setTranscribing] = React.useState(false);
   const [level, setLevel] = React.useState(0);
+  const [ready, setReady] = React.useState(false);
+  const [heard, setHeard] = React.useState(false);
   const [browserFailed, setBrowserFailed] = React.useState(false);
 
   const recognition = React.useRef<any>(null);
@@ -54,10 +59,13 @@ export function useDictation(value: string, onText: (next: string) => void, pref
     const rec = new LocalVoiceRecorder();
     recorder.current = rec;
     const base = latest.current;
+    setReady(false); setHeard(false);
     setListening(true);
     try {
       const text = await rec.listenOnce({
         onLevel: setLevel,
+        onReady: () => setReady(true),
+        onSpeechStart: () => setHeard(true),
         onPartial: t => append(base, t),
         onEnd: () => { setListening(false); setTranscribing(true); setLevel(0); },
       });
@@ -96,6 +104,8 @@ export function useDictation(value: string, onText: (next: string) => void, pref
     r.lang = "en-US";
     const base = latest.current;
     r.onresult = (event: any) => append(base, Array.from(event.results).map((x: any) => x[0].transcript).join(""));
+    r.onaudiostart = () => setReady(true);
+    r.onspeechstart = () => setHeard(true);
     r.onend = () => setListening(false);
     r.onerror = (e: any) => {
       setListening(false);
@@ -111,6 +121,7 @@ export function useDictation(value: string, onText: (next: string) => void, pref
       notifyError(speechErrorText(code));
     };
     recognition.current = r;
+    setReady(false); setHeard(false);
     setListening(true);
     r.start();
   };
@@ -120,6 +131,7 @@ export function useDictation(value: string, onText: (next: string) => void, pref
     listening,
     transcribing,
     level,
+    phase: micPhase({ listening, transcribing, ready, heard }),
     engine: resolveEngine(pref, browserFailed),
     toggle,
   };

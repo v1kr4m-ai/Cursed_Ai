@@ -41,6 +41,7 @@ import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
 import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speechErrorText } from "../../services/voiceEngine";
 import { MicModeButton } from "../voice/MicModeButton";
+import { MicStatus, micPhase } from "../voice/MicStatus";
 import { cn } from "@/lib/utils";
 import { notify, notifyError, notifyWarning } from "../../lib/notify";
 import { parseStudioCommand, StudioIntent, StudioRequest } from "../../services/studioIntent";
@@ -89,6 +90,8 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [micReady, setMicReady] = useState(false);
+  const [micHeard, setMicHeard] = useState(false);
   const [liveTps, setLiveTps] = useState<number | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
   // Files attached to the message being written
@@ -161,12 +164,15 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
   const startWhisperDictation = async () => {
     const recorder = new LocalVoiceRecorder();
     localRecorderRef.current = recorder;
+    setMicReady(false); setMicHeard(false);
     setIsDictating(true);
     setAttachMsg(null);
     const base = input;                       // live captions replace only what is dictated
     try {
       const text = await recorder.listenOnce({
         onLevel: setMicLevel,
+        onReady: () => setMicReady(true),
+        onSpeechStart: () => setMicHeard(true),
         onPartial: (t) => setInput((base ? base + " " : "") + t),
         onEnd: () => { setIsDictating(false); setIsTranscribing(true); setMicLevel(0); },
       });
@@ -208,6 +214,8 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join("");
       setInput((base ? base + " " : "") + transcript);
     };
+    recognition.onaudiostart = () => setMicReady(true);
+    recognition.onspeechstart = () => setMicHeard(true);
     recognition.onend = () => setIsDictating(false);
     recognition.onerror = (e: any) => {
       setIsDictating(false);
@@ -218,6 +226,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       notifyError(speechErrorText(code));
     };
     dictationRef.current = recognition;
+    setMicReady(false); setMicHeard(false);
     setIsDictating(true);
     recognition.start();
   };
@@ -497,6 +506,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         {attachMsg && <span className="text-xs text-amber-400">{attachMsg}</span>}
       </div>
     )}
+    <MicStatus phase={micPhase({ listening: isDictating, transcribing: isTranscribing, ready: micReady, heard: micHeard })} level={micLevel} />
     <div className="bg-white/5 border border-white/10 rounded-2xl p-1.5 flex items-end gap-1.5 transition-all duration-300 ease-out shadow-xl shadow-black/40 focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
       <div className="flex shrink-0 gap-0.5 mb-0.5 ml-0.5">
         {modelPicker}

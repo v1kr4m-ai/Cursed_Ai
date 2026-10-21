@@ -124,8 +124,8 @@ export class LocalVoiceRecorder {
    * transcription is started a moment BEFORE the pause is confirmed, so the answer is ready sooner.
    * Resolves "" if nothing was said.
    */
-  async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onPartial?: (text: string) => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
-    const { onLevel, onSpeechStart, onPartial, onEnd, silenceMs = 650, maxWaitMs = 10000, maxMs = 30000 } = opts;
+  async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onReady?: () => void; onPartial?: (text: string) => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
+    const { onLevel, onSpeechStart, onReady, onPartial, onEnd, silenceMs = 650, maxWaitMs = 10000, maxMs = 30000 } = opts;
     this.cancelled = false;
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const AudioCtx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -142,7 +142,7 @@ export class LocalVoiceRecorder {
     const t0 = performance.now();
     let noise = 0.004, spoke = false, speechStartIdx = 0, lastLoud = 0, quietChunks = 0;
     let speculative: { len: number; promise: Promise<string> } | null = null;
-    let partialBusy = false, lastPartialAt = t0, finished = false;
+    let partialBusy = false, lastPartialAt = t0, finished = false, readySent = false;
     const lastLoudChunk = { i: -1 };
 
     const merge = (from: number, to: number) => {
@@ -164,6 +164,7 @@ export class LocalVoiceRecorder {
       this.endListening = stop;
       proc.onaudioprocess = (e) => {
         const data = new Float32Array(e.inputBuffer.getChannelData(0)); // copy: the browser reuses its buffer
+        if (!readySent) { readySent = true; onReady?.(); }
         const idx = chunks.push(data) - 1;
         let sum = 0;
         for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
