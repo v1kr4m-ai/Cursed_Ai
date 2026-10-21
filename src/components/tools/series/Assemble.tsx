@@ -2,6 +2,7 @@ import React from "react";
 import { Scissors, Loader2, FolderOpen, CheckCircle2, Circle } from "lucide-react";
 import { api, fileUrl, type Episode, type Project } from "./api";
 import { SubtitlesPanel } from "./Subtitles";
+import { notify, notifyError } from "../../../lib/notify";
 
 /**
  * Stage 3. Join each episode's finished scenes into one file with ffmpeg, and show the checklist
@@ -84,6 +85,39 @@ function EpisodeRow({ project, episode, onChanged }: { project: Project; episode
   );
 }
 
+/** Subtitles for every joined episode that has none yet, then burned in with the default look. */
+function SubtitleAll({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
+  const [source, setSource] = React.useState("script");
+  const [step, setStep] = React.useState("");
+  const todo = project.episodes.filter(e => e.exportPath && !e.subtitles?.outPath);
+  async function run() {
+    try {
+      for (let i = 0; i < todo.length; i++) {
+        const e = todo[i];
+        setStep(`Episode ${e.number} (${i + 1}/${todo.length}): ${e.subtitles?.cues.length ? "burning" : "listening"}...`);
+        if (!e.subtitles?.cues.length) onChanged(await api.generateSubtitles(project.id, e.id, source));
+        setStep(`Episode ${e.number} (${i + 1}/${todo.length}): burning in...`);
+        onChanged(await api.burnSubtitles(project.id, e.id));
+      }
+      notify({ message: `Subtitled ${todo.length} episode${todo.length === 1 ? "" : "s"}`, tab: "series" });
+    } catch (e: any) { notifyError(e?.message || String(e), "series"); }
+    finally { setStep(""); }
+  }
+  if (!project.episodes.some(e => e.exportPath)) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/30 p-3 text-xs">
+      <span className="font-medium">Subtitle every joined episode</span>
+      <select value={source} onChange={e => setSource(e.target.value)} disabled={!!step} className="bg-transparent border border-neutral-700 rounded-md px-2 py-1 [&_*]:bg-white [&_*]:text-black">
+        <option value="script">From the script</option><option value="offline">Offline (Whisper)</option><option value="online">Online (Gemini)</option>
+      </select>
+      <button onClick={run} disabled={!!step || !todo.length} className="flex items-center gap-1.5 rounded-md bg-sky-600/80 hover:bg-sky-600 disabled:opacity-40 px-3 py-1.5 font-medium text-white">
+        {step ? <Loader2 size={13} className="animate-spin" /> : null}{step || (todo.length ? `Do the ${todo.length} without subtitles` : "All done")}
+      </button>
+      <span className="opacity-55">Uses each episode's saved look; fix any line afterwards in its own panel and burn again.</span>
+    </div>
+  );
+}
+
 export function Assemble({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
   if (!project.episodes.length) {
     return <div className="grid place-items-center h-full text-sm text-neutral-500">Nothing to assemble yet.</div>;
@@ -93,6 +127,7 @@ export function Assemble({ project, onChanged }: { project: Project; onChanged: 
       <p className="text-xs text-neutral-500">
         Scenes are normalised to {project.settings.width}x{project.settings.height} at {project.settings.fps} fps before joining, so clips rendered at different sizes still cut together.
       </p>
+      <SubtitleAll project={project} onChanged={onChanged} />
       {project.episodes.map(ep => <EpisodeRow key={ep.id} project={project} episode={ep} onChanged={onChanged} />)}
     </div>
   );
