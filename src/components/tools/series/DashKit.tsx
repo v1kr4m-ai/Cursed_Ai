@@ -401,14 +401,23 @@ export function Tile({ id, className = "", tone = "frost", onClick, title, headi
   );
 }
 
-/** A video that plays (muted, looping) while the pointer is over it and rests on a frame otherwise. */
+/**
+ * A video that plays (muted, looping) while the pointer is over its card and rests on a frame otherwise.
+ * The listeners sit on the card around the video, so labels or tints laid over the video do not stop it.
+ */
 export function HoverVideo({ src, className = "" }: { src: string; className?: string }) {
   const v = React.useRef<HTMLVideoElement>(null);
-  return (
-    <video ref={v} src={src + "#t=0.4"} muted loop playsInline preload="metadata" className={className}
-      onMouseEnter={() => { const e = v.current; if (e) { e.currentTime = 0; e.play().catch(() => {}); } }}
-      onMouseLeave={() => { const e = v.current; if (e) { e.pause(); e.currentTime = 0.4; } }} />
-  );
+  React.useEffect(() => {
+    const video = v.current;
+    const card = video?.parentElement;
+    if (!video || !card) return;
+    const play = () => { video.currentTime = 0; video.play().catch(() => {}); };
+    const rest = () => { video.pause(); video.currentTime = 0.4; };
+    card.addEventListener("pointerenter", play);
+    card.addEventListener("pointerleave", rest);
+    return () => { card.removeEventListener("pointerenter", play); card.removeEventListener("pointerleave", rest); };
+  }, [src]);
+  return <video ref={v} src={src + "#t=0.4"} muted loop playsInline preload="metadata" className={className} />;
 }
 
 export const hours = (min: number) => (min >= 90 ? `${Math.round(min / 60)} h` : `${Math.max(1, Math.round(min))} min`);
