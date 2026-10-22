@@ -9,7 +9,9 @@ import { REF_KINDS, type RefKind } from "../../../../seriesTool/refKinds";
  * a costume, a location. Uploaded art is used as-is, so it lands as a finished reference and can
  * be wired into scenes straight away.
  */
-export function RefDrop({ project, episodeId, onChanged, compact }: {
+export function RefDrop({ project, episodeId, onChanged, compact, people }: {
+  /** Names already in the series, offered when a picture of a person is attached. */
+  people?: string[];
   project: Project;
   episodeId: string;
   onChanged: (p: Project) => void;
@@ -20,6 +22,7 @@ export function RefDrop({ project, episodeId, onChanged, compact }: {
   const [error, setError] = React.useState<string | null>(null);
   const [kind, setKind] = React.useState<RefKind>("person");
   const kindInfo = REF_KINDS.find(k => k.id === kind)!;
+  const [person, setPerson] = React.useState("");
   const picker = React.useRef<HTMLInputElement>(null);
 
   async function take(files: FileList | File[] | null) {
@@ -30,7 +33,7 @@ export function RefDrop({ project, episodeId, onChanged, compact }: {
     try {
       for (const file of images) {
         const label = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60);
-        await api.uploadRef(project.id, episodeId, file, label, kindInfo.role, kind);
+        await api.uploadRef(project.id, episodeId, file, label, kindInfo.role, kind, kind === "person" ? person.trim() : undefined);
       }
       onChanged(await api.get(project.id));
     } catch (e: any) {
@@ -84,6 +87,13 @@ export function RefDrop({ project, episodeId, onChanged, compact }: {
           ))}
         </div>
         <p className="text-[10px] leading-relaxed text-neutral-500">{kindInfo.blurb} The next pictures you attach are saved as this.</p>
+        {kind === "person" && (
+          <div>
+            <input value={person} onChange={e => setPerson(e.target.value)} list="series-people" placeholder="Who is this? (a name, so several people stay apart)" className="w-full rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:border-sky-600" />
+            <datalist id="series-people">{(people || []).map(n => <option key={n} value={n} />)}</datalist>
+            <p className="mt-1 text-[10px] text-neutral-600">Attach several photos with the same name for one person. Leave it empty if the series has only one person.</p>
+          </div>
+        )}
       </div>
 
       <input

@@ -16,6 +16,10 @@ export interface Ref {
   role: "style" | "character";
   /** What the picture is for (person, outfit, product, location, pose, prop, palette, style); see refKinds.ts. Older refs have only a role. */
   kind?: string;
+  /** Which person this picture shows (a name shared by all that person's pictures). Lets a series with several people keep them apart. */
+  person?: string;
+  /** Left out of every prompt and workflow slot without deleting it. */
+  skip?: boolean;
   prompt: string;
   negative: string;
   seed: number;
@@ -38,6 +42,8 @@ export interface Scene {
   textCard: string;
   /** Ref ids in connection order: these become <Picture 1>..<Picture N> in the prompt. */
   refIds: string[];
+  /** The people who appear in this scene, by name; their pictures lead the reference order. */
+  cast?: string[];
   seed: number;
   /** The assembled prompt actually sent to ComfyUI. Editable - regenerating does not overwrite edits. */
   promptText: string;
@@ -166,7 +172,7 @@ export function snapFrames(seconds: number, fps: number): number {
 
 /** The prompt text sent to ComfyUI: reference wiring, then the three fields the model expects. */
 export function buildScenePrompt(project: Project, episode: Episode, scene: Scene): string {
-  const refs = scene.refIds.map(id => episode.refs.find(r => r.id === id)).filter(Boolean) as Ref[];
+  const refs = scene.refIds.map(id => episode.refs.find(r => r.id === id)).filter((r): r is Ref => !!r && !r.skip);
   const wiring = refs.map((ref, i) => {
     const picture = `<Picture ${i + 1}>`;
     const info = refKindInfo(kindOf(ref)) || REF_KINDS[0];
@@ -181,7 +187,14 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
   const voice = format.voice && project.voiceLock === DEFAULT_VOICE_LOCK ? format.voice : project.voiceLock;
   const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });
 
-  return [wiring, "", fields.description, fields.soundscape, fields.music].join("\n");
+  // With several people in the shot, say who is who and that they must stay different.
+  const people = refs.map((r, i) => ({ r, i })).filter(({ r }) => kindOf(r) === "person" && r.person);
+  const distinct = new Set(people.map(({ r }) => r.person));
+  const who = distinct.size > 1
+    ? `There are ${distinct.size} different people in this video: ${people.map(({ r, i }) => `<Picture ${i + 1}> is ${r.person}`).join(", ")}. Keep each person looking exactly like their own picture, clearly different from the others.`
+    : "";
+
+  return [wiring, who, "", fields.description, fields.soundscape, fields.music].filter((l, i) => i !== 1 || l).join("\n");
 }
 
 /** Episode progress, used for the dashboard bars and the checklist. */

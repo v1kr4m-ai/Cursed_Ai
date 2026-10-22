@@ -11,6 +11,7 @@ import { notify } from "../../../lib/notify";
 import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
+import { castInstruction, ensureCast, peopleOf, renamePerson, setSkip, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { planProblems, tidyPlan } from "./planCheck";
@@ -25,21 +26,22 @@ import { DIGEST_THRESHOLD, digestDocument, type DigestProgress } from "./chunk";
  * months later when an episode needs rewriting.
  */
 
-const EPISODE_SHAPE = `{
+const episodeShape = (cast: boolean) => `{
     "number": 1,
     "title": "Episode title",
     "era": "what this episode covers",
     "hookOut": "closing line that pulls the viewer to the next episode",
     "refs": [
       { "name": "style_plate", "role": "style", "prompt": "image prompt for the look of this episode", "negative": "what to avoid" },
-      { "name": "character_name", "role": "character", "prompt": "image prompt for this character", "negative": "what to avoid" }
+${cast ? "" : `,
+      { "name": "character_name", "role": "character", "prompt": "image prompt for this character", "negative": "what to avoid" }`}
     ],
     "scenes": [
-      { "number": 1, "vo": "(write this scene's own line here)", "shot": "(write this scene's own shot here)", "textCard": "", "refs": ["style_plate", "character_name"] }
+      { "number": 1, "vo": "(write this scene's own line here)", "shot": "(write this scene's own shot here)", "textCard": "", ${cast ? `"cast": ["Name"], "refs": ["style_plate"]` : `"refs": ["style_plate", "character_name"]`} }
     ]
   }`;
 
-function rulesFor(fmt: SeriesFormat) {
+function rulesFor(fmt: SeriesFormat, people: Person[]) {
   const lineRule = fmt.speech === "none"
     ? `- The "vo" line is only a short note (${fmt.lineWords} words) for the editor: nothing is spoken in the clip.`
     : `- Every "vo" line is ${fmt.lineWords} words: it is ${fmt.speech === "voiceover" ? "spoken over" : fmt.speech === "sung" ? "sung during" : "said on camera in"} one short clip.`;
@@ -52,25 +54,25 @@ ${lineRule}
 - Every scene needs a real, specific "shot" (what the camera sees and what the person does) and a real "vo". Never leave them empty and never repeat the same text in two fields.
 - Always leave "textCard" empty. Subtitles and captions are added later by the editor, never inside the clips.
 - Image prompts should describe a photographic still, with lighting and grade, not a character sheet.
-- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.
+${people.length ? castInstruction(people) : `- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.`}
 - Scene "refs" lists ref names from the same episode, style_plate first.`;
 }
 
 /** Asks for the whole plan: every episode of the season, or exactly `count` of them. */
-function planInstruction(fmt: SeriesFormat, count: number) {
+function planInstruction(fmt: SeriesFormat, count: number, people: Person[]) {
   return `Turn our discussion into a production plan and reply with JSON only - no commentary, no code fences.
 ${count > 0 ? `Write exactly ${count} episode${count > 1 ? "s" : ""}.` : "Write every episode we discussed."}
 
 Shape - a JSON array of episodes:
 [
-  ${EPISODE_SHAPE}
+  ${episodeShape(people.length > 0)}
 ]
 
-${rulesFor(fmt)}`;
+${rulesFor(fmt, people)}`;
 }
 
 /** Asks for one more episode that carries on from the ones already planned. */
-function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string) {
+function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[]) {
   const number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
   const recap = project.episodes.map(e => `Episode ${e.number} "${e.title}" (${e.era || "no period"}): ${e.scenes.slice(0, 2).map(sc => sc.vo).filter(Boolean).join(" / ")}${e.hookOut ? ` - ends with: ${e.hookOut}` : ""}`).join("\n");
   return `Write the NEXT episode, number ${number}, and reply with JSON only - no commentary, no code fences.
@@ -82,17 +84,17 @@ ${recap || "(nothing yet)"}
 ${direction.trim() ? `What I want in this episode: ${direction.trim()}
 ` : ""}
 Shape - one JSON object (a single episode, not an array):
-${EPISODE_SHAPE.replace('"number": 1', `"number": ${number}`)}
+${episodeShape(people.length > 0).replace('"number": 1', `"number": ${number}`)}
 
-${rulesFor(fmt)}`;
+${rulesFor(fmt, people)}`;
 }
 
 /** The plan the page already holds, written back in the shape the planner uses, so one more episode can be added without losing renders. */
 function planJson(project: Project) {
   return project.episodes.map(e => ({
     number: e.number, title: e.title, era: e.era, hookOut: e.hookOut,
-    refs: e.refs.map(r => ({ name: r.name, role: r.role, prompt: r.prompt, negative: r.negative, seed: r.seed })),
-    scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, shot: sc.shot, textCard: sc.textCard, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
+    refs: e.refs.map(r => ({ name: r.name, role: r.role, kind: r.kind, person: r.person, skip: r.skip, prompt: r.prompt, negative: r.negative, seed: r.seed })),
+    scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, shot: sc.shot, textCard: sc.textCard, cast: sc.cast, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
   }));
 }
 
@@ -221,11 +223,18 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
     };
     let answer = await ask([]);
     let json: any, problem = "";
-    try { json = tidyPlan(extractJson(answer)); problem = planProblems(json, fmt); } catch { problem = "That was not valid JSON. Reply again with ONLY the JSON, starting with the first bracket, no text before or after it, no code fences."; }
+    try { json = tidyPlan(extractJson(answer)); problem = planProblems(json, fmt, peopleOf(project).map(x => x.name)); } catch { problem = "That was not valid JSON. Reply again with ONLY the JSON, starting with the first bracket, no text before or after it, no code fences."; }
     if (!problem) return json;
     answer = await ask([{ role: "assistant", content: answer.slice(0, 3000) }, { role: "user", content: problem + " Send the complete corrected JSON again, nothing else." }]);
     json = tidyPlan(extractJson(answer));
     return json;
+  }
+
+  /** After a plan is saved: every episode gets the series photos, every person gets a still of their own, and each scene gets its cast's pictures. */
+  async function finishPlan(planned: Project, extra: File[]) {
+    const synced = await syncPhotos(planned, extra);
+    const episodes = ensureCast(synced.project);
+    onSaved(JSON.stringify(episodes) !== JSON.stringify(synced.project.episodes) ? await api.patch(project.id, { episodes }) : synced.project);
   }
 
   /** Writes episode N+1 from what is already planned and adds it, leaving every rendered clip alone. */
@@ -240,12 +249,12 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
 ${(s.digest || s.text).slice(0, 12000)}` })),
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction), a => setRawPlan(a));
+      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction, peopleOf(project)), a => setRawPlan(a));
       const next = Array.isArray(got) ? got[0] : got;
       if (!next || typeof next !== "object" || !Array.isArray(next.scenes)) throw new Error("The model did not write an episode with scenes.");
       next.number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
       const planned = await api.savePlan(project.id, [...planJson(project), next], true);
-      onSaved((await syncPhotos(planned)).project);
+      await finishPlan(planned, []);
       setDirection("");
       notify({ message: `Episode ${next.number} added - open Produce to render it`, tab: "series" });
     } catch (e: any) {
@@ -291,15 +300,14 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         ...storyBlocks,
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const episodes = await askForJson(base, planInstruction(fmt, episodeCount), a => setRawPlan(a));
+      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project)), a => setRawPlan(a));
       // Asked for one episode, a model often sends the episode itself rather than a list of one.
       const list = Array.isArray(episodes) ? episodes : Array.isArray(episodes?.episodes) ? episodes.episodes : episodes && typeof episodes === "object" && Array.isArray(episodes.scenes) ? [episodes] : null;
       if (!list) throw new Error("The plan must be a list of episodes.");
       // Photos picked before the plan existed are attached now, and every episode gets the series photos.
       const planned = await api.savePlan(project.id, list);
-      const synced = await syncPhotos(planned, pendingPhotos);
+      await finishPlan(planned, pendingPhotos);
       setPendingPhotos([]);
-      onSaved(synced.project);
     } catch (e: any) {
       setError(e?.message || String(e));
       setShowRaw(true);
@@ -516,7 +524,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             {(showAttach || seriesPhotos(project).length + pendingPhotos.length === 0) && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-3 overflow-hidden">
                 {firstEpisode ? (
-                  <RefDrop project={project} episodeId={firstEpisode.id} onChanged={async p => { onSaved(p); const r = await syncPhotos(p); if (r.copied || r.wired) onSaved(r.project); }} />
+                  <RefDrop project={project} people={peopleOf(project).map(x => x.name)} episodeId={firstEpisode.id} onChanged={async p => { onSaved(p); const r = await syncPhotos(p); if (r.copied || r.wired) onSaved(r.project); }} />
                 ) : (
                   <label className="block cursor-pointer rounded-lg border border-dashed border-neutral-600 bg-neutral-900/40 p-4 text-center text-xs text-neutral-400 hover:bg-neutral-900/70">
                     Choose photos now - they are attached as soon as the plan exists
@@ -529,13 +537,29 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           {(seriesPhotos(project).length > 0 || pendingPhotos.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {seriesPhotos(project).slice(0, 12).map(r => (
-                <div key={r.id} className="w-14 text-center"><img src={fileUrl(r.file!)} title={r.name} alt={r.name} className="h-14 w-14 rounded object-cover border border-neutral-700" /><div className="truncate text-[9px] text-neutral-500" title={refKindInfo(kindOf(r))!.label}>{refKindInfo(kindOf(r))!.label.split(" ")[0]}</div></div>
+                <div key={r.id} className={"photo-tile w-16 text-center " + (r.skip ? "opacity-40" : "")}>
+                  <img src={fileUrl(r.file!)} title={r.name + (r.person ? " - " + r.person : "")} alt={r.name} className="h-16 w-16 rounded object-cover border border-neutral-700" />
+                  <div className="truncate text-[9px] text-neutral-400" title={refKindInfo(kindOf(r))!.label + (r.person ? ": " + r.person : "")}>{r.person || refKindInfo(kindOf(r))!.label.split(" ")[0]}</div>
+                  <label className="flex items-center justify-center gap-1 text-[9px] text-neutral-500" title="Leave this picture out of every prompt and workflow slot"><input type="checkbox" checked={!!r.skip} onChange={async e => onSaved(await api.patch(project.id, { episodes: setSkip(project, r, e.target.checked) }))} />skip</label>
+                </div>
               ))}
               {pendingPhotos.map((f, i) => (
                 <button key={i} onClick={() => setPendingPhotos(p => p.filter((_, j) => j !== i))} title={f.name + " - click to remove"} className="h-12 w-12 overflow-hidden rounded border border-dashed border-sky-500">
                   <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
                 </button>
               ))}
+            </div>
+          )}
+          {peopleOf(project).length > 0 && (
+            <div className="space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-neutral-500">People in this series</div>
+              {peopleOf(project).map(person => (
+                <div key={person.name} className="flex items-center gap-2 text-xs text-neutral-300">
+                  <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
+                  <span className="shrink-0 text-[10px] text-neutral-500">{person.photos.length} photo{person.photos.length === 1 ? "" : "s"}</span>
+                </div>
+              ))}
+              <p className="text-[10px] leading-relaxed text-neutral-600">Each person gets a picture made only from their own photos. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
             </div>
           )}
           {project.episodes.length > 1 && seriesPhotos(project).length > 0 && (

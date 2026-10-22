@@ -15,7 +15,7 @@ import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTo
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
 import { probeDuration, stitch } from "./ffmpeg";
 import { extractUpload } from "../comfyTool/extract";
-import { refSourceFiles } from "./refSources";
+import { fillSlots, refSourceFiles } from "./refSources";
 import { refKindInfo } from "./refKinds";
 import { buildScenePrompt, newId, snapFrames, type Episode, type Project, type Ref, type Scene, type Source, type Status } from "./model";
 import { createSeriesStore } from "./store";
@@ -339,6 +339,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       res.json({ comfyUp: r.ok, comfyUrl: url });
     } catch {
       res.json({ comfyUp: false, comfyUrl: url });
+      person: String(req.query.person || "").trim().slice(0, 60) || undefined,
     }
   });
 
@@ -357,7 +358,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         info,
         promptText: ref.prompt,
         // An image-to-image workflow draws the person in the photos it is given. With fewer photos than slots the photos repeat (a blank slot would fail).
-        refImagePaths: (() => { const files = refSourceFiles(fresh.episodes.find(e => e.id === ep.id) || ep, ref); return info.refImageNodeIds.map((_, i) => (files.length ? files[i % files.length] : "")); })(),
+        refImagePaths: fillSlots(refSourceFiles(fresh.episodes.find(e => e.id === ep.id) || ep, ref), info.refImageBypassable, info.refImageNodeIds.length),
         refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "ref"),
@@ -380,7 +381,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       const liveEp = fresh.episodes.find(e => e.id === ep.id)!;
       const liveScene = liveEp.scenes.find(s => s.id === scene.id)!;
 
-      const refs = liveScene.refIds.map(id => liveEp.refs.find(r => r.id === id)).filter(Boolean) as Ref[];
+      // Pictures marked "skip" are left out, as if they were not attached.
+      const refs = liveScene.refIds.map(id => liveEp.refs.find(r => r.id === id)).filter((r): r is Ref => !!r && !r.skip);
       const missing = refs.filter(r => !r.file || !fs.existsSync(r.file));
       if (missing.length) throw new Error(`Render these references first: ${missing.map(r => r.name).join(", ")}`);
 
@@ -393,7 +395,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       mark(p.id, scene.id, "scene", { status: "running", error: null, promptText });
 
       // Unused reference slots are passed blank, which bypasses them for this run.
-      const refPaths = info.refImageNodeIds.map((_, i) => refs[i]?.file || "");
+      const refPaths = fillSlots(refs.map(r => r.file || ""), info.refImageBypassable, info.refImageNodeIds.length);
       const dest = uniqueDestination(path.join(store.clipsDir(fresh), `ep${String(liveEp.number).padStart(2, "0")}_scene${String(liveScene.number).padStart(2, "0")}.mp4`));
 
       await runWorkflow({
@@ -568,3 +570,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
 }
           fromRefIds: prior?.fromRefIds,
           kind: refKindInfo(String(r.kind || prior?.kind || ""))?.id,
+          kind: refKindInfo(String(r.kind || prior?.kind || ""))?.id,
+          person: String(r.person || prior?.person || "").trim().slice(0, 60) || undefined,
+          skip: typeof r.skip === "boolean" ? r.skip : prior?.skip,
+            cast: Array.isArray(s.cast) ? s.cast.map((n: unknown) => String(n).trim()).filter(Boolean) : prior?.cast,

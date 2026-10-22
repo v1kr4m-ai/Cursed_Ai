@@ -5,6 +5,11 @@ import { extractJson } from "../src/components/tools/series/api";
 import { planProblems, tidyPlan } from "../src/components/tools/series/planCheck";
 import { judgeImage, judgeVideo, suggestions, type WfInfo } from "../src/components/tools/series/workflows";
 import { kindOf, kindRank } from "../seriesTool/refKinds";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { peopleOf, ensureCast, renamePerson, setSkip } from "../src/components/tools/series/people";
+import { fillSlots, refSourceFiles } from "../seriesTool/refSources";
 import { formatOf } from "../seriesTool/formats";
 
 describe("snapFrames", () => {
@@ -186,5 +191,65 @@ describe("reference kinds", () => {
     expect(kindOf({ role: "character", kind: "bogus" })).toBe("person");
     const refs = [{ role: "style" as const, kind: "style" }, { role: "character" as const, kind: "outfit" }, { role: "character" as const }];
     expect([...refs].sort((a, b) => kindRank(a) - kindRank(b)).map(kindOf)).toEqual(["person", "outfit", "style"]);
+  });
+});
+
+describe("several people", () => {
+  const ref = (id: string, name: string, over: any = {}) => ({ id, name, role: "character" as const, kind: "person", prompt: "", negative: "", seed: 1, file: "x.png", status: "done" as const, error: null, ...over });
+  const world = () => {
+    const { project, episode, scene } = fixture();
+    const ep = { ...episode, refs: [
+      { ...ref("s", "style_plate", { role: "style", kind: "style", prompt: "a look", file: null, status: "pending" as const }) },
+      ref("a1", "Ann photo", { person: "Ann" }), ref("a2", "Ann photo 2", { person: "Ann" }), ref("b1", "Bo photo", { person: "Bo" }),
+    ], scenes: [{ ...scene, refIds: ["s"], cast: ["Ann", "Bo"] }, { ...scene, id: "s2", number: 2, refIds: ["s"], cast: ["Bo"] }] };
+    return { ...project, episodes: [ep] } as Project;
+  };
+
+  it("finds the people and gives each a still made only from their own photos", () => {
+    const p = world();
+    expect(peopleOf(p).map(x => x.name)).toEqual(["Ann", "Bo"]);
+    const eps = ensureCast(p);
+    const stills = eps[0].refs.filter(r => r.prompt && r.kind === "person");
+    expect(stills.map(r => r.person)).toEqual(["Ann", "Bo"]);
+    expect(stills[0].fromRefIds).toEqual(["a1", "a2"]);
+    expect(stills[1].fromRefIds).toEqual(["b1"]);
+  });
+
+  it("puts a scene's cast in its picture list, style first, and leaves out the people who are not in it", () => {
+    const eps = ensureCast(world());
+    const names = (i: number) => eps[0].scenes[i].refIds.map(id => eps[0].refs.find(r => r.id === id)!.name);
+    expect(names(0)).toEqual(["style_plate", "Ann", "Bo"]);
+    expect(names(1)).toEqual(["style_plate", "Bo"]);
+  });
+
+  it("says who is who when two people share a shot, and leaves skipped pictures out", () => {
+    const eps = ensureCast(world());
+    const project = { ...world(), episodes: eps } as Project;
+    const prompt = buildScenePrompt(project as unknown as Project, eps[0] as any, eps[0].scenes[0] as any);
+    expect(prompt).toContain("2 different people");
+    expect(prompt).toContain("is Ann");
+    const skipped = { ...project, episodes: [{ ...eps[0], refs: eps[0].refs.map(r => (r.person === "Bo" ? { ...r, skip: true } : r)) }] } as Project;
+    expect(buildScenePrompt(skipped as unknown as Project, skipped.episodes[0] as any, skipped.episodes[0].scenes[0] as any)).not.toContain("is Bo");
+  });
+
+  it("renames and skips everywhere, and fills workflow slots without ever passing a blank to a slot that cannot be skipped", () => {
+    const p = world();
+    expect(renamePerson(p, "Ann", "Anna")[0].scenes[0].cast).toEqual(["Anna", "Bo"]);
+    expect(setSkip(p, p.episodes[0].refs[1], true)[0].refs[1].skip).toBe(true);
+    expect(fillSlots(["a.png"], [false, true, false], 3)).toEqual(["a.png", "", "a.png"]);
+    expect(fillSlots([], [false, false], 2)).toEqual(["", ""]);
+    expect(fillSlots(["a", "b", "c"], [], 2)).toEqual(["a", "b"]);
+  });
+
+  it("keeps another person's photo out of a person's still", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refs-"));
+    const f = (n: string) => { const file = path.join(dir, n); fs.writeFileSync(file, "x"); return file; };
+    const ep = { ...fixture().episode, refs: [
+      ref("a1", "Ann photo", { person: "Ann", file: f("a.png") }), ref("b1", "Bo photo", { person: "Bo", file: f("b.png") }),
+      ref("o1", "dress", { kind: "outfit", file: f("o.png") }),
+      ref("st", "Ann still", { person: "Ann", prompt: "x", file: null }),
+    ] };
+    const files = refSourceFiles(ep as any, ep.refs[3] as any).map(x => path.basename(x));
+    expect(files).toEqual(["a.png", "o.png"]);
   });
 });

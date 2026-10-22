@@ -6,6 +6,7 @@
  * at all (a workflow that points at nodes missing from its file never runs). These checks say so in
  * words and name workflows that would work, instead of letting a render fail or ignore the photo.
  */
+import React from "react";
 import type { Project } from "./api";
 
 export interface WfInfo {
@@ -18,6 +19,8 @@ export interface WfInfo {
   outputKind: string;
   /** False for workflows that edit a picture rather than make one from a prompt (upscalers, face tools). */
   needsPrompt?: boolean;
+  /** Per reference slot: can the workflow run with that slot left empty? */
+  refImageBypassable?: boolean[];
 }
 
 export type Level = "ok" | "warn" | "bad";
@@ -78,4 +81,11 @@ export function suggestions(list: WfInfo[], kind: "image" | "video", opts: { pho
     .filter(w => w.isRunnable && w.needsPrompt !== false && !/upscal|expression|face ?swap|inpaint|outpaint|train/i.test(w.name) && w.refImageCount >= need)
     .sort((a, b) => a.refImageCount - b.refImageCount || (a.name < b.name ? -1 : 1))
     .slice(0, 4);
+}
+
+/** What one workflow offers (slots, which can be skipped), once the list has loaded. */
+export function useWorkflowInfo(kind: "image" | "video", path: string): WfInfo | undefined {
+  const [info, setInfo] = React.useState<WfInfo | undefined>();
+  React.useEffect(() => { let live = true; fetchWorkflows(kind).then(l => { if (live) setInfo(findWorkflow(l, path)); }).catch(() => {}); return () => { live = false; }; }, [kind, path]);
+  return info;
 }

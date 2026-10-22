@@ -1,4 +1,6 @@
-import React from "react";
+import React from "react";
+import { peopleOf, placeCast } from "./people";
+import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { formatOf } from "../../../../seriesTool/formats";
 import { kindOf, refKindInfo, REF_KINDS } from "../../../../seriesTool/refKinds";
@@ -104,6 +106,14 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
             <div className="space-y-2 p-3">
               <textarea className={`${field} h-24 resize-none text-xs`} value={draft.prompt} onChange={e => setDraft({ ...draft, prompt: e.target.value })} onBlur={() => save({ prompt: draft.prompt })} placeholder="Image prompt" />
               <textarea className={`${field} h-16 resize-none text-xs`} value={draft.negative} onChange={e => setDraft({ ...draft, negative: e.target.value })} onBlur={() => save({ negative: draft.negative })} placeholder="Negative prompt" />
+              <label className="flex items-center gap-2 text-[11px] text-neutral-400"><input type="checkbox" checked={!!draft.skip} onChange={e => save({ skip: e.target.checked })} />Skip this picture: leave it out of every prompt and workflow slot (nothing is deleted)</label>
+              {kindOf(draft) === "person" && (
+                <div>
+                  <label className="text-[11px] text-neutral-500">Who is this person? (pictures with the same name are the same person)</label>
+                  <input className={`${field} text-xs`} value={draft.person || ""} list="series-people-card" onChange={e => setDraft({ ...draft, person: e.target.value })} onBlur={() => save({ person: (draft.person || "").trim() || undefined })} placeholder="Name" />
+                  <datalist id="series-people-card">{peopleOf(project).map(x => <option key={x.name} value={x.name} />)}</datalist>
+                </div>
+              )}
               <div>
                 <label className="text-[11px] text-neutral-500">What this picture is for</label>
                 <select value={kindOf(draft)} onChange={e => { const k = REF_KINDS.find(x => x.id === e.target.value)!; save({ kind: k.id, role: k.role }); }} className={`${field} text-xs [&_*]:bg-white [&_*]:text-black`}>
@@ -146,6 +156,8 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
 
   const isRunning = running?.targetId === scene.id;
   const fmt = formatOf(project.format);
+  const people = peopleOf(project);
+  const videoWf = useWorkflowInfo("video", project.settings.videoWorkflow);
   const words = draft.vo.trim().split(/\s+/).filter(Boolean).length;
   const [minWords, maxWords] = fmt.lineWords.split("-").map(Number);
   const inRange = fmt.speech === "none" || (words >= minWords && words <= maxWords);
@@ -215,21 +227,46 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
                 <label className="text-[11px] text-neutral-500">On-screen text card {project.allowTextCards ? "" : "(not used: text cards are switched off in Develop, so no writing is added to the video)"}</label>
                 <input className={`${field} text-xs`} value={draft.textCard} onChange={e => setDraft({ ...draft, textCard: e.target.value })} onBlur={() => save({ textCard: draft.textCard })} />
               </div>
+              {people.length > 0 && (
+                <div>
+                  <label className="text-[11px] text-neutral-500">People in this scene</label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {people.map(person => {
+                      const on = (draft.cast || []).some(n => n.toLowerCase() === person.name.toLowerCase());
+                      return (
+                        <button key={person.name} onClick={() => { const cast = on ? (draft.cast || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()) : [...(draft.cast || []), person.name]; save({ cast, refIds: placeCast(episode, { ...draft, cast }, people).refIds }); }}
+                          className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${on ? "border-emerald-600 bg-emerald-600/20 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}>{person.name}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div>
-                <label className="text-[11px] text-neutral-500">References, in Picture order</label>
-                <div className="mt-1 flex flex-wrap gap-1.5">
+                <label className="text-[11px] text-neutral-500">References: tick the pictures this scene uses (the order is the Picture order)</label>
+                <div className="mt-1 space-y-1">
                   {episode.refs.map(r => {
                     const index = draft.refIds.indexOf(r.id);
-                    const on = index >= 0;
+                    const on = index >= 0 && !r.skip;
                     return (
-                      <motion.button key={r.id} whileTap={{ scale: 0.95 }} onClick={() => toggleRef(r.id)}
-                        className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition ${on ? "border-sky-600 bg-sky-600/20 text-sky-200" : "border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}>
-                        {r.file && <img src={fileUrl(r.file)} alt="" className="h-3.5 w-3.5 rounded-sm object-cover" />}
-                        {on ? `${index + 1}. ` : ""}{r.name}{!r.file ? " (not rendered)" : ""}
-                      </motion.button>
+                      <label key={r.id} className={`flex items-center gap-2 rounded-md border px-2 py-1 text-[11px] transition ${on ? "border-sky-700 bg-sky-600/10 text-sky-100" : "border-neutral-800 text-neutral-400"} ${r.skip ? "opacity-50" : ""}`}>
+                        <input type="checkbox" checked={index >= 0} disabled={r.skip} onChange={() => toggleRef(r.id)} />
+                        {r.file ? <img src={fileUrl(r.file)} alt="" className="h-6 w-6 rounded-sm object-cover" /> : <span className="h-6 w-6 rounded-sm bg-neutral-800" />}
+                        <span className="min-w-0 flex-1 truncate">{on ? `Picture ${index + 1}: ` : ""}{r.name}{r.person ? ` (${r.person})` : ""}</span>
+                        <span className="shrink-0 text-[10px] text-neutral-500">{r.skip ? "skipped everywhere" : !r.file ? "not rendered" : refKindInfo(kindOf(r))!.label.split(" ")[0]}</span>
+                      </label>
                     );
                   })}
                 </div>
+                {videoWf && (() => {
+                  const used = draft.refIds.filter(id => !episode.refs.find(r => r.id === id)?.skip).length;
+                  const slots = videoWf.refImageCount;
+                  return (
+                    <p className={`mt-1 text-[10px] leading-relaxed ${used > slots ? "text-rose-300" : "text-neutral-500"}`}>
+                      {slots === 0 ? "This workflow shows no reference slots." : `The clip workflow has ${slots} reference slot${slots === 1 ? "" : "s"}; this scene uses ${used}.`}
+                      {used > slots ? " Untick some: extra pictures stop the render." : used < slots ? (videoWf.refImageBypassable?.slice(used).every(Boolean) ? " Slots left empty are skipped by the workflow." : " Slots left empty repeat the first picture, because this workflow cannot skip them.") : ""}
+                    </p>
+                  );
+                })()}
               </div>
               <div>
                 <label className="flex justify-between text-[11px] text-neutral-500">

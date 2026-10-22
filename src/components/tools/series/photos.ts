@@ -18,7 +18,7 @@ export function seriesPhotos(project: Project): Ref[] {
 async function copyPhoto(project: Project, episodeId: string, photo: Ref) {
   const blob = await (await fetch(fileUrl(photo.file!))).blob();
   const ext = (photo.file!.match(/\.[a-z0-9]+$/i)?.[0] || ".png").toLowerCase();
-  await api.uploadRef(project.id, episodeId, new File([blob], photo.name.replace(/[^\w ()-]+/g, "_") + ext, { type: blob.type || "image/png" }), photo.name, photo.role, photo.kind);
+  await api.uploadRef(project.id, episodeId, new File([blob], photo.name.replace(/[^\w ()-]+/g, "_") + ext, { type: blob.type || "image/png" }), photo.name, photo.role, photo.kind, photo.person);
 }
 
 export interface SyncResult { project: Project; copied: number; wired: number }

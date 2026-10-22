@@ -6,6 +6,10 @@ export interface Ref {
   id: string; name: string; role: "style" | "character";
   /** What the picture is for: person, outfit, product, location, pose, prop, palette, style, other. */
   kind?: string;
+  /** Which person this picture shows; pictures of one person share the name. */
+  person?: string;
+  /** Left out of prompts and workflow slots without deleting it. */
+  skip?: boolean;
   prompt: string; negative: string; seed: number;
   /** Uploaded photos this still is made from (image-to-image). Empty means the episode's attached photos. */
   fromRefIds?: string[];
@@ -14,7 +18,7 @@ export interface Ref {
 
 export interface Scene {
   id: string; number: number; vo: string; shot: string; textCard: string;
-  refIds: string[]; seed: number; promptText: string; promptEdited: boolean;
+  refIds: string[]; cast?: string[]; seed: number; promptText: string; promptEdited: boolean;
   status: Status; clipPath: string | null; durationS: number | null;
   promptId: string | null; error: string | null;
 }
@@ -127,8 +131,8 @@ export const api = {
   deleteSource: (id: string, sourceId: string) =>
     call<{ ok: true }>(`/api/series/projects/${id}/sources/${sourceId}`, { method: "DELETE" }),
   deleteRef: (id: string, refId: string) => call<{ ok: true }>(`/api/series/projects/${id}/refs/${refId}`, { method: "DELETE" }),
-  async uploadRef(id: string, episodeId: string, file: File, label: string, role: "style" | "character", kind?: string) {
-    const query = new URLSearchParams({ name: file.name, label, role, ...(kind ? { kind } : {}) });
+  async uploadRef(id: string, episodeId: string, file: File, label: string, role: "style" | "character", kind?: string, person?: string) {
+    const query = new URLSearchParams({ name: file.name, label, role, ...(kind ? { kind } : {}), ...(person ? { person } : {}) });
     const res = await fetch(`/api/series/projects/${id}/episodes/${episodeId}/upload?${query}`, {
       method: "POST",
       headers: { "Content-Type": file.type || "application/octet-stream" },
