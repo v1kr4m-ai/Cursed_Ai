@@ -10,6 +10,8 @@ import path from "path";
 import { buildLlmArgs, buildLoraArgs, cleanLlm, cleanLora, writeLoraToml } from "./builders";
 import { freeVram, isRunning, jobState, startProcess, startTask, stopJob, subscribeAll, type JobKind } from "./jobs";
 import { exists, listDirs, listFiles, listHfModels, resolvePaths, type TrainConfig } from "./paths";
+import { buildDataset, triggerFor } from "./personDataset";
+import { createSeriesStore } from "../seriesTool/store";
 import { chunkText, describeWithOllama, pairsFromChunk, sourceText, VISION_HINT, type Source } from "./sources";
 
 export interface TrainOptions {
@@ -135,6 +137,21 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     fs.unlinkSync(img);
     try { fs.unlinkSync(path.join(path.dirname(img), path.parse(img).name + ".txt")); } catch { /* had no caption */ }
     res.json({ ok: true });
+  });
+
+  /** Builds a LoRA dataset from the photos of one person in a Series project (a person is a name shared by that person's pictures). */
+  app.post("/api/train/lora/from-series", (req, res) => {
+    const person = String(req.body?.person || "").trim();
+    const project = createSeriesStore(path.join(opts.appRoot, "series")).get(String(req.body?.projectId || ""));
+    if (!project) return bad(res, 404, "No such series.");
+    if (!person) return bad(res, 400, "Choose a person.");
+    const photos = [...new Set(project.episodes.flatMap(ep => ep.refs)
+      .filter(r => !!r.file && !r.prompt.trim() && !r.skip && (r.person || "").trim().toLowerCase() === person.toLowerCase())
+      .map(r => r.file as string))];
+    if (!photos.length) return bad(res, 400, `${person} has no attached photos. Attach some in Develop > Reference photos, with that person's name.`);
+    const trigger = triggerFor(person);
+    const result = buildDataset({ dir: path.join(P().fluxDatasetsDir, trigger), trigger, photos });
+    res.json({ ...result, name: trigger, enough: result.total >= 10, person });
   });
 
   app.post("/api/train/dataset/create", (req, res) => {

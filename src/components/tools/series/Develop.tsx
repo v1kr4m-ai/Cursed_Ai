@@ -177,6 +177,20 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const [showAttach, setShowAttach] = React.useState(false);
   const photosCard = React.useRef<HTMLDivElement>(null);
   /** Opens the Reference photos card and brings it into view. */
+  /** Builds a training dataset from one person's photos, then opens Train LoRA with it chosen and the trigger word filled in. */
+  const trainPerson = async (name: string) => {
+    try {
+      const r = await fetch("/api/train/lora/from-series", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, person: name }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Could not build the dataset.");
+      if (!d.enough && !confirm(`${name} has only ${d.total} photo${d.total === 1 ? "" : "s"} in the dataset. A LoRA needs about 15-30 varied photos (different angles, light and clothes) to learn a face well.
+
+Open Train LoRA anyway? You can add more pictures there first.`)) return;
+      window.dispatchEvent(new CustomEvent("cursed:train-lora", { detail: { trigger: d.name, datasetDir: d.dir } }));
+      window.dispatchEvent(new CustomEvent("cursed:goto", { detail: { tab: "trainlora" } }));
+      notify({ message: `${name}: dataset ready (${d.total} photos, ${d.added} new). Trigger word ${d.name}.`, tab: "trainlora" });
+    } catch (e: any) { notify({ message: e?.message || String(e), kind: "error", tab: "series" }); }
+  };
   const goToPhotos = () => { setShowAttach(true); setTimeout(() => photosCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150); };
   const [showStory, setShowStory] = React.useState(true);
   const [digesting, setDigesting] = React.useState<{ name: string; done: number; total: number } | null>(null);
@@ -616,6 +630,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                 <div key={person.name} className="flex items-center gap-2 text-xs text-neutral-300">
                   <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
                   <span className="shrink-0 text-[10px] text-neutral-500">{person.photos.length} photo{person.photos.length === 1 ? "" : "s"}</span>
+                  <button onClick={() => trainPerson(person.name)} title="Build a LoRA dataset from this person's photos and open Train LoRA with their trigger word" className="shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-[10px] text-neutral-300 hover:border-violet-500 hover:text-violet-200">Train a LoRA</button>
                 </div>
               ))}
               <p className="text-[10px] leading-relaxed text-neutral-600">Each person gets a picture made only from their own photos. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>

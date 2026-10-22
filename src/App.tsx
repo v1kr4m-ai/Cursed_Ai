@@ -128,6 +128,12 @@ function defaultSettings(): AppSettings {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>(() => readSavedSettings().startTab || "chat");
+  // Other pages ask to open a tab with a window event (for example Series sending a person to Train LoRA).
+  useEffect(() => {
+    const go = (e: Event) => { const tab = (e as CustomEvent).detail?.tab; if (typeof tab === "string") setActiveTab(tab); };
+    window.addEventListener("cursed:goto", go);
+    return () => window.removeEventListener("cursed:goto", go);
+  }, []);
   const [chats, setChats] = useState<Chat[]>(() => {
     try { return JSON.parse((localStorage.getItem("cursed.chats") ?? localStorage.getItem("sunayna.chats") ?? "[]")).filter((c: Chat) => c.messages?.length); } catch { return []; }
   });

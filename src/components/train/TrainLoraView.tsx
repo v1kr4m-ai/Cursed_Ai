@@ -28,6 +28,17 @@ export function TrainLoraView() {
   const [status, reload] = useTrainStatus();
   const [tab, setTab] = React.useState<Tab>("dataset");
   const [f, setF] = React.useState<Form>(() => load(DEFAULTS));
+  // Series sends a person here: their dataset and trigger word are filled in and the Train tab opens.
+  React.useEffect(() => {
+    const onPerson = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      setF(prev => { const n = { ...prev, trigger: String(d.trigger || prev.trigger).replace(/[^\w-]/g, ""), datasetDir: String(d.datasetDir || prev.datasetDir) }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch { /* storage blocked */ } return n; });
+      setTab("train");
+      setTimeout(() => reload(), 300);
+    };
+    window.addEventListener("cursed:train-lora", onPerson);
+    return () => window.removeEventListener("cursed:train-lora", onPerson);
+  }, [reload]);
   const set = (patch: Partial<Form>) => setF(prev => { const n = { ...prev, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch { /* storage blocked */ } return n; });
   const [images, setImages] = React.useState<Img[]>([]);
   const [newName, setNewName] = React.useState("");
