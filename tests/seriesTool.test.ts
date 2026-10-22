@@ -10,6 +10,7 @@ import os from "os";
 import path from "path";
 import { peopleOf, ensureCast, renamePerson, setSkip } from "../src/components/tools/series/people";
 import { fillSlots, refSourceFiles } from "../seriesTool/refSources";
+import { projectFormat, SERIES_FORMATS } from "../seriesTool/formats";
 import { formatOf } from "../seriesTool/formats";
 
 describe("snapFrames", () => {
@@ -251,5 +252,41 @@ describe("several people", () => {
     ] };
     const files = refSourceFiles(ep as any, ep.refs[3] as any).map(x => path.basename(x));
     expect(files).toEqual(["a.png", "o.png"]);
+  });
+});
+
+describe("video styles", () => {
+  it("has a complete, unique, grouped style list including the outfit change", () => {
+    const ids = SERIES_FORMATS.map(f => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(expect.arrayContaining(["outfit-change", "street-walk", "grwm", "fashion", "product-demo", "pov", "skit", "transformation", "travel", "asmr"]));
+    for (const f of SERIES_FORMATS) {
+      expect(f.group, f.id).toBeTruthy();
+      expect(f.plan, f.id).toBeTruthy();
+      expect(f.shotExample, f.id).toBeTruthy();
+      expect(f.lineWords, f.id).toMatch(/^\d+-\d+$/);
+    }
+  });
+
+  it("silences or voices any style with the voice switch, keeping the clips clean for your own music", () => {
+    expect(projectFormat({ format: "street-walk" }).speech).toBe("oncamera");
+    const off = projectFormat({ format: "street-walk", voice: "off" });
+    expect(off.speech).toBe("none");
+    expect(off.music).toBe("N/A");
+    const on = projectFormat({ format: "outfit-change", voice: "on" });
+    expect(on.speech).toBe("oncamera");
+    expect(on.plan).toContain("talks to the camera");
+    expect(projectFormat({ format: "outfit-change" }).speech).toBe("none");
+    expect(projectFormat({ format: "singing", voice: "off" }).music).toBe("N/A");
+  });
+
+  it("words an outfit-change clip without speech and a talking one with it", () => {
+    const { project, episode, scene } = fixture();
+    const silent = buildScenePrompt({ ...project, format: "outfit-change" }, episode, scene);
+    expect(silent).toContain("Nobody speaks");
+    expect(silent).not.toContain("<d>");
+    const talking = buildScenePrompt({ ...project, format: "outfit-change", voice: "on" }, episode, scene);
+    expect(talking).toContain("<d>[English]");
+    expect(buildScenePrompt({ ...project, format: "skit" }, episode, scene)).toContain("talk to each other");
   });
 });

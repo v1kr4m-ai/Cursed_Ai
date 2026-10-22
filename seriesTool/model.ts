@@ -56,7 +56,7 @@ export interface Scene {
 }
 
 import type { Subtitles } from "./subtitlesCore";
-import { formatOf, sceneFields } from "./formats";
+import { projectFormat, sceneFields, type VoiceMode } from "./formats";
 import { kindOf, refKindInfo, REF_KINDS } from "./refKinds";
 import type { AudioMix, Output } from "./finishCore";
 
@@ -135,6 +135,8 @@ export interface Project {
   sources?: Source[];
   /** What kind of video this is (see formats.ts). Missing means narration. */
   format?: string;
+  /** Voice in the clips: the style's own choice (auto), none (off, clean for your own music) or always talking (on). */
+  voice?: VoiceMode;
   /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
   allowTextCards?: boolean;
 }
@@ -182,7 +184,7 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
       : info.wiring(picture, ref.name);
   }).join(" ");
 
-  const format = formatOf(project.format);
+  const format = projectFormat(project);
   // The default narrator is for narration; an on-camera format needs a person's voice instead.
   const voice = format.voice && project.voiceLock === DEFAULT_VOICE_LOCK ? format.voice : project.voiceLock;
   const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });

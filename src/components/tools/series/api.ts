@@ -56,6 +56,8 @@ export interface Project {
   settings: ProjectSettings; episodes: Episode[]; sources?: Source[];
   /** What kind of video this is: narration, vlog, ugc, singing, dancing... (seriesTool/formats.ts). */
   format?: string;
+  /** Voice in the clips: auto (the style decides), off (no talking, clean for your own music) or on (talks to the camera). */
+  voice?: "auto" | "off" | "on";
   /** Burn each scene's text card into the picture. Off by default. */
   allowTextCards?: boolean;
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;

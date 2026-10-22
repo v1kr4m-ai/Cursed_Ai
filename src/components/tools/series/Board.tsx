@@ -3,7 +3,7 @@ import { peopleOf, placeCast } from "./people";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
-import { formatOf } from "../../../../seriesTool/formats";
+import { projectFormat } from "../../../../seriesTool/formats";
 import { kindOf, refKindInfo, REF_KINDS } from "../../../../seriesTool/refKinds";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -156,7 +156,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
   React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
 
   const isRunning = running?.targetId === scene.id;
-  const fmt = formatOf(project.format);
+  const fmt = projectFormat(project);
   const people = peopleOf(project);
   const videoWf = useWorkflowInfo("video", project.settings.videoWorkflow);
   const words = draft.vo.trim().split(/\s+/).filter(Boolean).length;

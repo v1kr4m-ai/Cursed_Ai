@@ -1,7 +1,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus } from "lucide-react";
-import { SERIES_FORMATS, formatOf, type SeriesFormat } from "../../../../seriesTool/formats";
+import { SERIES_FORMATS, projectFormat, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
@@ -56,6 +56,7 @@ ${lineRule}
 - Always leave "textCard" empty. Subtitles and captions are added later by the editor, never inside the clips.
 - Image prompts should describe a photographic still, with lighting and grade, not a character sheet.
 ${people.length ? castInstruction(people) : `- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.`}
+- A ref may carry a "kind": person, outfit, product, location, pose, prop, palette or style. Give each outfit or product its own ref with that kind.
 - Scene "refs" lists ref names from the same episode, style_plate first.`;
 }
 
@@ -98,6 +99,21 @@ function planJson(project: Project) {
     scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, shot: sc.shot, textCard: sc.textCard, cast: sc.cast, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
   }));
 }
+
+/** Styles where reference photos matter, with what to attach. */
+const PHOTO_STYLES: Record<string, string> = {
+  ugc: "This style looks best with a photo of the person and, if she shows it, a picture of the product or outfit.",
+  vlog: "Attach a photo of the person so every clip shows the same face.",
+  "street-walk": "Attach a photo of the person who walks, and a picture of the street if you want a particular place.",
+  grwm: "Attach a photo of the person, and pictures of the outfits she picks.",
+  "outfit-change": "Attach a photo of the person, then one picture for each outfit she changes into (kind: Outfit / costume).",
+  fashion: "Attach a photo of the model, then one picture for each look (kind: Outfit / costume).",
+  "product-demo": "Attach a picture of the product (kind: Product) so it looks the same in every clip.",
+  pov: "Attach pictures of the places or things she sees, if they matter.",
+  skit: "Attach one photo per person and give each person a name, so each keeps their own face.",
+  singing: "Attach a photo of the singer so every clip shows the same person.",
+  dancing: "Attach a photo of the dancer so every clip shows the same person.",
+};
 
 const field = "w-full bg-neutral-900/60 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors";
 
@@ -150,9 +166,12 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const [direction, setDirection] = React.useState("");
   const [addingNext, setAddingNext] = React.useState(false);
   const [pendingPhotos, setPendingPhotos] = React.useState<File[]>([]);
-  const fmt = formatOf(project.format);
+  const fmt = projectFormat(project);
   const [showRaw, setShowRaw] = React.useState(false);
   const [showAttach, setShowAttach] = React.useState(false);
+  const photosCard = React.useRef<HTMLDivElement>(null);
+  /** Opens the Reference photos card and brings it into view. */
+  const goToPhotos = () => { setShowAttach(true); setTimeout(() => photosCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150); };
   const [showStory, setShowStory] = React.useState(true);
   const [digesting, setDigesting] = React.useState<{ name: string; done: number; total: number } | null>(null);
   const [voicePref, setVoicePref] = React.useState(() => savedSetting("voiceEngine", "auto" as const));
@@ -171,8 +190,8 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
 
   const systemPrompt =
     `You are helping plan a short-form video series for YouTube Shorts / Reels. ` +
-    `Video style: ${formatOf(project.format).label} - ${formatOf(project.format).blurb} ` +
-    `Each episode is about eight 7-second vertical clips with one ${formatOf(project.format).lineLabel.toLowerCase()} line each. ` +
+    `Video style: ${projectFormat(project).label} - ${projectFormat(project).blurb} ` +
+    `Each episode is about eight 7-second vertical clips with one ${projectFormat(project).lineLabel.toLowerCase()} line each. ` +
     `Idea: ${idea.logline || "(not stated yet)"}. Audience: ${idea.audience || "general"}. Tone: ${idea.tone || "documentary"}. ` +
     `Notes: ${idea.notes || "none"}. ` +
     `You are a creative writing partner for the user's own fictional video series, so help with scripts, scenes and outlines whenever asked. ` +
@@ -400,21 +419,41 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
             <Clapperboard size={14} className="text-sky-400" /> Video style
           </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {SERIES_FORMATS.map(f => (
-              <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: f.id, discussion: messages }))} title={f.blurb}
-                className={"rounded-full border px-3 py-1 text-xs transition " + (fmt.id === f.id ? "border-sky-500 bg-sky-500/15 text-sky-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
-                {f.label}
-              </button>
-            ))}
+          {[...new Set(SERIES_FORMATS.map(f => f.group))].map(group => (
+            <div key={group} className="space-y-1">
+              <div className="text-[10px] uppercase tracking-wider text-neutral-500">{group}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {SERIES_FORMATS.filter(f => f.group === group).map(f => (
+                  <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: f.id, discussion: messages }))} title={f.blurb}
+                    className={"rounded-full border px-3 py-1 text-xs transition " + (fmt.id === f.id ? "border-sky-500 bg-sky-500/15 text-sky-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="space-y-1">
+            <div className="text-[10px] uppercase tracking-wider text-neutral-500">Voice in the clips</div>
+            <div className="flex flex-wrap gap-1.5">
+              {([["auto", "Style default"], ["off", "No voice (I add music later)"], ["on", "She talks to the camera"]] as const).map(([v, label]) => (
+                <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voice: v, discussion: messages }))}
+                  className={"rounded-full border px-3 py-1 text-xs transition " + ((project.voice || "auto") === v ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <p className="text-[11px] leading-relaxed text-neutral-500">{fmt.blurb} Each scene has one <span className="text-neutral-300">{fmt.lineLabel.toLowerCase()}</span>. Change the style, then build the plan again (renders you already made are kept).</p>
-          {(fmt.id === "ugc" || fmt.id === "vlog") && (
-            <ol className="list-decimal space-y-0.5 rounded-lg border border-sky-900/50 bg-sky-950/20 py-2 pl-7 pr-3 text-[11px] leading-relaxed text-sky-200/80">
-              <li>Attach the person's photo under <b>Reference images</b> below.</li>
-              <li>Build the episode plan. Each scene is written for the person talking to the camera.</li>
-              <li>On Produce, render the stills first: they are made from your photo, so they look like the same person. Then render the clips, which are animated from those stills.</li>
-            </ol>
+          {PHOTO_STYLES[fmt.id] && (
+            <div className="space-y-1.5 rounded-lg border border-sky-900/50 bg-sky-950/20 p-2.5 text-[11px] leading-relaxed text-sky-200/80">
+              <div>{PHOTO_STYLES[fmt.id]}</div>
+              <button onClick={goToPhotos} className="flex items-center gap-1.5 rounded-md bg-sky-600/25 px-2.5 py-1 text-[11px] font-medium text-sky-100 hover:bg-sky-600/40"><ImagePlus size={12} /> Add reference photos</button>
+              <ol className="list-decimal space-y-0.5 pl-4 text-sky-200/70">
+                <li>Add the photos in the <b>Reference photos</b> card (the button above takes you there) and pick what each one is: person, outfit, product...</li>
+                <li>Build the episode plan.</li>
+                <li>On Produce, render the stills first (they are made from your photos), then the clips.</li>
+              </ol>
+            </div>
           )}
           <label className="flex items-start gap-2 text-[11px] text-neutral-400">
             <input type="checkbox" className="mt-0.5" checked={!!project.allowTextCards} onChange={async e => onSaved(await api.patch(project.id, { allowTextCards: e.target.checked, discussion: messages }))} />
@@ -515,7 +554,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         </motion.div>
 
         {/* reference photos: attached once, used by every episode, scene and still */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+        <motion.div ref={photosCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
           <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
             <ImagePlus size={14} className="text-pink-400" /> Reference photos
             <span className="ml-auto text-[11px] text-neutral-500">{seriesPhotos(project).length + pendingPhotos.length} attached</span>
