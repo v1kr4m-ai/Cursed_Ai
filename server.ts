@@ -1,5 +1,6 @@
 import { registerHub, modelDirs } from "./hub";
 import { streamGemini } from "./geminiChat";
+import { registerOnlineModels, resolveOne, streamOnline, type OnlineStore } from "./onlineModels";
 import { registerLmStudio } from "./lmStudio";
 import { registerSubtitles } from "./seriesTool/subtitles";
 import { registerExport } from "./seriesTool/exportEpisodes";
@@ -200,7 +201,7 @@ async function startServer() {
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
   interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
-  interface ServerConfig { engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[] }
+  interface ServerConfig { online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -583,6 +584,18 @@ async function startServer() {
         const key = geminiKey();
         if (!key) throw new Error("No Gemini API key - add one in Settings > Integrations.");
         await streamGemini(key, cloud[1], messages || [{ role: "user", content: prompt }], options, res, abortController.signal);
+        res.write(`data: [DONE]
+
+`);
+        res.end();
+        return;
+      }
+      const online = /^online:([^:]+):(.+)$/.exec(modelName || "");
+      if (online) {
+        const provider = resolveOne(serverConfig.online || {}, online[1]);
+        if (!provider) throw new Error(`Unknown online provider "${online[1]}" - check Settings > Integrations > Online models.`);
+        console.log(`[Online] Chat via ${provider.label}: ${online[2]}`);
+        await streamOnline(provider, online[2], messages || [{ role: "user", content: prompt }], options, res, abortController.signal);
         res.write(`data: [DONE]
 
 `);
@@ -1674,6 +1687,7 @@ async function startServer() {
     getComfyUrl: () => COMFYUI_URL,
   });
   registerOllamaClaude(app, { ollamaUrl: OLLAMA_URL });
+  registerOnlineModels(app, { get: () => serverConfig.online || {}, set: s => { serverConfig.online = s; saveConfig(); } });
   registerTrainTool(app, {
     appRoot: process.cwd(), dataDir: process.cwd(),
     getConfig: () => serverConfig.train || {}, setConfig: c => { serverConfig.train = c; saveConfig(); },

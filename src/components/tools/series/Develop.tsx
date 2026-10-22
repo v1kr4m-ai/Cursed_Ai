@@ -575,7 +575,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             {offline.length > 0 && <optgroup label="Offline (on this PC)">{offline.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
             {online.length > 0 && <optgroup label="Online">{online.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
           </select>
-          {model?.startsWith("gemini:") || /[:-]cloud$/i.test(model || "") ? <span className="flex items-center gap-1 text-[10px] text-sky-400"><Cloud size={11} /> online</span> : <span className="text-[10px] text-emerald-400">offline</span>}
+          {model?.startsWith("gemini:") || model?.startsWith("online:") || /[:-]cloud$/i.test(model || "") ? <span className="flex items-center gap-1 text-[10px] text-sky-400"><Cloud size={11} /> online</span> : <span className="text-[10px] text-emerald-400">offline</span>}
         </div>
         <div ref={scroller} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && !streaming && (

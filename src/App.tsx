@@ -223,6 +223,7 @@ export default function App() {
       const data = await AIService.getModels();
       const ext = await fetch("/api/external-models").then(r => r.json()).catch(() => null);
       const gem = await fetch("/api/gemini-key").then(r => r.json()).catch(() => null);
+      const onl = await fetch("/api/online/providers").then(r => r.json()).catch(() => null);
 
       setModels(prev => {
         const available: string[] = data?.available || [];
@@ -269,7 +270,13 @@ export default function App() {
           id: `gemini:${id}`, name, description: gem?.set ? "Online - answered by Google Gemini (needs internet)." : "Online - add a Gemini API key in Settings > Integrations to use it.",
           size: "", format: "GGUF", isDownloaded: !!gem?.set, parameters: "Cloud", type: type as AIModel["type"], source: "gemini", tags: ["Cloud"],
         }));
-        return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio"), ...online]
+        // Online providers set up in Settings: one entry per model, listed once a key is saved and the provider is on.
+        const viaKeys: AIModel[] = ((onl?.providers || []) as any[]).filter(p => p.keySet && p.enabled).flatMap((p: any): AIModel[] =>
+          (p.models as string[]).map((name): AIModel => ({
+            id: `online:${p.id}:${name}`, name: `${name}`, description: `Online - answered by ${p.label} (needs internet; the chat is sent to them).`,
+            size: "", format: "GGUF", isDownloaded: true, parameters: p.label, type: "General", source: "online", tags: ["Cloud"],
+          })));
+        return [...known, ...extraFiles, ...fromServer("ollama", "Ollama"), ...fromServer("lmstudio", "LM Studio"), ...online, ...viaKeys]
           .map(m => ({ ...m, tags: m.tags ?? inferFlags(m.name), sizeBytes: m.sizeBytes ?? parseSize(m.size) }));
       });
     }

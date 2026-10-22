@@ -53,7 +53,7 @@ export interface AIModel {
   /** Direct HTTPS URL to the .gguf file. Omitted for models with no working download path yet. */
   downloadUrl?: string;
   /** Where it runs: a GGUF file, or an external local server. */
-  source?: 'gguf' | 'ollama' | 'lmstudio' | 'gemini';
+  source?: 'gguf' | 'ollama' | 'lmstudio' | 'gemini' | 'online';
   /** Capability flags: Reasoning, Coding, Multilingual, Vision, Tools, Embedding. */
   tags?: string[];
   /** File size in bytes when known, for the RAM-fit hint. */

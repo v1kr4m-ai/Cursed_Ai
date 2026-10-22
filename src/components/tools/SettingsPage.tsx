@@ -8,6 +8,7 @@ import { VoiceSpeechSettings } from "./VoiceSpeechSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { ThemeSettings } from "./ThemeSettings";
 import { LmStudioControl } from "./LmStudioControl";
+import { OnlineModelsSettings } from "./OnlineModelsSettings";
 import { GoogleConnectPanel, useGoogleStatus } from "../comfy/google";
 import { nativeFolder, postJson, api } from "../comfy/types";
 
@@ -239,6 +240,10 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
         <Row title="Windows notifications" note={perm === "denied" ? "Blocked for this window - allow notifications for it in Windows settings." : perm === "unsupported" ? "Not supported here." : "Also notify when the window is in the background."}><Switch on={settings.desktopNotify && perm === "granted"} onChange={desktop} /></Row>
       </Group>) },
 
+    { id: "online", cat: "integrations", title: "Online models", keywords: "chatgpt openai gpt claude anthropic grok xai perplexity openrouter mistral groq deepseek api key online cloud provider model address url", node: (
+      <Group title="Online models (ChatGPT, Claude, Grok, Perplexity...)" note="Optional. Add a key for a service and its models appear in the model picker, marked online. Chats with an online model are sent to that company; local models never leave this PC. Each service's address and model list can be changed, and any OpenAI-compatible service can be added.">
+        <OnlineModelsSettings />
+      </Group>) },
     { id: "gemini", cat: "integrations", title: "Gemini", keywords: "gemini key api cloud imagen veo google", node: (
       <Group title="Gemini (cloud image & video)" note="Only the Cloud mode of Image and Video uses this key. Chat, voice and local generation never do.">
         <Row title="API key" stack note={gemini?.set ? (gemini.source === "env" ? "A key is set through the GEMINI_API_KEY environment variable." : "A key is saved on this PC (stored in config.json, never sent back to the browser).") : "No key yet - get a free one at aistudio.google.com."}>
