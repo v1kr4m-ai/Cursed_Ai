@@ -106,7 +106,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       else if (field.role === "height") values[field.id] = p.settings.height;
       else if (field.role === "length" && kind === "scene") values[field.id] = snapFrames(p.settings.seconds, p.settings.fps);
       else if (field.role === "fps" && kind === "scene") values[field.id] = p.settings.fps;
-      else if (field.input === "steps") values[field.id] = p.settings.steps;
+      // The steps setting is for the video model; a still keeps the step count its own workflow was built for.
+      else if (field.input === "steps" && kind === "scene") values[field.id] = p.settings.steps;
     }
     return values;
   }
@@ -353,8 +354,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         workflow: graph,
         info,
         promptText: ref.prompt,
-        // An image-to-image workflow draws the person in the photos it is given; blank slots are bypassed.
-        refImagePaths: (() => { const files = refSourceFiles(fresh.episodes.find(e => e.id === ep.id) || ep, ref); return info.refImageNodeIds.map((_, i) => files[i] || ""); })(),
+        // An image-to-image workflow draws the person in the photos it is given. With fewer photos than slots the photos repeat (a blank slot would fail).
+        refImagePaths: (() => { const files = refSourceFiles(fresh.episodes.find(e => e.id === ep.id) || ep, ref); return info.refImageNodeIds.map((_, i) => (files.length ? files[i % files.length] : "")); })(),
         refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "ref"),
