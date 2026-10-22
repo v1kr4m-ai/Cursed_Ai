@@ -1,9 +1,11 @@
-import React from "react";
+import React from "react";
+import { WorkflowCheck } from "./WorkflowPicker";
 import { formatOf } from "../../../../seriesTool/formats";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Play, RefreshCw, Image as ImageIcon, Film, ChevronRight, X, AlertTriangle,
   Clock, Loader2, CheckCircle2, CircleSlash, Trash2, Wand2, Clapperboard, Mic,
+  Plus,
 } from "lucide-react";
 import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type Status } from "./api";
 import { RefDrop } from "./RefDrop";
@@ -241,7 +243,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
   );
 }
 
-export function Board({ project, onChanged, focusEpisodeId }: { project: Project; onChanged: (p: Project) => void; focusEpisodeId?: string | null }) {
+export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpenSettings }: { project: Project; onChanged: (p: Project) => void; focusEpisodeId?: string | null; onAddEpisode?: () => void; onOpenSettings?: () => void }) {
   const [openEpisode, setOpenEpisode] = React.useState<string | null>(focusEpisodeId || project.episodes[0]?.id || null);
   React.useEffect(() => { if (focusEpisodeId) setOpenEpisode(focusEpisodeId); }, [focusEpisodeId]);
   const running = project.running || null;
@@ -281,6 +283,12 @@ export function Board({ project, onChanged, focusEpisodeId }: { project: Project
         )}
       </AnimatePresence>
 
+      <WorkflowCheck project={project} onChanged={onChanged} onOpenSettings={onOpenSettings} />
+      {onAddEpisode && (
+        <button onClick={onAddEpisode} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-700/60 bg-emerald-600/10 px-3 py-2.5 text-sm text-emerald-200 transition hover:bg-emerald-600/20">
+          <Plus size={15} /> Add the next episode (episode {(project.episodes[project.episodes.length - 1]?.number || 0) + 1})
+        </button>
+      )}
       {project.episodes.map((ep, i) => {
         const open = openEpisode === ep.id;
         const scenesDone = ep.scenes.filter(s => s.status === "done").length;

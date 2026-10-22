@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildScenePrompt, snapFrames, type Episode, type Project, type Scene } from "../seriesTool/model";
 import { buildFilter } from "../seriesTool/ffmpeg";
 import { extractJson } from "../src/components/tools/series/api";
+import { planProblems, tidyPlan } from "../src/components/tools/series/planCheck";
+import { judgeImage, judgeVideo, suggestions, type WfInfo } from "../src/components/tools/series/workflows";
+import { formatOf } from "../seriesTool/formats";
 
 describe("snapFrames", () => {
   it("lands on the model's 17k+5 grid", () => {
@@ -118,5 +121,47 @@ describe("extractJson", () => {
 
   it("complains when there is no plan to find", () => {
     expect(() => extractJson("I could not do that.")).toThrow(/did not contain a usable plan/);
+  });
+});
+
+describe("planCheck", () => {
+  const ugc = formatOf("ugc");
+  it("maps other field names and flags scenes with no shot", () => {
+    const plan = tidyPlan([{ number: 1, scenes: [{ number: 1, vo: "hi there", visual: "Selfie in a kitchen" }, { number: 2, line: "second line" }] }]);
+    expect(plan[0].scenes[0].shot).toBe("Selfie in a kitchen");
+    const problem = planProblems(plan, ugc);
+    expect(problem).toContain("episode 1 scene 2");
+    expect(problem).not.toContain("scene 1,");
+  });
+
+  it("accepts a plan whose scenes are complete, and does not need a line for a silent style", () => {
+    expect(planProblems([{ number: 1, scenes: [{ number: 1, vo: "a", shot: "b" }] }], ugc)).toBe("");
+    expect(planProblems([{ number: 1, scenes: [{ number: 1, vo: "", shot: "dance" }] }], formatOf("dancing"))).toBe("");
+  });
+});
+
+describe("workflow checks", () => {
+  const wf = (over: Partial<WfInfo>): WfInfo => ({ name: "w", path: "C:\w\w.json", refImageCount: 0, isRunnable: true, missing: [], outputKind: "image", ...over });
+
+  it("rejects a still workflow that cannot take the photo or cannot run", () => {
+    expect(judgeImage(wf({ refImageCount: 0 }), "C:\w\w.json", true).level).toBe("bad");
+    expect(judgeImage(wf({ refImageCount: 1 }), "C:\w\w.json", true).level).toBe("ok");
+    expect(judgeImage(wf({ refImageCount: 0 }), "C:\w\w.json", false).level).toBe("ok");
+    const broken = judgeImage(wf({ isRunnable: false, missing: ["incomplete workflow: node 31 points at node 57"] }), "C:\w\w.json", false);
+    expect(broken.level).toBe("bad");
+    expect(broken.text).toContain("incomplete workflow");
+  });
+
+  it("needs as many video slots as a scene has references", () => {
+    expect(judgeVideo(wf({ refImageCount: 2 }), "p", 3).level).toBe("bad");
+    expect(judgeVideo(wf({ refImageCount: 0 }), "p", 2).level).toBe("warn");
+    expect(judgeImage(wf({ isRunnable: false, missing: ["UI-format workflow - start ComfyUI so this app can read it"] }), "p", true).level).toBe("warn");
+    expect(judgeVideo(wf({ refImageCount: 3 }), "p", 3).level).toBe("ok");
+    expect(judgeVideo(undefined, "", 1).level).toBe("bad");
+  });
+
+  it("suggests runnable workflows with enough slots, fewest slots first", () => {
+    const list = [wf({ name: "a", refImageCount: 0 }), wf({ name: "b", refImageCount: 3 }), wf({ name: "c", refImageCount: 1 }), wf({ name: "d", refImageCount: 1, isRunnable: false })];
+    expect(suggestions(list, "image", { photo: true }).map(w => w.name)).toEqual(["c", "b"]);
   });
 });

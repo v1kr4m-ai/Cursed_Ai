@@ -1,4 +1,5 @@
-import React from "react";
+import React from "react";
+import { WorkflowPicker, WorkflowCheck } from "./WorkflowPicker";
 import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles } from "lucide-react";
 import { api, fileUrl, type Project, type ProjectSummary } from "./api";
@@ -176,11 +177,9 @@ function SettingsPane({ project, onChanged }: { project: Project; onChanged: (p:
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
         <h3 className="text-sm font-medium text-neutral-200">Workflows</h3>
-        <label className="block text-[11px] text-neutral-500">Scene workflow (reference-to-video)</label>
-        <input className={`${field} font-mono text-xs`} value={draft.videoWorkflow} placeholder="F:\\ComfyUI\\...\\workflows\\video_minimax_h3_r2v.json" onChange={e => setDraft({ ...draft, videoWorkflow: e.target.value })} onBlur={() => saveSettings()} />
-        <label className="block text-[11px] text-neutral-500">Reference-still workflow (text-to-image)</label>
-        <input className={`${field} font-mono text-xs`} value={draft.imageWorkflow} placeholder="F:\\ComfyUI\\...\\workflows\\Text to Image Creation by Juggernaut.json" onChange={e => setDraft({ ...draft, imageWorkflow: e.target.value })} onBlur={() => saveSettings()} />
-        <p className="text-[11px] text-neutral-500">Full path to a workflow saved in ComfyUI. Size, duration and steps below are written into whichever inputs that workflow exposes.</p>
+        <WorkflowPicker project={project} kind="video" label="Clip workflow (reference pictures to video)" value={draft.videoWorkflow} onChange={path => { const next = { ...draft, videoWorkflow: path }; setDraft(next); saveSettings(next); }} />
+        <WorkflowPicker project={project} kind="image" label="Still workflow (a photo to new stills, or text to image)" value={draft.imageWorkflow} onChange={path => { const next = { ...draft, imageWorkflow: path }; setDraft(next); saveSettings(next); }} />
+        <p className="text-[11px] text-neutral-500">Workflows come from the same folder as the Image and Video tabs. Each one is checked against this series: it must run, and take the reference photos and pictures your scenes use. Size, duration and steps below are written into whichever inputs the workflow exposes.</p>
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
@@ -221,6 +220,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
   const [projectId, setProjectId] = React.useState<string | null>(() => store.get(LAST_KEY));
   const [project, setProject] = React.useState<Project | null>(null);
   const [stage, setStage] = React.useState<Stage>("dashboard");
+  const [addFocus, setAddFocus] = React.useState(false);
   const [focusEpisode, setFocusEpisode] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [theme, setTheme] = React.useState<"light" | "dark">(() => (store.get(THEME_KEY) === "dark" ? "dark" : store.get(THEME_KEY) === "light" ? "light" : look || "light"));
@@ -294,7 +294,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                       const Icon = s.icon;
                       const active = stage === s.id;
                       return (
-                        <button key={s.id} onClick={() => { setFocusEpisode(null); setStage(s.id); }} title={s.hint} className="relative rounded-full px-3 py-1.5 text-xs">
+                        <button key={s.id} onClick={() => { setFocusEpisode(null); setAddFocus(false); setStage(s.id); }} title={s.hint} className="relative rounded-full px-3 py-1.5 text-xs">
                           {active && (
                             <motion.span layoutId="series-stage-pill" transition={{ type: "spring", stiffness: 420, damping: 32 }}
                               className="absolute inset-0 rounded-full sd-dark" />
@@ -322,9 +322,9 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                       ) : stage === "dashboard" ? (
                         <ProjectDashboard project={project} onChanged={setProject} onGo={(st, episodeId) => { setFocusEpisode(episodeId || null); setStage(st); }} />
                       ) : stage === "develop" ? (
-                        <Develop project={project} modelId={modelId} models={models} onSaved={setProject} />
+                        <Develop project={project} modelId={modelId} models={models} onSaved={setProject} focusAdd={addFocus} />
                       ) : stage === "produce" ? (
-                        <Board project={project} onChanged={setProject} focusEpisodeId={focusEpisode} />
+                        <Board project={project} onChanged={setProject} onOpenSettings={() => setStage("settings")} focusEpisodeId={focusEpisode} onAddEpisode={() => { setAddFocus(true); setStage("develop"); }} />
                       ) : stage === "assemble" ? (
                         <Assemble project={project} onChanged={setProject} />
                       ) : (

@@ -10,6 +10,9 @@ import { savedSetting } from "../../../lib/settingsStore";
 import { notify } from "../../../lib/notify";
 import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
+import { seriesPhotos, syncPhotos } from "./photos";
+import { WorkflowCheck } from "./WorkflowPicker";
+import { planProblems, tidyPlan } from "./planCheck";
 import { StorySources } from "./StorySources";
 import { DIGEST_THRESHOLD, digestDocument, type DigestProgress } from "./chunk";
 
@@ -31,7 +34,7 @@ const EPISODE_SHAPE = `{
       { "name": "character_name", "role": "character", "prompt": "image prompt for this character", "negative": "what to avoid" }
     ],
     "scenes": [
-      { "number": 1, "vo": "LINE_HINT", "shot": "what the camera sees and does, one or two sentences", "textCard": "", "refs": ["style_plate", "character_name"] }
+      { "number": 1, "vo": "(write this scene's own line here)", "shot": "(write this scene's own shot here)", "textCard": "", "refs": ["style_plate", "character_name"] }
     ]
   }`;
 
@@ -44,6 +47,8 @@ Rules:
 - Every episode gets exactly one ref with role "style" named "style_plate", listed first in every scene's refs.
 - 8 scenes per episode unless we agreed otherwise.
 ${lineRule}
+- A good shot looks like this (do not copy it, write your own for every scene): "${fmt.shotExample}". The "vo" is: ${fmt.lineHint}
+- Every scene needs a real, specific "shot" (what the camera sees and what the person does) and a real "vo". Never leave them empty and never repeat the same text in two fields.
 - Always leave "textCard" empty. Subtitles and captions are added later by the editor, never inside the clips.
 - Image prompts should describe a photographic still, with lighting and grade, not a character sheet.
 - If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.
@@ -57,7 +62,7 @@ ${count > 0 ? `Write exactly ${count} episode${count > 1 ? "s" : ""}.` : "Write 
 
 Shape - a JSON array of episodes:
 [
-  ${EPISODE_SHAPE.replace("LINE_HINT", fmt.lineHint)}
+  ${EPISODE_SHAPE}
 ]
 
 ${rulesFor(fmt)}`;
@@ -76,7 +81,7 @@ ${recap || "(nothing yet)"}
 ${direction.trim() ? `What I want in this episode: ${direction.trim()}
 ` : ""}
 Shape - one JSON object (a single episode, not an array):
-${EPISODE_SHAPE.replace("LINE_HINT", fmt.lineHint).replace('"number": 1', `"number": ${number}`)}
+${EPISODE_SHAPE.replace('"number": 1', `"number": ${number}`)}
 
 ${rulesFor(fmt)}`;
 }
@@ -114,7 +119,10 @@ const REFUSAL = /^(i'?m sorry|i am sorry|sorry,|i can('|no)?t (assist|help|do th
 
 const TALK_MODEL_KEY = "cursed.series.talkModel";
 
-export function Develop({ project, modelId, models, onSaved }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void }) {
+export function Develop({ project, modelId, models, onSaved, focusAdd }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void; focusAdd?: boolean }) {
+  const episodesCard = React.useRef<HTMLDivElement>(null);
+  // Arriving from "Add the next episode" on the Produce board: bring that card into view.
+  React.useEffect(() => { if (focusAdd) setTimeout(() => episodesCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350); }, [focusAdd]);
   const [talkModel, setTalkModel] = React.useState<string>(() => { try { return localStorage.getItem(TALK_MODEL_KEY) || ""; } catch { return ""; } });
   const ready = (models || []).filter(m => m.isDownloaded);
   const isOnline = (m: AIModel) => /[:-]cloud$/i.test(m.id) || m.source === "gemini" || !!m.tags?.some(t => /^cloud$/i.test(t));
@@ -137,6 +145,7 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
   const [episodeCount, setEpisodeCount] = React.useState(0);
   const [direction, setDirection] = React.useState("");
   const [addingNext, setAddingNext] = React.useState(false);
+  const [pendingPhotos, setPendingPhotos] = React.useState<File[]>([]);
   const fmt = formatOf(project.format);
   const [showRaw, setShowRaw] = React.useState(false);
   const [showAttach, setShowAttach] = React.useState(false);
@@ -199,14 +208,23 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
     }
   }
 
-  /** Asks for JSON; if the answer cannot be read, asks once more, telling the model to send nothing but the JSON. */
+  /**
+   * Asks for JSON and checks it. An unreadable answer, or a plan with scenes that have no shot or line, is sent back
+   * once with exactly what was wrong (small models often leave fields empty or copy one sentence into every field).
+   */
   async function askForJson(base: { role: string; content: string }[], instruction: string, keep: (answer: string) => void) {
-    let answer = await askModel([...base, { role: "user", content: instruction }], model);
-    keep(answer);
-    try { return extractJson(answer); } catch { /* ask again below */ }
-    answer = await askModel([...base, { role: "user", content: instruction }, { role: "assistant", content: answer.slice(0, 1500) }, { role: "user", content: "That was not valid JSON. Reply again with ONLY the JSON, starting with the first bracket, no text before or after it, no code fences." }], model);
-    keep(answer);
-    return extractJson(answer);
+    const ask = async (extra: { role: string; content: string }[]) => {
+      const answer = await askModel([...base, { role: "user", content: instruction }, ...extra], model);
+      keep(answer);
+      return answer;
+    };
+    let answer = await ask([]);
+    let json: any, problem = "";
+    try { json = tidyPlan(extractJson(answer)); problem = planProblems(json, fmt); } catch { problem = "That was not valid JSON. Reply again with ONLY the JSON, starting with the first bracket, no text before or after it, no code fences."; }
+    if (!problem) return json;
+    answer = await ask([{ role: "assistant", content: answer.slice(0, 3000) }, { role: "user", content: problem + " Send the complete corrected JSON again, nothing else." }]);
+    json = tidyPlan(extractJson(answer));
+    return json;
   }
 
   /** Writes episode N+1 from what is already planned and adds it, leaving every rendered clip alone. */
@@ -225,7 +243,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
       const next = Array.isArray(got) ? got[0] : got;
       if (!next || typeof next !== "object" || !Array.isArray(next.scenes)) throw new Error("The model did not write an episode with scenes.");
       next.number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
-      onSaved(await api.savePlan(project.id, [...planJson(project), next], true));
+      const planned = await api.savePlan(project.id, [...planJson(project), next], true);
+      onSaved((await syncPhotos(planned)).project);
       setDirection("");
       notify({ message: `Episode ${next.number} added - open Produce to render it`, tab: "series" });
     } catch (e: any) {
@@ -272,8 +291,14 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
       const episodes = await askForJson(base, planInstruction(fmt, episodeCount), a => setRawPlan(a));
-      if (!Array.isArray(episodes)) throw new Error("The plan must be a list of episodes.");
-      onSaved(await api.savePlan(project.id, episodes));
+      // Asked for one episode, a model often sends the episode itself rather than a list of one.
+      const list = Array.isArray(episodes) ? episodes : Array.isArray(episodes?.episodes) ? episodes.episodes : episodes && typeof episodes === "object" && Array.isArray(episodes.scenes) ? [episodes] : null;
+      if (!list) throw new Error("The plan must be a list of episodes.");
+      // Photos picked before the plan existed are attached now, and every episode gets the series photos.
+      const planned = await api.savePlan(project.id, list);
+      const synced = await syncPhotos(planned, pendingPhotos);
+      setPendingPhotos([]);
+      onSaved(synced.project);
     } catch (e: any) {
       setError(e?.message || String(e));
       setShowRaw(true);
@@ -420,8 +445,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         </p>
 
         {/* the season so far, and the way to add the next episode */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
-          className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+        <motion.div ref={episodesCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
+          className={"rounded-xl border bg-neutral-900/40 p-4 space-y-3 " + (focusAdd ? "border-emerald-600/70" : "border-neutral-800")}>
           <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
             <Clapperboard size={14} className="text-emerald-400" /> Episodes
             <span className="ml-auto text-[11px] text-neutral-500">{project.episodes.length} planned</span>
@@ -479,37 +504,47 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           </AnimatePresence>
         </motion.div>
 
-        {/* reference images: optional, used as-is for characters, costume, location */}
-        {firstEpisode && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
-            <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
-              <ImagePlus size={14} className="text-pink-400" /> Reference images
-              <span className="ml-auto text-[11px] text-neutral-500">{attachedRefs.length} attached</span>
-            </button>
-            <AnimatePresence initial={false}>
-              {showAttach && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-3 overflow-hidden">
-                  <p className="text-[11px] text-neutral-500">Attached to <span className="text-neutral-300">{firstEpisode.title}</span>. Move or add more per episode on the Produce board.</p>
-                  <RefDrop project={project} episodeId={firstEpisode.id} onChanged={onSaved} />
-                  {attachedRefs.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {attachedRefs.slice(0, 12).map(r => (
-                        <motion.img
-                          key={r.id} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-                          src={fileUrl(r.file!)} title={r.name} alt={r.name}
-                          className="h-12 w-12 rounded object-cover border border-neutral-700"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
+        {/* reference photos: attached once, used by every episode, scene and still */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+          <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
+            <ImagePlus size={14} className="text-pink-400" /> Reference photos
+            <span className="ml-auto text-[11px] text-neutral-500">{seriesPhotos(project).length + pendingPhotos.length} attached</span>
+          </button>
+          <p className="text-[11px] leading-relaxed text-neutral-500">Attach the person's photo (or a look to match) once. It is copied into every episode, also the ones you add later, and used wherever a still or clip needs it.</p>
+          <AnimatePresence initial={false}>
+            {(showAttach || seriesPhotos(project).length + pendingPhotos.length === 0) && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-3 overflow-hidden">
+                {firstEpisode ? (
+                  <RefDrop project={project} episodeId={firstEpisode.id} onChanged={async p => { onSaved(p); const r = await syncPhotos(p); if (r.copied || r.wired) onSaved(r.project); }} />
+                ) : (
+                  <label className="block cursor-pointer rounded-lg border border-dashed border-neutral-600 bg-neutral-900/40 p-4 text-center text-xs text-neutral-400 hover:bg-neutral-900/70">
+                    Choose photos now - they are attached as soon as the plan exists
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={e => { setPendingPhotos(p => [...p, ...Array.from(e.target.files || [])]); e.target.value = ""; }} />
+                  </label>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {(seriesPhotos(project).length > 0 || pendingPhotos.length > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {seriesPhotos(project).slice(0, 12).map(r => (
+                <img key={r.id} src={fileUrl(r.file!)} title={r.name} alt={r.name} className="h-12 w-12 rounded object-cover border border-neutral-700" />
+              ))}
+              {pendingPhotos.map((f, i) => (
+                <button key={i} onClick={() => setPendingPhotos(p => p.filter((_, j) => j !== i))} title={f.name + " - click to remove"} className="h-12 w-12 overflow-hidden rounded border border-dashed border-sky-500">
+                  <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+          {project.episodes.length > 1 && seriesPhotos(project).length > 0 && (
+            <button onClick={async () => { const r = await syncPhotos(project); onSaved(r.project); notify({ message: `Photos placed: ${r.copied} copied, ${r.wired} scenes wired`, tab: "series" }); }} className="text-[11px] text-sky-300 hover:underline">Put the photos in every episode and scene now</button>
+          )}
+          <WorkflowCheck project={project} onChanged={onSaved} />
+        </motion.div>
 
-        <button onClick={() => setShowRaw(s => !s)} className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-700 hover:bg-neutral-800/60 px-3 py-2 text-xs text-neutral-300 transition">
-          <FileJson size={14} /> {showRaw ? "Hide" : "Paste or inspect"} plan JSON
+        <button onClick={() => setShowRaw(s => !s)} className="w-full text-center text-[11px] text-neutral-600 hover:text-neutral-300 transition">
+          {showRaw ? "Hide" : "Advanced:"} plan JSON (only needed if the model's plan could not be read)
         </button>
         <AnimatePresence>
           {showRaw && (
