@@ -63,6 +63,13 @@ export interface Project {
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;
 }
 
+/** A saved way of making a series: style, voice, look, workflows and size, with none of the story. */
+export interface SeriesTemplate {
+  id: string; name: string; note: string; builtin: boolean; format: string; voice: "auto" | "off" | "on";
+  /** What a new project takes from it (a body for the project patch). */
+  patch: Partial<Project>;
+}
+
 export interface ProjectSummary {
   id: string; title: string; dir: string; updatedAt: string;
   episodes: number; scenes: number; scenesDone: number; exports: number;
@@ -115,6 +122,9 @@ export const api = {
   pinFinal: (id: string, episodeId: string, kind: OutputKind | null) => call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/final`, { method: "PUT", body: JSON.stringify({ kind }) }),
   exportEpisodes: (id: string, dir: string, opts: { kind: ExportKind; episodeIds?: string[] }) => call<{ dir: string; files: string[]; episodes: number; skipped: { number: number; title: string }[] }>(`/api/series/projects/${id}/export`, { method: "POST", body: JSON.stringify({ dir, ...opts }) }),
   masterVideo: (id: string, dir: string, kind: ExportKind) => call<{ file: string; dir: string; episodes: number; skipped: { number: number; title: string }[] }>(`/api/series/projects/${id}/master`, { method: "POST", body: JSON.stringify({ dir, kind }) }),
+  templates: () => call<{ templates: SeriesTemplate[] }>("/api/series/templates"),
+  saveTemplate: (projectId: string, name: string) => call<{ template: SeriesTemplate }>("/api/series/templates", { method: "POST", body: JSON.stringify({ projectId, name }) }),
+  deleteTemplate: (id: string) => call<{ ok: true }>(`/api/series/templates/${id}`, { method: "DELETE" }),
   comfyStatus: () => call<{ comfyUp: boolean; comfyUrl: string }>("/api/series/workflows"),
   async uploadSource(id: string, file: File) {
     const res = await fetch(`/api/series/projects/${id}/sources?name=${encodeURIComponent(file.name)}`, {

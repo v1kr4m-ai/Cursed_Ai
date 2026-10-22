@@ -1,8 +1,8 @@
-import React from "react";
+import React from "react";
 import { WorkflowPicker, WorkflowCheck } from "./WorkflowPicker";
 import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles } from "lucide-react";
-import { api, fileUrl, type Project, type ProjectSummary } from "./api";
+import { api, fileUrl, type Project, type ProjectSummary, type SeriesTemplate } from "./api";
 import "./series-theme.css";
 import { Ring, Tile, TileBoard, PageTitle, type TileDef } from "./DashKit";
 import { Develop } from "./Develop";
@@ -54,9 +54,19 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
   }, []);
   React.useEffect(() => { refresh(); }, [refresh]);
 
+  const [templates, setTemplates] = React.useState<SeriesTemplate[]>([]);
+  const [templateId, setTemplateId] = React.useState("");
+  React.useEffect(() => { api.templates().then(d => setTemplates(d.templates)).catch(() => {}); }, []);
+
   async function create() {
     if (!title.trim()) return;
-    try { const p = await api.create(title.trim()); setTitle(""); onOpen(p.id); } catch (e: any) { setError(e?.message || String(e)); }
+    try {
+      let p = await api.create(title.trim());
+      // A template only sets how the series is made; the story, episodes and pictures start empty.
+      const t = templates.find(x => x.id === templateId);
+      if (t) p = await api.patch(p.id, t.patch);
+      setTitle(""); onOpen(p.id);
+    } catch (e: any) { setError(e?.message || String(e)); }
   }
   async function remove(id: string, name: string) {
     if (!confirm(`Delete "${name}" and everything rendered in it? This cannot be undone.`)) return;
@@ -93,6 +103,12 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
           <p className="text-[11px] opacity-60 mb-3">Name it - the next screen is a conversation about what it should be.</p>
           <div className="flex items-center gap-2 max-w-xl">
             <input className={field} placeholder="New series title" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && create()} />
+            {templates.length > 0 && (
+              <select value={templateId} onChange={e => setTemplateId(e.target.value)} title="Start from a saved way of making a series: style, voice, workflows and size" className="shrink-0 rounded-lg border border-current/20 bg-transparent px-2 py-2 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
+                <option value="">Blank series</option>
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.builtin ? "" : " (mine)"}</option>)}
+              </select>
+            )}
             <motion.button whileHover={{ scale: title.trim() ? 1.03 : 1 }} whileTap={{ scale: 0.97 }} onClick={create} disabled={!title.trim()}
               className="flex shrink-0 items-center gap-2 rounded-full bg-zinc-900 text-white px-4 py-2 text-xs font-semibold shadow-lg disabled:opacity-40"><Plus size={14} /> Start a series</motion.button>
           </div>
@@ -152,6 +168,36 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
   );
 }
 
+function TemplateBox({ project }: { project: Project }) {
+  const [list, setList] = React.useState<SeriesTemplate[]>([]);
+  const [name, setName] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const load = React.useCallback(() => api.templates().then(d => setList(d.templates)).catch(() => {}), []);
+  React.useEffect(() => { load(); }, [load]);
+  const save = async () => {
+    setBusy(true); setError("");
+    try { await api.saveTemplate(project.id, name); setName(""); await load(); } catch (e: any) { setError(e?.message || String(e)); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input className={`${field} text-xs`} value={name} onChange={e => setName(e.target.value)} placeholder="Template name, e.g. My UGC setup" onKeyDown={e => e.key === "Enter" && name.trim() && save()} />
+        <button onClick={save} disabled={busy || !name.trim()} className="shrink-0 rounded-lg bg-neutral-700 px-3 py-2 text-xs text-white hover:bg-neutral-600 disabled:opacity-40">Save as template</button>
+      </div>
+      {error && <p className="text-[11px] text-rose-300">{error}</p>}
+      <div className="space-y-1">
+        {list.map(t => (
+          <div key={t.id} className="flex items-center gap-2 rounded-lg bg-neutral-900/60 px-2.5 py-1.5 text-xs text-neutral-300">
+            <span className="min-w-0 flex-1 truncate">{t.name}{t.builtin ? " (built in)" : ""}<span className="ml-2 text-[10px] text-neutral-500">{t.format}{t.voice !== "auto" ? `, voice ${t.voice}` : ""}</span></span>
+            {!t.builtin && <button onClick={async () => { if (confirm(`Remove the template "${t.name}"?`)) { await api.deleteTemplate(t.id); load(); } }} className="text-[10px] text-neutral-500 hover:text-rose-300">remove</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SettingsPane({ project, onChanged }: { project: Project; onChanged: (p: Project) => void }) {
   const [draft, setDraft] = React.useState(project.settings);
   const [locks, setLocks] = React.useState({ styleLock: project.styleLock, voiceLock: project.voiceLock });
@@ -195,6 +241,12 @@ function SettingsPane({ project, onChanged }: { project: Project; onChanged: (p:
         <p className="text-[11px] text-neutral-500">
           Frame counts snap up to the grid the model accepts, so a 7 second clip becomes 175 frames (7.29s) at 24 fps.
         </p>
+      </div>
+
+      <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+        <h3 className="text-sm font-medium text-neutral-200">Templates</h3>
+        <p className="text-[11px] text-neutral-500">Save how this series is made (video style, voice, look, workflows, size and length) so a new series can start from it. Nothing from the story, episodes, pictures or people is saved.</p>
+        <TemplateBox project={project} />
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">

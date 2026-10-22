@@ -5,6 +5,7 @@ import { registerLmStudio } from "./lmStudio";
 import { registerSubtitles } from "./seriesTool/subtitles";
 import { registerExport } from "./seriesTool/exportEpisodes";
 import { registerFinish } from "./seriesTool/finish";
+import { registerTemplates } from "./seriesTool/templates";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
 import type { TrainConfig } from "./trainTool/paths";
@@ -1696,6 +1697,7 @@ async function startServer() {
   });
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
+  registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     transcribe: async samples => {
