@@ -4,6 +4,7 @@
  * no character picture yet, so the stills and clips are made from it without any per-scene setup.
  */
 import { api, fileUrl, type Episode, type Project, type Ref } from "./api";
+import { kindOf } from "../../../../seriesTool/refKinds";
 
 /** An attached photo has a file and no prompt: it is used as it is, never generated. */
 export const isPhoto = (r: Ref) => !!r.file && !r.prompt.trim();
@@ -17,7 +18,7 @@ export function seriesPhotos(project: Project): Ref[] {
 async function copyPhoto(project: Project, episodeId: string, photo: Ref) {
   const blob = await (await fetch(fileUrl(photo.file!))).blob();
   const ext = (photo.file!.match(/\.[a-z0-9]+$/i)?.[0] || ".png").toLowerCase();
-  await api.uploadRef(project.id, episodeId, new File([blob], photo.name.replace(/[^\w ()-]+/g, "_") + ext, { type: blob.type || "image/png" }), photo.name, photo.role);
+  await api.uploadRef(project.id, episodeId, new File([blob], photo.name.replace(/[^\w ()-]+/g, "_") + ext, { type: blob.type || "image/png" }), photo.name, photo.role, photo.kind);
 }
 
 export interface SyncResult { project: Project; copied: number; wired: number }
@@ -31,7 +32,7 @@ export async function syncPhotos(start: Project, extra: File[] = []): Promise<Sy
   let copied = 0;
   // Photos picked before any plan existed go into the first episode.
   if (extra.length && project.episodes[0]) {
-    for (const f of extra) { await api.uploadRef(project.id, project.episodes[0].id, f, f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60), "character"); copied++; }
+    for (const f of extra) { await api.uploadRef(project.id, project.episodes[0].id, f, f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60), "character", "person"); copied++; }
     project = await api.get(project.id);
   }
   const photos = seriesPhotos(project);
@@ -46,7 +47,7 @@ export async function syncPhotos(start: Project, extra: File[] = []): Promise<Sy
   // Wire: a scene with no character picture gets this episode's character photos.
   let wired = 0;
   const episodes: Episode[] = project.episodes.map(ep => {
-    const mine = ep.refs.filter(r => isPhoto(r) && r.role === "character").map(r => r.id);
+    const mine = ep.refs.filter(r => isPhoto(r) && kindOf(r) === "person").map(r => r.id);
     if (!mine.length) return ep;
     return {
       ...ep,

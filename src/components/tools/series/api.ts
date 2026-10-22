@@ -4,6 +4,8 @@ export type Status = "pending" | "queued" | "running" | "done" | "failed";
 
 export interface Ref {
   id: string; name: string; role: "style" | "character";
+  /** What the picture is for: person, outfit, product, location, pose, prop, palette, style, other. */
+  kind?: string;
   prompt: string; negative: string; seed: number;
   /** Uploaded photos this still is made from (image-to-image). Empty means the episode's attached photos. */
   fromRefIds?: string[];
@@ -125,8 +127,8 @@ export const api = {
   deleteSource: (id: string, sourceId: string) =>
     call<{ ok: true }>(`/api/series/projects/${id}/sources/${sourceId}`, { method: "DELETE" }),
   deleteRef: (id: string, refId: string) => call<{ ok: true }>(`/api/series/projects/${id}/refs/${refId}`, { method: "DELETE" }),
-  async uploadRef(id: string, episodeId: string, file: File, label: string, role: "style" | "character") {
-    const query = new URLSearchParams({ name: file.name, label, role });
+  async uploadRef(id: string, episodeId: string, file: File, label: string, role: "style" | "character", kind?: string) {
+    const query = new URLSearchParams({ name: file.name, label, role, ...(kind ? { kind } : {}) });
     const res = await fetch(`/api/series/projects/${id}/episodes/${episodeId}/upload?${query}`, {
       method: "POST",
       headers: { "Content-Type": file.type || "application/octet-stream" },

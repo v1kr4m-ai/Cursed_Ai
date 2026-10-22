@@ -1,7 +1,8 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ImagePlus, Loader2, UploadCloud, X } from "lucide-react";
-import { api, type Project, type Ref } from "./api";
+import { api, type Project } from "./api";
+import { REF_KINDS, type RefKind } from "../../../../seriesTool/refKinds";
 
 /**
  * Attach reference images by dropping them, pasting them, or picking a file: a character's face,
@@ -17,7 +18,8 @@ export function RefDrop({ project, episodeId, onChanged, compact }: {
   const [over, setOver] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [role, setRole] = React.useState<Ref["role"]>("character");
+  const [kind, setKind] = React.useState<RefKind>("person");
+  const kindInfo = REF_KINDS.find(k => k.id === kind)!;
   const picker = React.useRef<HTMLInputElement>(null);
 
   async function take(files: FileList | File[] | null) {
@@ -28,7 +30,7 @@ export function RefDrop({ project, episodeId, onChanged, compact }: {
     try {
       for (const file of images) {
         const label = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60);
-        await api.uploadRef(project.id, episodeId, file, label, role);
+        await api.uploadRef(project.id, episodeId, file, label, kindInfo.role, kind);
       }
       onChanged(await api.get(project.id));
     } catch (e: any) {
@@ -67,16 +69,21 @@ export function RefDrop({ project, episodeId, onChanged, compact }: {
         </motion.div>
       </motion.div>
 
-      <div className="flex items-center gap-1.5">
-        {(["character", "style"] as const).map(r => (
-          <button
-            key={r}
-            onClick={() => setRole(r)}
-            className={`rounded-full px-2.5 py-0.5 text-[11px] transition ${role === r ? "bg-sky-600/25 text-sky-200 border border-sky-700" : "border border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}
-          >
-            {r === "character" ? "character / costume" : "style plate"}
-          </button>
-        ))}
+      <div className="space-y-1.5">
+        <div className="text-[10px] uppercase tracking-wider text-neutral-500">What is this picture?</div>
+        <div className="flex flex-wrap gap-1.5">
+          {REF_KINDS.map(k => (
+            <button
+              key={k.id}
+              onClick={() => setKind(k.id)}
+              title={k.blurb}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] transition ${kind === k.id ? "bg-sky-600/25 text-sky-200 border border-sky-700" : "border border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}
+            >
+              {k.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] leading-relaxed text-neutral-500">{kindInfo.blurb} The next pictures you attach are saved as this.</p>
       </div>
 
       <input

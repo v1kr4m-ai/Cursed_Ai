@@ -14,6 +14,8 @@ export interface Ref {
   id: string;
   name: string;
   role: "style" | "character";
+  /** What the picture is for (person, outfit, product, location, pose, prop, palette, style); see refKinds.ts. Older refs have only a role. */
+  kind?: string;
   prompt: string;
   negative: string;
   seed: number;
@@ -49,6 +51,7 @@ export interface Scene {
 
 import type { Subtitles } from "./subtitlesCore";
 import { formatOf, sceneFields } from "./formats";
+import { kindOf, refKindInfo, REF_KINDS } from "./refKinds";
 import type { AudioMix, Output } from "./finishCore";
 
 export interface Episode {
@@ -166,9 +169,11 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
   const refs = scene.refIds.map(id => episode.refs.find(r => r.id === id)).filter(Boolean) as Ref[];
   const wiring = refs.map((ref, i) => {
     const picture = `<Picture ${i + 1}>`;
-    return ref.role === "style"
-      ? `Use ${picture} as the visual style reference for grade, lighting, haze and lens character.`
-      : `Use ${picture} as the exact appearance reference for ${ref.name}, preserving appearance, clothing and proportions.`;
+    const info = refKindInfo(kindOf(ref)) || REF_KINDS[0];
+    // A plain character ref keeps its original wording: appearance, clothing and proportions.
+    return !ref.kind && ref.role === "character"
+      ? `Use ${picture} as the exact appearance reference for ${ref.name}, preserving appearance, clothing and proportions.`
+      : info.wiring(picture, ref.name);
   }).join(" ");
 
   const format = formatOf(project.format);

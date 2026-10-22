@@ -16,6 +16,7 @@ import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../
 import { probeDuration, stitch } from "./ffmpeg";
 import { extractUpload } from "../comfyTool/extract";
 import { refSourceFiles } from "./refSources";
+import { refKindInfo } from "./refKinds";
 import { buildScenePrompt, newId, snapFrames, type Episode, type Project, type Ref, type Scene, type Source, type Status } from "./model";
 import { createSeriesStore } from "./store";
 
@@ -299,7 +300,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     const ref: Ref = {
       id: newId(),
       name: String(req.query.label || path.basename(original, ext)).slice(0, 60),
-      role: req.query.role === "style" ? "style" : "character",
+      role: req.query.role === "style" || req.query.kind === "style" || req.query.kind === "palette" ? "style" : "character",
+      kind: refKindInfo(String(req.query.kind || ""))?.id,
       prompt: "",
       negative: "",
       seed: Math.floor(Math.random() * 100000),
@@ -565,3 +567,4 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
   return { store };
 }
           fromRefIds: prior?.fromRefIds,
+          kind: refKindInfo(String(r.kind || prior?.kind || ""))?.id,

@@ -4,6 +4,7 @@ import { buildFilter } from "../seriesTool/ffmpeg";
 import { extractJson } from "../src/components/tools/series/api";
 import { planProblems, tidyPlan } from "../src/components/tools/series/planCheck";
 import { judgeImage, judgeVideo, suggestions, type WfInfo } from "../src/components/tools/series/workflows";
+import { kindOf, kindRank } from "../seriesTool/refKinds";
 import { formatOf } from "../seriesTool/formats";
 
 describe("snapFrames", () => {
@@ -163,5 +164,27 @@ describe("workflow checks", () => {
   it("suggests runnable workflows with enough slots, fewest slots first", () => {
     const list = [wf({ name: "a", refImageCount: 0 }), wf({ name: "b", refImageCount: 3 }), wf({ name: "c", refImageCount: 1 }), wf({ name: "d", refImageCount: 1, isRunnable: false })];
     expect(suggestions(list, "image", { photo: true }).map(w => w.name)).toEqual(["c", "b"]);
+  });
+});
+
+describe("reference kinds", () => {
+  it("tells the video model what each kind of picture is for", () => {
+    const { project, episode, scene } = fixture();
+    const mk = (id: string, name: string, kind: string, role: "style" | "character" = "character") => ({ id, name, role, kind, prompt: "", negative: "", seed: 1, file: "f.png", status: "done" as const, error: null });
+    const ep = { ...episode, refs: [mk("a", "Richie", "person"), mk("b", "pink dress", "outfit"), mk("c", "the bag", "product"), mk("d", "cafe", "location"), mk("e", "sunset", "palette", "style")] };
+    const prompt = buildScenePrompt(project, ep, { ...scene, refIds: ["a", "b", "c", "d", "e"] });
+    expect(prompt).toContain("<Picture 1> as the exact appearance reference for Richie");
+    expect(prompt).toContain('<Picture 2> as the outfit reference ("pink dress")');
+    expect(prompt).toContain('<Picture 3> as the product reference ("the bag")');
+    expect(prompt).toContain('<Picture 4> as the location reference ("cafe")');
+    expect(prompt).toContain('<Picture 5> as the colour palette reference ("sunset")');
+  });
+
+  it("reads the kind of an older ref from its role, and orders photos person first", () => {
+    expect(kindOf({ role: "style" })).toBe("style");
+    expect(kindOf({ role: "character" })).toBe("person");
+    expect(kindOf({ role: "character", kind: "bogus" })).toBe("person");
+    const refs = [{ role: "style" as const, kind: "style" }, { role: "character" as const, kind: "outfit" }, { role: "character" as const }];
+    expect([...refs].sort((a, b) => kindRank(a) - kindRank(b)).map(kindOf)).toEqual(["person", "outfit", "style"]);
   });
 });

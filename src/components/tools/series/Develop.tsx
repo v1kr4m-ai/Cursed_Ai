@@ -11,6 +11,7 @@ import { notify } from "../../../lib/notify";
 import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
+import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { planProblems, tidyPlan } from "./planCheck";
 import { StorySources } from "./StorySources";
@@ -528,7 +529,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           {(seriesPhotos(project).length > 0 || pendingPhotos.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {seriesPhotos(project).slice(0, 12).map(r => (
-                <img key={r.id} src={fileUrl(r.file!)} title={r.name} alt={r.name} className="h-12 w-12 rounded object-cover border border-neutral-700" />
+                <div key={r.id} className="w-14 text-center"><img src={fileUrl(r.file!)} title={r.name} alt={r.name} className="h-14 w-14 rounded object-cover border border-neutral-700" /><div className="truncate text-[9px] text-neutral-500" title={refKindInfo(kindOf(r))!.label}>{refKindInfo(kindOf(r))!.label.split(" ")[0]}</div></div>
               ))}
               {pendingPhotos.map((f, i) => (
                 <button key={i} onClick={() => setPendingPhotos(p => p.filter((_, j) => j !== i))} title={f.name + " - click to remove"} className="h-12 w-12 overflow-hidden rounded border border-dashed border-sky-500">

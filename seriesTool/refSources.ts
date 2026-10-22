@@ -7,6 +7,7 @@
  */
 import fs from "fs";
 import type { Episode, Ref } from "./model";
+import { kindRank } from "./refKinds";
 
 /** An attached photo is a ref that has a file but no prompt: it is used as-is, never generated. */
 export const isAttachedPhoto = (r: Ref) => !!r.file && !r.prompt.trim();
@@ -15,7 +16,6 @@ export function refSourceFiles(episode: Episode, ref: Ref): string[] {
   const named = (ref.fromRefIds || []).map(id => episode.refs.find(r => r.id === id)).filter((r): r is Ref => !!r);
   const pool = named.length
     ? named
-    : [...episode.refs.filter(r => r.id !== ref.id && isAttachedPhoto(r) && r.role === "character"),
-       ...episode.refs.filter(r => r.id !== ref.id && isAttachedPhoto(r) && r.role === "style")];
+    : episode.refs.filter(r => r.id !== ref.id && isAttachedPhoto(r)).sort((a, b) => kindRank(a) - kindRank(b));
   return pool.map(r => r.file!).filter(f => fs.existsSync(f));
 }

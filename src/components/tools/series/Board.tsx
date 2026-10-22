@@ -1,6 +1,7 @@
 import React from "react";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { formatOf } from "../../../../seriesTool/formats";
+import { kindOf, refKindInfo, REF_KINDS } from "../../../../seriesTool/refKinds";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Play, RefreshCw, Image as ImageIcon, Film, ChevronRight, X, AlertTriangle,
@@ -80,7 +81,7 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
         <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(o => !o)}>
           <div className="truncate text-sm text-neutral-200">{ref_.name}</div>
           <div className="flex items-center gap-1 text-[11px] text-neutral-500">
-            {ref_.role === "style" ? <><Wand2 size={9} className="text-violet-400" /> style plate - Picture 1</> : <><ImageIcon size={9} /> character reference</>}
+            {ref_.role === "style" ? <><Wand2 size={9} className="text-violet-400" /> {refKindInfo(kindOf(ref_))!.label}{kindOf(ref_) === "style" ? " - Picture 1" : ""}</> : <><ImageIcon size={9} /> {refKindInfo(kindOf(ref_))!.label}</>}
           </div>
         </button>
         <Badge status={isRunning ? "running" : ref_.status} progress={running?.progress} />
@@ -103,6 +104,12 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
             <div className="space-y-2 p-3">
               <textarea className={`${field} h-24 resize-none text-xs`} value={draft.prompt} onChange={e => setDraft({ ...draft, prompt: e.target.value })} onBlur={() => save({ prompt: draft.prompt })} placeholder="Image prompt" />
               <textarea className={`${field} h-16 resize-none text-xs`} value={draft.negative} onChange={e => setDraft({ ...draft, negative: e.target.value })} onBlur={() => save({ negative: draft.negative })} placeholder="Negative prompt" />
+              <div>
+                <label className="text-[11px] text-neutral-500">What this picture is for</label>
+                <select value={kindOf(draft)} onChange={e => { const k = REF_KINDS.find(x => x.id === e.target.value)!; save({ kind: k.id, role: k.role }); }} className={`${field} text-xs [&_*]:bg-white [&_*]:text-black`}>
+                  {REF_KINDS.map(k => <option key={k.id} value={k.id}>{k.label} - {k.blurb}</option>)}
+                </select>
+              </div>
               {draft.prompt.trim() && episode.refs.some(r => r.id !== ref_.id && r.file && !r.prompt.trim()) && (
                 <div>
                   <label className="text-[11px] text-neutral-500">Made from these photos (image-to-image) - none picked means all attached photos</label>
