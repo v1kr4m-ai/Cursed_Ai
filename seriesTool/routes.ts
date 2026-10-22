@@ -408,6 +408,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "scene"),
         randomizeSeed: false,
+      // A cancelled run returns without a file; it must not be recorded as finished.
+      if (job.abort.signal.aborted || !fs.existsSync(dest)) throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a picture.");
         destFolder: path.dirname(dest),
         destFilename: path.basename(dest),
         onEvent: runEventSink(p.id, job),
@@ -459,6 +461,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     const job = running.get(req.params.id);
     if (!job) return res.json({ ok: true, note: "Nothing running." });
     job.abort.abort();
+      if (job.abort.signal.aborted || !fs.existsSync(dest)) throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a clip.");
     if (job.promptId) await cancelPrompt(opts.getComfyUrl(), job.promptId).catch(() => {});
     res.json({ ok: true });
   });
