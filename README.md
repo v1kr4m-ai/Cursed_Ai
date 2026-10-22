@@ -7,7 +7,7 @@ One React UI, two runtimes:
 | Target | How it runs | Maturity |
 |---|---|---|
 | **Web / Desktop** | React frontend + Express server, GGUF models via `node-llama-cpp` | Main target, most complete |
-| **Android** | Kotlin app, WebView UI, embedded Ktor server, vendored **llama.cpp** via JNI | Real inference works; fewer features |
+| **Android** | Kotlin app, WebView UI, embedded Ktor server, vendored **llama.cpp** via JNI | Two modes: **Connect to my PC** (the full studio on the PC, shown on the phone) or the small on-phone engine |
 
 Nothing is mocked: every control in the UI talks to a real backend, and anything that isn't built yet says so instead of faking it.
 
@@ -165,6 +165,14 @@ The server reads `.gguf` files from `models/` (or any folder you pick in **Setti
 | Live voice (browser engine) | Chrome or Edge, microphone permission, internet (the browser's speech service). Use Local Whisper in Settings for fully offline |
 
 ---
+
+### Using the phone as a screen for the PC
+
+1. On the PC: **Settings -> General -> Phone & other devices** shows the access code and the address (for example `http://192.168.1.5:3000`). If the phone cannot connect, run the firewall command shown there once, as administrator.
+2. On the phone (same Wi-Fi): open the **Cursed** app, type the address and the six-digit code, tap **Connect to my PC**. The studio opens exactly as on the PC: chat, Image, Video, Series, Train LoRA, everything runs on the PC; photos can be attached from the phone's gallery.
+3. The app remembers the PC and reconnects on launch. Back from the first page returns to the connect screen (to change the PC, or to switch to **Use on this phone**).
+
+No web build is needed for this mode: the phone loads the studio from the PC, so it is always the current version.
 
 ## Building the Android app
 
