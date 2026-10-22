@@ -5,6 +5,8 @@ export type Status = "pending" | "queued" | "running" | "done" | "failed";
 export interface Ref {
   id: string; name: string; role: "style" | "character";
   prompt: string; negative: string; seed: number;
+  /** Uploaded photos this still is made from (image-to-image). Empty means the episode's attached photos. */
+  fromRefIds?: string[];
   file: string | null; status: Status; error: string | null;
 }
 
@@ -46,6 +48,10 @@ export interface Project {
   discussion: { role: "user" | "assistant"; content: string; at: string }[];
   styleLock: string; voiceLock: string;
   settings: ProjectSettings; episodes: Episode[]; sources?: Source[];
+  /** What kind of video this is: narration, vlog, ugc, singing, dancing... (seriesTool/formats.ts). */
+  format?: string;
+  /** Burn each scene's text card into the picture. Off by default. */
+  allowTextCards?: boolean;
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;
 }
 
@@ -145,7 +151,7 @@ export async function askModel(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
-    body: JSON.stringify({ messages, model, options: { temperature: 0.8, maxTokens: 4096 } }),
+    body: JSON.stringify({ messages, model, options: { temperature: 0.8, maxTokens: 8192 } }),
   });
   if (!res.ok || !res.body) throw new Error((await res.text()) || "The model did not answer.");
 
@@ -170,32 +176,47 @@ export async function askModel(
       } catch { /* a partial frame - the next chunk completes it */ }
     }
   }
+  if (!answer.trim()) throw new Error("The model sent back an empty answer. It may have run out of memory while loading - try again, or pick a smaller model.");
   return answer;
 }
 
-/** Pull the first JSON object or array out of a model answer that may be wrapped in prose or fences. */
+/**
+ * Pull the first JSON object or array out of a model answer that may be wrapped in prose, fences or a
+ * <think> block. An answer that was cut off mid-way (a small model running out of room) is repaired by
+ * keeping every complete item and closing the rest.
+ */
 export function extractJson(text: string): any {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidates = [fenced?.[1], text].filter(Boolean) as string[];
+  const clean = text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "");
+  const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)(```|$)/i);
+  const candidates = [fenced?.[1], clean].filter(Boolean) as string[];
   for (const candidate of candidates) {
     const start = candidate.search(/[[{]/);
     if (start < 0) continue;
-    const opener = candidate[start];
-    const closer = opener === "[" ? "]" : "}";
-    let depth = 0, inString = false, escaped = false;
+    const stack: string[] = [];
+    let inString = false, escaped = false;
+    // The last point where an item had just been closed, and which brackets were still open there.
+    let safe: { end: number; open: string[] } | null = null;
     for (let i = start; i < candidate.length; i++) {
       const ch = candidate[i];
       if (escaped) { escaped = false; continue; }
       if (ch === "\\") { escaped = true; continue; }
-      if (ch === '"') inString = !inString;
+      if (ch === '"') { inString = !inString; continue; }
       if (inString) continue;
-      if (ch === opener) depth++;
-      else if (ch === closer && --depth === 0) {
-        try { return JSON.parse(candidate.slice(start, i + 1)); } catch { break; }
+      if (ch === "[" || ch === "{") stack.push(ch === "[" ? "]" : "}");
+      else if (ch === "]" || ch === "}") {
+        stack.pop();
+        if (!stack.length) {
+          try { return JSON.parse(candidate.slice(start, i + 1)); } catch { break; }
+        }
+        safe = { end: i + 1, open: [...stack] };
       }
     }
+    if (safe) {
+      try { return JSON.parse(candidate.slice(start, safe.end).replace(/,\s*$/, "") + [...safe.open].reverse().join("")); } catch { /* not repairable */ }
+    }
   }
-  throw new Error("The model's answer did not contain a usable plan. Try again, or paste the plan JSON by hand.");
+  const seen = text.trim().slice(0, 140).replace(/\s+/g, " ");
+  throw new Error(`The model's answer did not contain a usable plan${seen ? ` (it said: "${seen}${text.trim().length > 140 ? "..." : ""}")` : " (it answered nothing)"}. Try again, pick a bigger model, or paste the plan JSON by hand.`);
 }
 
 export const STATUS_STYLE: Record<Status, string> = {

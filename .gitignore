@@ -68,3 +68,4 @@ modules/**/*.zip
 
 # Fine-tuning workspace: Python env, base models, datasets, outputs
 /train/
+/unsloth_compiled_cache/

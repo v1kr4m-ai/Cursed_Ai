@@ -104,7 +104,7 @@ function RedoCard({ project, onChanged, onGo }: { project: Project; onChanged?: 
         <select value={scene.id} onChange={e => setSceneId(e.target.value)} className={sel}>{scenes.map(s => <option key={s.id} value={s.id}>Scene {s.number}{s.status === "done" ? "" : " (" + s.status + ")"}</option>)}</select>
       </div>
       <textarea value={shot} onChange={e => setShot(e.target.value)} rows={2} placeholder="What the camera sees" className="w-full resize-none rounded-md border border-current/20 bg-transparent px-2 py-1" />
-      <textarea value={vo} onChange={e => setVo(e.target.value)} rows={2} placeholder="Narration line" className="w-full resize-none rounded-md border border-current/20 bg-transparent px-2 py-1" />
+      <textarea value={vo} onChange={e => setVo(e.target.value)} rows={2} placeholder="Line (narration, speech or lyric)" className="w-full resize-none rounded-md border border-current/20 bg-transparent px-2 py-1" />
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={redo} disabled={busy || scene.status === "running"} className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-1.5 font-semibold text-white disabled:opacity-40">
           {busy ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} className="fill-current" />}{changed ? "Save and re-render" : "Re-render"}

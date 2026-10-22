@@ -13,6 +13,8 @@ export default defineConfig(({mode}) => {
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
+    // The fine-tuning Python environment ships its own JS tests; only this app's tests/ folder counts.
+    test: { include: ['tests/**/*.test.ts'] },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

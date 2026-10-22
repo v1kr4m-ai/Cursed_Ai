@@ -34,7 +34,7 @@ function fixture(): { project: Project; episode: Episode; scene: Scene } {
     ],
   };
   const project = {
-    styleLock: "STYLE_LOCK.", voiceLock: "a narrator (S1)", episodes: [episode],
+    styleLock: "STYLE_LOCK.", voiceLock: "a narrator (S1)", allowTextCards: true, episodes: [episode],
   } as unknown as Project;
   return { project, episode, scene };
 }
@@ -56,6 +56,26 @@ describe("buildScenePrompt", () => {
     for (const key of ["integrated_multimodal_description:", "overall_soundscape:", "non_diegetic_music:"]) {
       expect(prompt).toContain(key);
     }
+  });
+
+  it("never writes subtitles into the picture, and drops caption words from the look", () => {
+    const { project, episode, scene } = fixture();
+    const prompt = buildScenePrompt({ ...project, allowTextCards: false, styleLock: "natural light, captions, emoticons, close-ups" }, episode, scene);
+    expect(prompt).not.toContain("Plain white text reading");
+    expect(prompt).toContain("No subtitles, captions");
+    expect(prompt).toContain("natural light, emoticons, close-ups");
+    expect(prompt).not.toContain("light, captions");
+  });
+
+  it("words the line for the chosen format", () => {
+    const { project, episode, scene } = fixture();
+    const vlog = buildScenePrompt({ ...project, format: "vlog" }, episode, scene);
+    expect(vlog).toContain("looks at the camera and says");
+    expect(vlog).not.toContain("off-screen voiceover");
+    expect(buildScenePrompt({ ...project, format: "singing" }, episode, scene)).toContain("sings this lyric");
+    const dance = buildScenePrompt({ ...project, format: "dancing" }, episode, scene);
+    expect(dance).toContain("Nobody speaks");
+    expect(dance).not.toContain("<d>");
   });
 
   it("leaves the text card out when the scene has none", () => {
@@ -82,6 +102,18 @@ describe("extractJson", () => {
 
   it("reads a bare array and ignores braces inside strings", () => {
     expect(extractJson('[{"title":"a } weird ] title"}]')[0].title).toBe("a } weird ] title");
+  });
+
+  it("skips a <think> block, and finds nothing when it never closes", () => {
+    expect(extractJson('<think>maybe [1,2] or {x}</think>[{"title":"a"}]')[0].title).toBe("a");
+    expect(() => extractJson('<think>I keep thinking [{"title":"no"}]')).toThrow(/usable plan/);
+  });
+
+  it("keeps the complete episodes when the answer was cut off", () => {
+    const cut = '[{"number":1,"title":"One","scenes":[{"vo":"a"}]},{"number":2,"title":"Two","scenes":[{"vo":"b"},{"vo":"unfini';
+    const plan = extractJson(cut);
+    expect(plan).toHaveLength(2);
+    expect(plan[1].scenes).toEqual([{ vo: "b" }]);
   });
 
   it("complains when there is no plan to find", () => {

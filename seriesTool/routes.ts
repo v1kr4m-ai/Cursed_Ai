@@ -15,6 +15,7 @@ import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTo
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
 import { probeDuration, stitch } from "./ffmpeg";
 import { extractUpload } from "../comfyTool/extract";
+import { refSourceFiles } from "./refSources";
 import { buildScenePrompt, newId, snapFrames, type Episode, type Project, type Ref, type Scene, type Source, type Status } from "./model";
 import { createSeriesStore } from "./store";
 
@@ -352,7 +353,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         workflow: graph,
         info,
         promptText: ref.prompt,
-        refImagePaths: new Array(info.refImageNodeIds.length).fill(""),
+        // An image-to-image workflow draws the person in the photos it is given; blank slots are bypassed.
+        refImagePaths: (() => { const files = refSourceFiles(fresh.episodes.find(e => e.id === ep.id) || ep, ref); return info.refImageNodeIds.map((_, i) => files[i] || ""); })(),
         refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "ref"),
@@ -561,3 +563,4 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
 
   return { store };
 }
+          fromRefIds: prior?.fromRefIds,

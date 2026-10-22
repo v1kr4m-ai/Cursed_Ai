@@ -17,6 +17,8 @@ export interface Ref {
   prompt: string;
   negative: string;
   seed: number;
+  /** Attached photos this still is made from (image-to-image). Empty: the episode's attached photos. */
+  fromRefIds?: string[];
   /** Absolute path once rendered. */
   file: string | null;
   status: Status;
@@ -46,6 +48,7 @@ export interface Scene {
 }
 
 import type { Subtitles } from "./subtitlesCore";
+import { formatOf, sceneFields } from "./formats";
 import type { AudioMix, Output } from "./finishCore";
 
 export interface Episode {
@@ -121,6 +124,10 @@ export interface Project {
   episodes: Episode[];
   /** Optional; older project.json files predate it. */
   sources?: Source[];
+  /** What kind of video this is (see formats.ts). Missing means narration. */
+  format?: string;
+  /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
+  allowTextCards?: boolean;
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
@@ -164,18 +171,12 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
       : `Use ${picture} as the exact appearance reference for ${ref.name}, preserving appearance, clothing and proportions.`;
   }).join(" ");
 
-  const card = scene.textCard.trim()
-    ? ` Plain white text reading "${scene.textCard.trim()}" appears low in the frame.`
-    : "";
+  const format = formatOf(project.format);
+  // The default narrator is for narration; an on-camera format needs a person's voice instead.
+  const voice = format.voice && project.voiceLock === DEFAULT_VOICE_LOCK ? format.voice : project.voiceLock;
+  const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });
 
-  return [
-    wiring,
-    "",
-    `integrated_multimodal_description: [Shot 1] ${project.styleLock} ${scene.shot.trim()}${card} ` +
-      `A ${project.voiceLock} says in an off-screen voiceover: <d>[English] ${scene.vo.trim()}</d>`,
-    "overall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.",
-    "non_diegetic_music: N/A",
-  ].join("\n");
+  return [wiring, "", fields.description, fields.soundscape, fields.music].join("\n");
 }
 
 /** Episode progress, used for the dashboard bars and the checklist. */

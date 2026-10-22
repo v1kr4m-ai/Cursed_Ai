@@ -1,11 +1,13 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush } from "lucide-react";
+import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus } from "lucide-react";
+import { SERIES_FORMATS, formatOf, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
 import { savedSetting } from "../../../lib/settingsStore";
+import { notify } from "../../../lib/notify";
 import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { StorySources } from "./StorySources";
@@ -19,11 +21,7 @@ import { DIGEST_THRESHOLD, digestDocument, type DigestProgress } from "./chunk";
  * months later when an episode needs rewriting.
  */
 
-const PLAN_INSTRUCTION = `Turn our discussion into a production plan and reply with JSON only - no commentary.
-
-Shape:
-[
-  {
+const EPISODE_SHAPE = `{
     "number": 1,
     "title": "Episode title",
     "era": "what this episode covers",
@@ -33,17 +31,64 @@ Shape:
       { "name": "character_name", "role": "character", "prompt": "image prompt for this character", "negative": "what to avoid" }
     ],
     "scenes": [
-      { "number": 1, "vo": "one narration line, 18-22 words", "shot": "what the camera sees and does, one or two sentences", "textCard": "optional on-screen text, or empty", "refs": ["style_plate", "character_name"] }
+      { "number": 1, "vo": "LINE_HINT", "shot": "what the camera sees and does, one or two sentences", "textCard": "", "refs": ["style_plate", "character_name"] }
     ]
-  }
-]
+  }`;
 
+function rulesFor(fmt: SeriesFormat) {
+  const lineRule = fmt.speech === "none"
+    ? `- The "vo" line is only a short note (${fmt.lineWords} words) for the editor: nothing is spoken in the clip.`
+    : `- Every "vo" line is ${fmt.lineWords} words: it is ${fmt.speech === "voiceover" ? "spoken over" : fmt.speech === "sung" ? "sung during" : "said on camera in"} one short clip.`;
+  return `Video style: ${fmt.label}. ${fmt.plan}
 Rules:
 - Every episode gets exactly one ref with role "style" named "style_plate", listed first in every scene's refs.
 - 8 scenes per episode unless we agreed otherwise.
-- Narration lines must be 18-22 words: they are spoken over a 7 second clip.
+${lineRule}
+- Always leave "textCard" empty. Subtitles and captions are added later by the editor, never inside the clips.
 - Image prompts should describe a photographic still, with lighting and grade, not a character sheet.
+- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.
 - Scene "refs" lists ref names from the same episode, style_plate first.`;
+}
+
+/** Asks for the whole plan: every episode of the season, or exactly `count` of them. */
+function planInstruction(fmt: SeriesFormat, count: number) {
+  return `Turn our discussion into a production plan and reply with JSON only - no commentary, no code fences.
+${count > 0 ? `Write exactly ${count} episode${count > 1 ? "s" : ""}.` : "Write every episode we discussed."}
+
+Shape - a JSON array of episodes:
+[
+  ${EPISODE_SHAPE.replace("LINE_HINT", fmt.lineHint)}
+]
+
+${rulesFor(fmt)}`;
+}
+
+/** Asks for one more episode that carries on from the ones already planned. */
+function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string) {
+  const number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
+  const recap = project.episodes.map(e => `Episode ${e.number} "${e.title}" (${e.era || "no period"}): ${e.scenes.slice(0, 2).map(sc => sc.vo).filter(Boolean).join(" / ")}${e.hookOut ? ` - ends with: ${e.hookOut}` : ""}`).join("\n");
+  return `Write the NEXT episode, number ${number}, and reply with JSON only - no commentary, no code fences.
+Carry on from what is already planned, and pick up the closing hook of the last episode.
+
+Already planned:
+${recap || "(nothing yet)"}
+
+${direction.trim() ? `What I want in this episode: ${direction.trim()}
+` : ""}
+Shape - one JSON object (a single episode, not an array):
+${EPISODE_SHAPE.replace("LINE_HINT", fmt.lineHint).replace('"number": 1', `"number": ${number}`)}
+
+${rulesFor(fmt)}`;
+}
+
+/** The plan the page already holds, written back in the shape the planner uses, so one more episode can be added without losing renders. */
+function planJson(project: Project) {
+  return project.episodes.map(e => ({
+    number: e.number, title: e.title, era: e.era, hookOut: e.hookOut,
+    refs: e.refs.map(r => ({ name: r.name, role: r.role, prompt: r.prompt, negative: r.negative, seed: r.seed })),
+    scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, shot: sc.shot, textCard: sc.textCard, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
+  }));
+}
 
 const field = "w-full bg-neutral-900/60 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors";
 
@@ -64,6 +109,8 @@ const FILL_INSTRUCTION = `From our discussion, fill in the series details and re
   "notes": "constraints, things to avoid, anything else we agreed"
 }
 Use what we actually agreed. Use an empty string for anything we have not discussed.`;
+
+const REFUSAL = /^(i'?m sorry|i am sorry|sorry,|i can('|no)?t (assist|help|do that|comply)|i cannot (assist|help|comply))/i;
 
 const TALK_MODEL_KEY = "cursed.series.talkModel";
 
@@ -87,6 +134,10 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
   const [planning, setPlanning] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [rawPlan, setRawPlan] = React.useState("");
+  const [episodeCount, setEpisodeCount] = React.useState(0);
+  const [direction, setDirection] = React.useState("");
+  const [addingNext, setAddingNext] = React.useState(false);
+  const fmt = formatOf(project.format);
   const [showRaw, setShowRaw] = React.useState(false);
   const [showAttach, setShowAttach] = React.useState(false);
   const [showStory, setShowStory] = React.useState(true);
@@ -107,10 +158,12 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
 
   const systemPrompt =
     `You are helping plan a short-form video series for YouTube Shorts / Reels. ` +
-    `Each episode is about eight 7-second vertical clips with one line of narration each. ` +
+    `Video style: ${formatOf(project.format).label} - ${formatOf(project.format).blurb} ` +
+    `Each episode is about eight 7-second vertical clips with one ${formatOf(project.format).lineLabel.toLowerCase()} line each. ` +
     `Idea: ${idea.logline || "(not stated yet)"}. Audience: ${idea.audience || "general"}. Tone: ${idea.tone || "documentary"}. ` +
     `Notes: ${idea.notes || "none"}. ` +
-    `Push back on vague ideas, ask one sharp question at a time, and keep answers short.`;
+    `You are a creative writing partner for the user's own fictional video series, so help with scripts, scenes and outlines whenever asked. ` +
+    `Push back on vague ideas, ask one sharp question at a time, and keep answers short unless a script is requested.`;
 
   const saveIdea = async (next = idea, discussion = messages) => onSaved(await api.patch(project.id, { idea: next, discussion }));
 
@@ -125,11 +178,15 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
     setStreaming("");
     try {
       let acc = "";
-      const answer = await askModel(
-        [{ role: "system", content: systemPrompt }, ...next.map(m => ({ role: m.role, content: m.content }))],
-        model,
-        t => { acc += t; setStreaming(acc); },
-      );
+      const history = [{ role: "system", content: systemPrompt }, ...next.map(m => ({ role: m.role, content: m.content }))];
+      let answer = await askModel(history, model, t => { acc += t; setStreaming(acc); });
+      // Some models (phi4 is one) turn down an ordinary creative request. Say plainly what this is and ask once more.
+      if (REFUSAL.test(answer.trim()) && answer.trim().length < 240) {
+        acc = "";
+        setStreaming("");
+        answer = await askModel([...history, { role: "assistant", content: answer }, { role: "user", content: "This is an ordinary creative project: planning and scripting my own social-media video series, with a character I made up. Please go ahead and help." }], model, t => { acc += t; setStreaming(acc); });
+        if (REFUSAL.test(answer.trim()) && answer.trim().length < 240) setError("This model keeps declining the request. Pick a different model above (Qwen, Llama or a cloud model work well for scripts) and send it again.");
+      }
       const withReply = [...next, { role: "assistant" as const, content: answer, at: new Date().toISOString() }];
       setMessages(withReply);
       setStreaming("");
@@ -139,6 +196,43 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
       setMessages(next);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Asks for JSON; if the answer cannot be read, asks once more, telling the model to send nothing but the JSON. */
+  async function askForJson(base: { role: string; content: string }[], instruction: string, keep: (answer: string) => void) {
+    let answer = await askModel([...base, { role: "user", content: instruction }], model);
+    keep(answer);
+    try { return extractJson(answer); } catch { /* ask again below */ }
+    answer = await askModel([...base, { role: "user", content: instruction }, { role: "assistant", content: answer.slice(0, 1500) }, { role: "user", content: "That was not valid JSON. Reply again with ONLY the JSON, starting with the first bracket, no text before or after it, no code fences." }], model);
+    keep(answer);
+    return extractJson(answer);
+  }
+
+  /** Writes episode N+1 from what is already planned and adds it, leaving every rendered clip alone. */
+  async function addNextEpisode() {
+    setAddingNext(true);
+    setError(null);
+    try {
+      const base = [
+        { role: "system", content: systemPrompt },
+        ...sources.map(s => ({ role: "user", content: `Source document "${s.name}":
+
+${(s.digest || s.text).slice(0, 12000)}` })),
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+      ];
+      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction), a => setRawPlan(a));
+      const next = Array.isArray(got) ? got[0] : got;
+      if (!next || typeof next !== "object" || !Array.isArray(next.scenes)) throw new Error("The model did not write an episode with scenes.");
+      next.number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
+      onSaved(await api.savePlan(project.id, [...planJson(project), next], true));
+      setDirection("");
+      notify({ message: `Episode ${next.number} added - open Produce to render it`, tab: "series" });
+    } catch (e: any) {
+      setError(e?.message || String(e));
+      setShowRaw(true);
+    } finally {
+      setAddingNext(false);
     }
   }
 
@@ -172,17 +266,12 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
         role: "user" as const,
         content: `Source document "${s.name}":\n\n${s.body}`,
       }));
-      const answer = await askModel(
-        [
-          { role: "system", content: systemPrompt },
-          ...storyBlocks,
-          ...messages.map(m => ({ role: m.role, content: m.content })),
-          { role: "user", content: PLAN_INSTRUCTION },
-        ],
-        model,
-      );
-      setRawPlan(answer);
-      const episodes = extractJson(answer);
+      const base = [
+        { role: "system", content: systemPrompt },
+        ...storyBlocks,
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+      ];
+      const episodes = await askForJson(base, planInstruction(fmt, episodeCount), a => setRawPlan(a));
       if (!Array.isArray(episodes)) throw new Error("The plan must be a list of episodes.");
       onSaved(await api.savePlan(project.id, episodes));
     } catch (e: any) {
@@ -270,11 +359,46 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
           </div>
         </motion.div>
 
+        {/* what kind of video: sets how lines are written, spoken and prompted */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
+          className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
+            <Clapperboard size={14} className="text-sky-400" /> Video style
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {SERIES_FORMATS.map(f => (
+              <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: f.id, discussion: messages }))} title={f.blurb}
+                className={"rounded-full border px-3 py-1 text-xs transition " + (fmt.id === f.id ? "border-sky-500 bg-sky-500/15 text-sky-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] leading-relaxed text-neutral-500">{fmt.blurb} Each scene has one <span className="text-neutral-300">{fmt.lineLabel.toLowerCase()}</span>. Change the style, then build the plan again (renders you already made are kept).</p>
+          {(fmt.id === "ugc" || fmt.id === "vlog") && (
+            <ol className="list-decimal space-y-0.5 rounded-lg border border-sky-900/50 bg-sky-950/20 py-2 pl-7 pr-3 text-[11px] leading-relaxed text-sky-200/80">
+              <li>Attach the person's photo under <b>Reference images</b> below.</li>
+              <li>Build the episode plan. Each scene is written for the person talking to the camera.</li>
+              <li>On Produce, render the stills first: they are made from your photo, so they look like the same person. Then render the clips, which are animated from those stills.</li>
+            </ol>
+          )}
+          <label className="flex items-start gap-2 text-[11px] text-neutral-400">
+            <input type="checkbox" className="mt-0.5" checked={!!project.allowTextCards} onChange={async e => onSaved(await api.patch(project.id, { allowTextCards: e.target.checked, discussion: messages }))} />
+            <span>Write on-screen text cards into the video. Leave this off to get clean clips: subtitles and captions are added afterwards in Assemble.</span>
+          </label>
+        </motion.div>
+
         <button onClick={fillFromDiscussion} disabled={filling || busy || !planReady} title={planReady ? "Reads the conversation and fills in the title, niche, style and the rest" : "Talk it through first"}
           className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900/60 hover:bg-neutral-800/80 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-neutral-100 transition">
           {filling ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} className="text-fuchsia-400" />}
           {filling ? "Filling in the details..." : "Fill the details from our discussion"}
         </button>
+        <div className="flex items-center gap-2 px-1 text-xs text-neutral-400">
+          <span>Episodes to write</span>
+          <select value={episodeCount} onChange={e => setEpisodeCount(Number(e.target.value))} className="rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
+            <option value={0}>All we discussed</option>
+            {[1, 2, 3, 4, 5, 6, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
         <motion.button
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           whileHover={{ scale: planning || busy || !planReady ? 1 : 1.015 }}
@@ -294,6 +418,37 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
         <p className="px-1 text-xs text-neutral-500">
           {planBlockedWhy || "Turns the story and discussion into episodes, scenes and reference stills. Running it again keeps clips you have already rendered."}
         </p>
+
+        {/* the season so far, and the way to add the next episode */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
+          className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
+            <Clapperboard size={14} className="text-emerald-400" /> Episodes
+            <span className="ml-auto text-[11px] text-neutral-500">{project.episodes.length} planned</span>
+          </h3>
+          {project.episodes.length === 0 ? (
+            <p className="text-[11px] leading-relaxed text-neutral-500">Nothing planned yet. Build the episode plan above first. After that, this is where you add each next episode.</p>
+          ) : (
+            <>
+              <ol className="space-y-1">
+                {project.episodes.map(e => (
+                  <li key={e.id} className="flex items-center gap-2 rounded-lg bg-neutral-900/60 px-2.5 py-1.5 text-xs text-neutral-300">
+                    <span className="w-5 shrink-0 text-neutral-500">{e.number}</span>
+                    <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                    <span className="shrink-0 text-[10px] text-neutral-600">{e.scenes.filter(sc => sc.status === "done").length}/{e.scenes.length} clips</span>
+                  </li>
+                ))}
+              </ol>
+              <textarea className={field + " h-16 resize-none text-xs"} value={direction} onChange={e => setDirection(e.target.value)} placeholder="Next episode: what should happen? (optional - leave empty to let the model carry on from the last hook)" />
+              <button onClick={addNextEpisode} disabled={addingNext || planning || busy}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-emerald-700/60 bg-emerald-600/15 hover:bg-emerald-600/25 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-emerald-100 transition">
+                {addingNext ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                {addingNext ? "Writing the episode..." : "Write episode " + ((project.episodes[project.episodes.length - 1]?.number || 0) + 1)}
+              </button>
+              <p className="text-[11px] leading-relaxed text-neutral-500">Adds one more episode after the last one, using the story so far. Nothing already rendered is touched. Then open Produce to render its stills and clips.</p>
+            </>
+          )}
+        </motion.div>
 
         <AnimatePresence>
           {digesting && (
@@ -417,6 +572,9 @@ export function Develop({ project, modelId, models, onSaved }: { project: Projec
               </motion.div>
             ))}
           </AnimatePresence>
+          {busy && !streaming && (
+            <div className="mr-auto flex max-w-[88%] items-center gap-2 text-xs text-neutral-500"><Loader2 size={13} className="animate-spin text-violet-400" /> Waiting for the model... a big model that is not loaded yet can take a minute or two to wake up.</div>
+          )}
           {streaming && (
             <motion.div layout className="mr-auto flex max-w-[88%] items-start gap-2">
               <Bot size={14} className="mt-2 shrink-0 text-violet-400" />

@@ -1,4 +1,5 @@
 import React from "react";
+import { formatOf } from "../../../../seriesTool/formats";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Play, RefreshCw, Image as ImageIcon, Film, ChevronRight, X, AlertTriangle,
@@ -100,6 +101,22 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
             <div className="space-y-2 p-3">
               <textarea className={`${field} h-24 resize-none text-xs`} value={draft.prompt} onChange={e => setDraft({ ...draft, prompt: e.target.value })} onBlur={() => save({ prompt: draft.prompt })} placeholder="Image prompt" />
               <textarea className={`${field} h-16 resize-none text-xs`} value={draft.negative} onChange={e => setDraft({ ...draft, negative: e.target.value })} onBlur={() => save({ negative: draft.negative })} placeholder="Negative prompt" />
+              {draft.prompt.trim() && episode.refs.some(r => r.id !== ref_.id && r.file && !r.prompt.trim()) && (
+                <div>
+                  <label className="text-[11px] text-neutral-500">Made from these photos (image-to-image) - none picked means all attached photos</label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {episode.refs.filter(r => r.id !== ref_.id && r.file && !r.prompt.trim()).map(r => {
+                      const on = (draft.fromRefIds || []).includes(r.id);
+                      return (
+                        <button key={r.id} title={r.name} onClick={() => save({ fromRefIds: on ? (draft.fromRefIds || []).filter(x => x !== r.id) : [...(draft.fromRefIds || []), r.id] })}
+                          className={"h-10 w-10 overflow-hidden rounded border-2 transition " + (on ? "border-sky-400" : "border-neutral-700 opacity-70 hover:opacity-100")}>
+                          <img src={fileUrl(r.file!)} alt={r.name} className="h-full w-full object-cover" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {ref_.file && <a href={fileUrl(ref_.file)} target="_blank" rel="noreferrer" className="block truncate text-[11px] text-sky-400 hover:underline">{ref_.file}</a>}
             </div>
           </motion.div>
@@ -119,8 +136,10 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
   React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
 
   const isRunning = running?.targetId === scene.id;
+  const fmt = formatOf(project.format);
   const words = draft.vo.trim().split(/\s+/).filter(Boolean).length;
-  const inRange = words >= 18 && words <= 22;
+  const [minWords, maxWords] = fmt.lineWords.split("-").map(Number);
+  const inRange = fmt.speech === "none" || (words >= minWords && words <= maxWords);
 
   const save = async (changes: Partial<Scene>) => {
     const next = { ...draft, ...changes };
@@ -147,7 +166,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
             <Badge status={isRunning ? "running" : scene.status} progress={running?.progress} />
             {scene.durationS && <span className="text-[11px] text-neutral-500">{scene.durationS.toFixed(2)}s</span>}
           </div>
-          <div className="mt-1 line-clamp-2 text-sm text-neutral-200">{scene.vo || <span className="text-neutral-600">No narration yet</span>}</div>
+          <div className="mt-1 line-clamp-2 text-sm text-neutral-200">{scene.vo || <span className="text-neutral-600">No {fmt.lineLabel.toLowerCase()} yet</span>}</div>
         </button>
         <motion.button whileTap={{ scale: 0.9 }} onClick={() => api.generateScene(project.id, scene.id)}
           className="rounded-md border border-neutral-700 p-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white"
@@ -174,8 +193,8 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
             <div className="space-y-3 p-3">
               <div>
                 <label className="flex justify-between text-[11px] text-neutral-500">
-                  <span className="flex items-center gap-1"><Mic size={10} /> Narration</span>
-                  <motion.span animate={{ color: inRange ? "rgb(52 211 153)" : "rgb(251 191 36)" }}>{words} words</motion.span>
+                  <span className="flex items-center gap-1"><Mic size={10} /> {fmt.lineLabel}</span>
+                  <motion.span animate={{ color: inRange ? "rgb(52 211 153)" : "rgb(251 191 36)" }}>{words} words{fmt.speech === "none" ? "" : ` (aim for ${fmt.lineWords})`}</motion.span>
                 </label>
                 <textarea className={`${field} h-16 resize-none text-xs`} value={draft.vo} onChange={e => setDraft({ ...draft, vo: e.target.value })} onBlur={() => save({ vo: draft.vo })} />
               </div>
@@ -184,7 +203,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
                 <textarea className={`${field} h-20 resize-none text-xs`} value={draft.shot} onChange={e => setDraft({ ...draft, shot: e.target.value })} onBlur={() => save({ shot: draft.shot })} />
               </div>
               <div>
-                <label className="text-[11px] text-neutral-500">On-screen text card</label>
+                <label className="text-[11px] text-neutral-500">On-screen text card {project.allowTextCards ? "" : "(not used: text cards are switched off in Develop, so no writing is added to the video)"}</label>
                 <input className={`${field} text-xs`} value={draft.textCard} onChange={e => setDraft({ ...draft, textCard: e.target.value })} onBlur={() => save({ textCard: draft.textCard })} />
               </div>
               <div>

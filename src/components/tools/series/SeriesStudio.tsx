@@ -202,7 +202,7 @@ function SettingsPane({ project, onChanged }: { project: Project; onChanged: (p:
         <h3 className="text-sm font-medium text-neutral-200">Locks</h3>
         <label className="block text-[11px] text-neutral-500">Style lock - pasted into every scene prompt so the look does not drift</label>
         <textarea className={`${field} h-20 resize-none text-xs`} value={locks.styleLock} onChange={e => setLocks({ ...locks, styleLock: e.target.value })} onBlur={() => saveLocks()} />
-        <label className="block text-[11px] text-neutral-500">Narrator lock - restated in every scene, or the voice changes between clips</label>
+        <label className="block text-[11px] text-neutral-500">Voice lock - who speaks or sings, restated in every scene (for on-camera styles, describe the person's voice; the style default is used while this is still the narrator)</label>
         <textarea className={`${field} h-16 resize-none text-xs`} value={locks.voiceLock} onChange={e => setLocks({ ...locks, voiceLock: e.target.value })} onBlur={() => saveLocks()} />
       </div>
     </div>
