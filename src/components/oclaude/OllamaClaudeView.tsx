@@ -2,7 +2,7 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion } from "motion/react";
-import { AlertTriangle, Archive, Bot, Brain, Check, CheckCircle2, ChevronDown, Cloud, Copy, Cpu, Download, FolderOpen, GitFork, Loader2, MoreVertical, Plus, Send, Settings2, ShieldCheck, Square, Trash2, Undo2, X } from "lucide-react";
+import { AlertTriangle, Archive, Bot, Brain, Check, CheckCircle2, ChevronDown, Cloud, Copy, Cpu, Download, FolderOpen, GitFork, Loader2, MoreVertical, Plus, RefreshCw, Send, Settings2, ShieldCheck, Square, Trash2, Undo2, X } from "lucide-react";
 import { AppSettings, MessageRole } from "../../types";
 import { cn } from "@/lib/utils";
 import { nativeFolder } from "../comfy/types";
@@ -198,6 +198,19 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
   ];
   const loadedCtx = status?.loaded.find(l => l.name === model)?.contextLength ?? null;
   const smallCtx = loadedCtx !== null && loadedCtx < 16384;
+  const [restarting, setRestarting] = React.useState(false);
+  /** Restarts Ollama with a 32k window after the person confirms; everything Ollama has loaded is dropped. */
+  const restartOllama = async () => {
+    if (!confirm("Restart Ollama with a 32k context window?\n\nThis stops Ollama now: any model it has loaded or is answering is dropped (Chat, Series and Ollama_Claude may be interrupted). The setting is also saved for your Windows user, so Ollama keeps it next time.")) return;
+    setRestarting(true);
+    try {
+      const r = await fetch("/api/oclaude/ollama-context", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contextLength: 32768 }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Could not restart Ollama.");
+      notify({ message: `Ollama restarted with a ${Math.round(d.contextLength / 1024)}k window - send your message again`, tab: "ollamaclaude" });
+      refresh();
+    } catch (e: any) { notifyError(e.message, "ollamaclaude"); } finally { setRestarting(false); }
+  };
   const items = session?.items ?? [];
   const lastResult = [...items].reverse().find(i => i.kind === "result");
   const canSend = !!input.trim() && !running && !!model && !!status?.claude.found;
@@ -415,7 +428,9 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
           {smallCtx && (
             <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-300">
               <AlertTriangle size={14} className="shrink-0" />
-              <span>Ollama loaded {model} with only {Math.round((loadedCtx || 0) / 1024)}k of context; Claude Code needs about 16k+ just for its instructions, so answers get cut off. Restart Ollama with a bigger window:</span>
+              <span>Ollama loaded {model} with only {Math.round((loadedCtx || 0) / 1024)}k of context; Claude Code needs about 16k+ just for its instructions, so answers get cut off.</span>
+              <button onClick={restartOllama} disabled={restarting} className="flex items-center gap-1.5 rounded-lg bg-amber-500/30 px-2.5 py-1 text-[11px] font-bold hover:bg-amber-500/40 disabled:opacity-50">{restarting ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}{restarting ? "Restarting Ollama..." : "Restart Ollama with a 32k window"}</button>
+              <span className="text-amber-300/70">or by hand:</span>
               <button onClick={() => copyCmd("setx OLLAMA_CONTEXT_LENGTH 32768")} className="flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-2.5 py-1 font-mono text-[11px] hover:bg-amber-500/30">{copied ? <Check size={11} /> : <Copy size={11} />}setx OLLAMA_CONTEXT_LENGTH 32768</button>
             </div>
           )}

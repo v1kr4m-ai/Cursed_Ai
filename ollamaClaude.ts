@@ -10,6 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawn, execFile, type ChildProcess } from "child_process";
+import { registerOllamaRestart } from "./ollamaRestart";
 
 export interface OllamaClaudeOptions { ollamaUrl: string }
 
@@ -235,6 +236,8 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
       res.json({ ok: true, path: target });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+
+  registerOllamaRestart(app, { ollamaUrl: opts.ollamaUrl });
 
   app.post("/api/oclaude/stop", (req, res) => {
     const proc = runs.get(String(req.body?.runId || ""));
