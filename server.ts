@@ -6,6 +6,7 @@ import { registerSubtitles } from "./seriesTool/subtitles";
 import { registerExport } from "./seriesTool/exportEpisodes";
 import { registerFinish } from "./seriesTool/finish";
 import { registerTemplates } from "./seriesTool/templates";
+import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
 import type { TrainConfig } from "./trainTool/paths";
@@ -46,6 +47,8 @@ function getLocalNetworkAddress(): string {
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
+  // Other devices on the network need an access code (this PC never does). serverConfig and saveConfig are defined further down; they are only used when a request arrives.
+  registerPhoneAccess(app, { get: () => serverConfig.phone || {}, set: c => { serverConfig.phone = c; saveConfig(); }, port: PORT });
 
   // Default express.json() limit is 100kb - too small for base64-encoded
   // reference/source images (image generation, ComfyUI img2img/SVD), which
@@ -202,7 +205,7 @@ async function startServer() {
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
   interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
-  interface ServerConfig { online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[] }
+  interface ServerConfig { phone?: PhoneConfig; online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[] }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {

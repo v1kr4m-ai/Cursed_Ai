@@ -9,6 +9,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { ThemeSettings } from "./ThemeSettings";
 import { LmStudioControl } from "./LmStudioControl";
 import { OnlineModelsSettings } from "./OnlineModelsSettings";
+import { PhoneAccessSettings } from "./PhoneAccessSettings";
 import { GoogleConnectPanel, useGoogleStatus } from "../comfy/google";
 import { nativeFolder, postJson, api } from "../comfy/types";
 
@@ -137,6 +138,11 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
       <Group title="Local API & network" note="The app serves everything from this PC. Other devices on your network can reach it at the address below.">
         <Row title="Local inference bridge" note="Use the local server instead of Gemini cloud calls for chat."><Switch on={settings.apiEnabled} onChange={v => { set({ apiEnabled: v }); AIService.setMode(v); }} /></Row>
         <Row title="Reachable at" note="Open this from a phone or another PC on the same network."><span className="text-emerald-300 font-mono text-xs">{stats?.localAddress || `http://localhost:${settings.apiPort}/api/*`}</span></Row>
+      </Group>) },
+
+    { id: "phone", cat: "general", title: "Phone & other devices", keywords: "phone android iphone mobile access code remote lan wifi network ip address firewall connect", node: (
+      <Group title="Phone & other devices" note="Use the studio from a phone on the same Wi-Fi: the PC does the work, the phone is the screen. Other devices need the access code; this PC never does.">
+        <PhoneAccessSettings />
       </Group>) },
 
     { id: "ui", cat: "appearance", title: "Interface", keywords: "interface size font text motion animation theme themes colour color dark light global module", node: (
