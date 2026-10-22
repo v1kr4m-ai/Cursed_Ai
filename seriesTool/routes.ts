@@ -447,7 +447,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     if (!ep) return bad(res, 404, "No such episode.");
     const redo = !!req.body?.redo;
 
-    const refs = ep.refs.filter(r => redo || r.status !== "done");
+    // Attached pictures (a file and no prompt) are used as they are; "render again" must never replace them.
+    const refs = ep.refs.filter(r => !(r.file && !r.prompt.trim()) && (redo || r.status !== "done"));
     const scenes = ep.scenes.filter(s => redo || s.status !== "done");
     for (const ref of refs) generateRef(p, ep, ref);
     for (const scene of scenes) generateScene(p, ep, scene);
@@ -470,6 +471,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     const ep = p.episodes.find(e => e.id === req.params.episodeId);
     if (!ep) return bad(res, 404, "No such episode.");
 
+    // An attached photo has no prompt: rendering it would replace the photo with a made-up picture.
+    if (found.ref.file && !found.ref.prompt.trim()) return bad(res, 409, "This is an attached picture. It is used as it is and is never rendered.");
     const ordered = [...ep.scenes].sort((a, b) => a.number - b.number);
     const unfinished = ordered.filter(s => s.status !== "done" || !s.clipPath);
     if (unfinished.length) return bad(res, 400, `${unfinished.length} scene(s) still need rendering.`);

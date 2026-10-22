@@ -14,6 +14,7 @@ import { seriesPhotos, syncPhotos } from "./photos";
 import { castInstruction, ensureCast, peopleOf, renamePerson, setSkip, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
+import { ZoomImage } from "./ZoomImage";
 import { planProblems, tidyPlan } from "./planCheck";
 import { StorySources } from "./StorySources";
 import { DIGEST_THRESHOLD, digestDocument, type DigestProgress } from "./chunk";
@@ -538,7 +539,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <div className="flex flex-wrap gap-1.5">
               {seriesPhotos(project).slice(0, 12).map(r => (
                 <div key={r.id} className={"photo-tile w-16 text-center " + (r.skip ? "opacity-40" : "")}>
-                  <img src={fileUrl(r.file!)} title={r.name + (r.person ? " - " + r.person : "")} alt={r.name} className="h-16 w-16 rounded object-cover border border-neutral-700" />
+                  <ZoomImage src={fileUrl(r.file!)} alt={r.name + (r.person ? " - " + r.person : "")} className="h-16 w-16 rounded object-cover border border-neutral-700" />
                   <div className="truncate text-[9px] text-neutral-400" title={refKindInfo(kindOf(r))!.label + (r.person ? ": " + r.person : "")}>{r.person || refKindInfo(kindOf(r))!.label.split(" ")[0]}</div>
                   <label className="flex items-center justify-center gap-1 text-[9px] text-neutral-500" title="Leave this picture out of every prompt and workflow slot"><input type="checkbox" checked={!!r.skip} onChange={async e => onSaved(await api.patch(project.id, { episodes: setSkip(project, r, e.target.checked) }))} />skip</label>
                 </div>

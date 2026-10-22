@@ -2,6 +2,7 @@ import React from "react";
 import { peopleOf, placeCast } from "./people";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
+import { ZoomImage } from "./ZoomImage";
 import { formatOf } from "../../../../seriesTool/formats";
 import { kindOf, refKindInfo, REF_KINDS } from "../../../../seriesTool/refKinds";
 import { motion, AnimatePresence } from "motion/react";
@@ -77,7 +78,7 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
       <div className="flex items-center gap-2 p-2">
         <motion.div whileHover={{ scale: 1.08 }} className="h-12 w-12 shrink-0 overflow-hidden rounded bg-neutral-800 grid place-items-center">
           {ref_.file
-            ? <img src={fileUrl(ref_.file)} alt={ref_.name} className="h-full w-full object-cover" />
+            ? <ZoomImage src={fileUrl(ref_.file)} alt={ref_.name} className="h-full w-full object-cover" />
             : <ImageIcon size={16} className="text-neutral-600" />}
         </motion.div>
         <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(o => !o)}>
@@ -88,11 +89,11 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
         </button>
         <Badge status={isRunning ? "running" : ref_.status} progress={running?.progress} />
         <div className="flex items-center gap-1">
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => api.generateRef(project.id, ref_.id)}
+          {!(ref_.file && !ref_.prompt.trim()) && <motion.button whileTap={{ scale: 0.9 }} onClick={() => api.generateRef(project.id, ref_.id)}
             className="rounded-md border border-neutral-700 p-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white"
             title={ref_.file ? "Render again" : "Render this still"}>
             {ref_.file ? <RefreshCw size={14} /> : <Play size={14} />}
-          </motion.button>
+          </motion.button>}
           <button onClick={remove} className="rounded-md p-1.5 text-neutral-600 opacity-0 transition group-hover:opacity-100 hover:text-rose-400" title="Remove reference">
             <Trash2 size={14} />
           </button>
@@ -250,7 +251,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
                     return (
                       <label key={r.id} className={`flex items-center gap-2 rounded-md border px-2 py-1 text-[11px] transition ${on ? "border-sky-700 bg-sky-600/10 text-sky-100" : "border-neutral-800 text-neutral-400"} ${r.skip ? "opacity-50" : ""}`}>
                         <input type="checkbox" checked={index >= 0} disabled={r.skip} onChange={() => toggleRef(r.id)} />
-                        {r.file ? <img src={fileUrl(r.file)} alt="" className="h-6 w-6 rounded-sm object-cover" /> : <span className="h-6 w-6 rounded-sm bg-neutral-800" />}
+                        {r.file ? <ZoomImage src={fileUrl(r.file)} alt={r.name} className="h-6 w-6 rounded-sm object-cover" /> : <span className="h-6 w-6 rounded-sm bg-neutral-800" />}
                         <span className="min-w-0 flex-1 truncate">{on ? `Picture ${index + 1}: ` : ""}{r.name}{r.person ? ` (${r.person})` : ""}</span>
                         <span className="shrink-0 text-[10px] text-neutral-500">{r.skip ? "skipped everywhere" : !r.file ? "not rendered" : refKindInfo(kindOf(r))!.label.split(" ")[0]}</span>
                       </label>
