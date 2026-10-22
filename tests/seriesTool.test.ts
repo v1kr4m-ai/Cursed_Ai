@@ -11,6 +11,7 @@ import path from "path";
 import { peopleOf, ensureCast, renamePerson, setSkip } from "../src/components/tools/series/people";
 import { fillSlots, refSourceFiles } from "../seriesTool/refSources";
 import { projectFormat, SERIES_FORMATS } from "../seriesTool/formats";
+import { isChatModel, paramsFromName, rateModel, recommend } from "../src/components/tools/series/modelRating";
 import { formatOf } from "../seriesTool/formats";
 
 describe("snapFrames", () => {
@@ -288,5 +289,53 @@ describe("video styles", () => {
     const talking = buildScenePrompt({ ...project, format: "outfit-change", voice: "on" }, episode, scene);
     expect(talking).toContain("<d>[English]");
     expect(buildScenePrompt({ ...project, format: "skit" }, episode, scene)).toContain("talk to each other");
+  });
+});
+
+describe("planner model rating", () => {
+  const m = (id: string, extra: any = {}) => ({ id, name: id, isDownloaded: true, source: "ollama", type: "General", tags: [], ...extra });
+
+  it("reads the size from the name, or from the file size when the name has none", () => {
+    expect(paramsFromName("qwen2.5:7b")).toBe(7);
+    expect(paramsFromName("qwen3-coder:30b")).toBe(30);
+    expect(paramsFromName("llama-3.3-70b-instruct")).toBe(70);
+    expect(paramsFromName("deepseek-v3.1:671b-cloud")).toBe(671);
+    expect(paramsFromName("phi4:latest")).toBeNull();
+    expect(rateModel(m("llama3.2:latest", { sizeBytes: 2e9 }) as any).params).toBe(3);
+  });
+
+  it("rates small models weak or basic and big or online ones strong", () => {
+    expect(rateModel(m("llama3.2:latest", { sizeBytes: 2e9 }) as any).tier).toBe("weak");
+    expect(rateModel(m("qwen2.5:7b") as any).tier).toBe("basic");
+    expect(rateModel(m("gpt-oss:20b") as any).tier).toBe("good");
+    expect(rateModel(m("qwen3-coder:30b") as any).tier).toBe("strong");
+    expect(rateModel(m("kimi-k2.6:cloud") as any).tier).toBe("strong");
+    expect(rateModel(m("online:openai:gpt-4o", { source: "online", tags: ["Cloud"] }) as any).online).toBe(true);
+  });
+
+  it("marks a model down after it needed retries here", () => {
+    const base = m("qwen3:14b") as any;
+    expect(rateModel(base).tier).toBe("good");
+    expect(rateModel(base, { ok: 0, struggled: 2, failed: 0 }).tier).toBe("basic");
+    expect(rateModel(base, { ok: 5, struggled: 2, failed: 0 }).tier).toBe("good");
+  });
+
+  it("recommends the best offline model and, separately, the best online one", () => {
+    const list = [m("qwen2.5:7b"), m("gpt-oss:20b"), m("qwen3:14b"), m("nomic-embed-text:latest"), m("llava:latest", { type: "Vision" }), m("kimi-k2.6:cloud"), m("online:xai:grok-4", { source: "online", tags: ["Cloud"] })] as any[];
+    const r = recommend(list);
+    expect(["gpt-oss:20b", "qwen3:14b"]).toContain(r.offline!.id);
+    expect(r.offline!.id).toBe("qwen3:14b");
+    expect(["kimi-k2.6:cloud", "online:xai:grok-4"]).toContain(r.online!.id);
+  });
+});
+
+describe("planner picker choices", () => {
+  it("leaves out models that cannot write a plan, and prefers a served model over a raw file", () => {
+    expect(isChatModel({ id: "nomic-embed-text:latest", name: "nomic-embed-text:latest", type: "General" } as any)).toBe(false);
+    expect(isChatModel({ id: "llava:latest", name: "llava:latest", type: "General" } as any)).toBe(false);
+    expect(isChatModel({ id: "qwen3:8b", name: "qwen3:8b", type: "General" } as any)).toBe(true);
+    const file = { id: "qwen3-coder-30b", name: "qwen3-coder-30b", isDownloaded: true, source: "gguf", type: "General", tags: [] };
+    const served = { id: "ollama:qwen3-coder:30b", name: "qwen3-coder:30b", isDownloaded: true, source: "ollama", type: "General", tags: [] };
+    expect(recommend([file, served] as any).offline!.id).toBe("ollama:qwen3-coder:30b");
   });
 });

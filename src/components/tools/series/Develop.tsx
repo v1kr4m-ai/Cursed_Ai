@@ -11,6 +11,7 @@ import { notify } from "../../../lib/notify";
 import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
+import { isChatModel, loadRecords, noteOutcome, rateModel, recommend, TIER_LABEL, tierRank } from "./modelRating";
 import { castInstruction, ensureCast, peopleOf, renamePerson, setSkip, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
@@ -144,12 +145,17 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   // Arriving from "Add the next episode" on the Produce board: bring that card into view.
   React.useEffect(() => { if (focusAdd) setTimeout(() => episodesCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350); }, [focusAdd]);
   const [talkModel, setTalkModel] = React.useState<string>(() => { try { return localStorage.getItem(TALK_MODEL_KEY) || ""; } catch { return ""; } });
-  const ready = (models || []).filter(m => m.isDownloaded);
+  const ready = (models || []).filter(m => m.isDownloaded && isChatModel(m));
   const isOnline = (m: AIModel) => /[:-]cloud$/i.test(m.id) || m.source === "gemini" || !!m.tags?.some(t => /^cloud$/i.test(t));
-  const offline = ready.filter(m => !isOnline(m)).map(m => ({ id: m.id, name: m.name }));
-  const online = ready.filter(isOnline).map(m => ({ id: m.id, name: m.name }));
+  const records = React.useMemo(() => loadRecords(), [models]);
+  const labelOf = (m: AIModel) => `${m.name} - ${TIER_LABEL[rateModel(m, records[m.id]).tier]}`;
+  const offline = ready.filter(m => !isOnline(m)).map(m => ({ id: m.id, name: labelOf(m) }));
+  const online = ready.filter(isOnline).map(m => ({ id: m.id, name: labelOf(m) }));
   const known = [...offline, ...online].some(m => m.id === talkModel);
   const model = known && talkModel ? talkModel : modelId;
+  const rating = rateModel(ready.find(m => m.id === model) || { id: model || "", name: model || "", sizeBytes: undefined }, model ? records[model] : undefined);
+  const better = React.useMemo(() => recommend(ready, records), [models]);
+  const betterThan = (m?: AIModel) => !!m && m.id !== model && tierRank(rateModel(m, records[m.id]).tier) < tierRank(rating.tier);
   const pickModel = (id: string) => { setTalkModel(id); try { localStorage.setItem(TALK_MODEL_KEY, id); } catch { /* storage blocked */ } };
   const [idea, setIdea] = React.useState(project.idea);
   const [title, setTitle] = React.useState(project.title);
@@ -243,10 +249,12 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
     };
     let answer = await ask([]);
     let json: any, problem = "";
+    const who = model || "";
     try { json = tidyPlan(extractJson(answer)); problem = planProblems(json, fmt, peopleOf(project).map(x => x.name)); } catch { problem = "That was not valid JSON. Reply again with ONLY the JSON, starting with the first bracket, no text before or after it, no code fences."; }
-    if (!problem) return json;
+    if (!problem) { noteOutcome(who, "ok"); return json; }
     answer = await ask([{ role: "assistant", content: answer.slice(0, 3000) }, { role: "user", content: problem + " Send the complete corrected JSON again, nothing else." }]);
-    json = tidyPlan(extractJson(answer));
+    try { json = tidyPlan(extractJson(answer)); } catch (e) { noteOutcome(who, "failed"); throw e; }
+    noteOutcome(who, planProblems(json, fmt, peopleOf(project).map(x => x.name)) ? "failed" : "struggled");
     return json;
   }
 
@@ -466,6 +474,17 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           {filling ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} className="text-fuchsia-400" />}
           {filling ? "Filling in the details..." : "Fill the details from our discussion"}
         </button>
+        {(rating.tier === "basic" || rating.tier === "weak") && (
+          <div className="space-y-1.5 rounded-lg border border-amber-700/50 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/90">
+            <div className="font-medium text-amber-200">{model} is a {TIER_LABEL[rating.tier]} planner</div>
+            <div>{rating.note} A plan needs a long, exact answer, so a small model may give empty shots or repeat the examples. It is asked to fix mistakes once, but a bigger model gives better episodes.</div>
+            <div className="flex flex-wrap gap-1.5">
+              {betterThan(better.offline) && <button onClick={() => pickModel(better.offline!.id)} className="rounded-md bg-amber-600/25 px-2.5 py-1 text-amber-100 hover:bg-amber-600/40">Use {better.offline!.name} (offline, {TIER_LABEL[rateModel(better.offline!, records[better.offline!.id]).tier]})</button>}
+              {betterThan(better.online) && <button onClick={() => pickModel(better.online!.id)} className="rounded-md bg-sky-600/25 px-2.5 py-1 text-sky-100 hover:bg-sky-600/40" title="The story and discussion are sent to that company">Use {better.online!.name} (online, {TIER_LABEL[rateModel(better.online!, records[better.online!.id]).tier]})</button>}
+              {!betterThan(better.offline) && !betterThan(better.online) && <span className="text-amber-200/80">No better model is set up yet. Add an online provider in Settings, or pull a larger Ollama model.</span>}
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2 px-1 text-xs text-neutral-400">
           <span>Episodes to write</span>
           <select value={episodeCount} onChange={e => setEpisodeCount(Number(e.target.value))} className="rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
