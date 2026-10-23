@@ -1,6 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus } from "lucide-react";
+import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { SERIES_FORMATS, projectFormat, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { MicStatus } from "../../voice/MicStatus";
@@ -119,9 +119,9 @@ const PHOTO_STYLES: Record<string, string> = {
 const field = "w-full bg-neutral-900/60 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors";
 
 const IDEA_FIELDS = [
-  { key: "logline" as const, icon: Lightbulb, color: "text-amber-400", placeholder: "Logline - what is this series, in one line?" },
-  { key: "audience" as const, icon: Users, color: "text-sky-400", placeholder: "Audience" },
-  { key: "tone" as const, icon: Palette, color: "text-violet-400", placeholder: "Tone (e.g. cold documentary)" },
+  { key: "logline" as const, label: "What is it about?", icon: Lightbulb, color: "text-amber-400", placeholder: "One line is enough, e.g. A creator shares her day, outfits and honest stories" },
+  { key: "audience" as const, label: "Who is it for?", icon: Users, color: "text-sky-400", placeholder: "e.g. young women who love fashion" },
+  { key: "tone" as const, label: "How should it feel?", icon: Palette, color: "text-violet-400", placeholder: "e.g. calm, warm and honest" },
 ];
 
 const FILL_INSTRUCTION = `From our discussion, fill in the series details and reply with JSON only - no commentary.
@@ -140,9 +140,79 @@ const REFUSAL = /^(i'?m sorry|i am sorry|sorry,|i can('|no)?t (assist|help|do th
 
 const TALK_MODEL_KEY = "cursed.series.talkModel";
 
+/** The four steps at the top of Develop: where you are, what is done, and a way to jump. */
+function StepRail({ steps, current, onPick }: { steps: { n: number; label: string; done: boolean }[]; current: number; onPick: (n: number) => void }) {
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+      <div className="flex items-start">
+        {steps.map((s, i) => (
+          <React.Fragment key={s.n}>
+            <button onClick={() => onPick(s.n)} className="flex w-16 shrink-0 flex-col items-center gap-1 text-center" title={s.label}>
+              <span className={"flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition " + (current === s.n ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" : s.done ? "border-emerald-700 bg-emerald-700/20 text-emerald-300" : "border-neutral-700 text-neutral-400")}>{s.done && current !== s.n ? <Check size={13} /> : s.n}</span>
+              <span className={"text-[10px] leading-tight " + (current === s.n ? "text-neutral-100" : "text-neutral-500")}>{s.label}</span>
+            </button>
+            {i < steps.length - 1 && <div className={"mt-3.5 h-px flex-1 " + (s.done ? "bg-emerald-700/60" : "bg-neutral-800")} />}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One step: a numbered header that shows a one-line summary while closed, and the controls while open. */
+function StepCard({ n, title, summary, done, open, onOpen, optional, next, children }: {
+  n: number; title: string; summary: string; done: boolean; open: boolean; onOpen: () => void; optional?: boolean;
+  next?: { label: string; go: () => void }; children: React.ReactNode;
+}) {
+  return (
+    <div className={"overflow-hidden rounded-xl border transition-colors " + (open ? "border-neutral-600 bg-neutral-900/50" : "border-neutral-800 bg-neutral-900/30")}>
+      <button onClick={onOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+        <span className={"flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold " + (done ? "border-emerald-700 bg-emerald-700/20 text-emerald-300" : "border-neutral-600 text-neutral-400")}>{done ? <Check size={12} /> : n}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-neutral-100">{title}{optional && <span className="ml-2 text-[10px] font-normal text-neutral-500">optional</span>}</span>
+          {!open && <span className="block truncate text-[11px] text-neutral-500">{summary}</span>}
+        </span>
+        <ChevronDown size={15} className={"shrink-0 text-neutral-500 transition-transform " + (open ? "rotate-180" : "")} />
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-neutral-800 px-4 pb-4 pt-3">
+          {children}
+          {next && (
+            <button onClick={next.go} className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-600 bg-neutral-800/60 px-4 py-2 text-xs font-medium text-neutral-100 transition hover:bg-neutral-700/70">{next.label} <ChevronRight size={14} /></button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A field with its name above it, so no one has to guess from a placeholder. */
+function Labeled({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <span className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-300">{icon}{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** Things most people never need, tucked away until asked for. */
+function Fold({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="rounded-lg border border-neutral-800">
+      <button onClick={() => setOpen(o => !o)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-neutral-400 hover:text-neutral-200">
+        <ChevronRight size={13} className={"transition-transform " + (open ? "rotate-90" : "")} /> <span className="font-medium">{title}</span>{hint && <span className="truncate text-neutral-600">{hint}</span>}
+      </button>
+      {open && <div className="space-y-3 border-t border-neutral-800 p-3">{children}</div>}
+    </div>
+  );
+}
+
 export function Develop({ project, modelId, models, onSaved, focusAdd }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void; focusAdd?: boolean }) {
   const episodesCard = React.useRef<HTMLDivElement>(null);
   // Arriving from "Add the next episode" on the Produce board: bring that card into view.
+  React.useEffect(() => { if (focusAdd) setStep(4); }, [focusAdd]);
   React.useEffect(() => { if (focusAdd) setTimeout(() => episodesCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350); }, [focusAdd]);
   const [talkModel, setTalkModel] = React.useState<string>(() => { try { return localStorage.getItem(TALK_MODEL_KEY) || ""; } catch { return ""; } });
   const ready = (models || []).filter(m => m.isDownloaded && isChatModel(m));
@@ -176,6 +246,8 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const [showRaw, setShowRaw] = React.useState(false);
   const [showAttach, setShowAttach] = React.useState(false);
   const photosCard = React.useRef<HTMLDivElement>(null);
+  // Four steps, one open at a time. A new series starts at 1, one with a story at 2, one with episodes at 4.
+  const [step, setStep] = React.useState<number>(() => (project.episodes.length ? 4 : project.idea.logline.trim() ? 2 : 1));
   /** Opens the Reference photos card and brings it into view. */
   /** Builds a training dataset from one person's photos, then opens Train LoRA with it chosen and the trigger word filled in. */
   const trainPerson = async (name: string) => {
@@ -191,7 +263,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
       notify({ message: `${name}: dataset ready (${d.total} photos, ${d.added} new). Trigger word ${d.name}.`, tab: "trainlora" });
     } catch (e: any) { notify({ message: e?.message || String(e), kind: "error", tab: "series" }); }
   };
-  const goToPhotos = () => { setShowAttach(true); setTimeout(() => photosCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150); };
+  const goToPhotos = () => { setStep(3); setShowAttach(true); setTimeout(() => photosCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150); };
   const [showStory, setShowStory] = React.useState(true);
   const [digesting, setDigesting] = React.useState<{ name: string; done: number; total: number } | null>(null);
   const [voicePref, setVoicePref] = React.useState(() => savedSetting("voiceEngine", "auto" as const));
@@ -400,43 +472,73 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
     } catch (e: any) { setError(e?.message || String(e)); }
   }
 
+  // One line per step, shown while it is closed.
+  const voiceText = project.voice === "off" ? ", no voice" : project.voice === "on" ? ", she talks" : "";
+  const storySummary = [title.trim() || project.title, idea.logline.trim()].filter(Boolean).join(" - ") || "Start here";
+  const lookSummary = `${fmt.label}${voiceText}`;
+  const photoCount = seriesPhotos(project).length + pendingPhotos.length;
+  const peopleCount = peopleOf(project).length;
+  const photosSummary = photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}${peopleCount ? `, ${peopleCount} ${peopleCount === 1 ? "person" : "people"}` : ""}` : "None added - fine if you have no photos";
+  const planSummary = project.episodes.length ? `${project.episodes.length} episode${project.episodes.length === 1 ? "" : "s"} planned` : "Not written yet";
+  const steps = [
+    { n: 1, label: "Story", done: !!(idea.logline.trim() || project.episodes.length) },
+    { n: 2, label: "Look", done: !!project.format },
+    { n: 3, label: "Photos", done: photoCount > 0 },
+    { n: 4, label: "Episodes", done: project.episodes.length > 0 },
+  ];
+
   return (
     <div className="grid lg:grid-cols-[380px_1fr] gap-4 h-full min-h-0">
       {/* left: the idea, attachments, and the button that turns talk into a plan */}
+      {/* left: four short steps, one open at a time */}
       <div className="space-y-3 overflow-y-auto pr-1">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-neutral-800 bg-gradient-to-b from-neutral-900/70 to-neutral-900/30 p-4 space-y-3"
-        >
-          <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
-            <Lightbulb size={14} className="text-amber-400" /> The idea
-          </h3>
-          <div className="relative">
-            <Type size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 pointer-events-none" />
-            <input className={`${field} pl-8`} placeholder="Series title" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => saveDetails({ title })} />
-          </div>
-          <div className="relative">
-            <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none" />
-            <input className={`${field} pl-8`} placeholder="Niche (e.g. ancient history, true crime)" value={idea.niche || ""} onChange={e => setIdea({ ...idea, niche: e.target.value })} onBlur={() => saveIdea()} />
-          </div>
-          {IDEA_FIELDS.map(({ key, icon: Icon, color, placeholder }) => (
-            <div key={key} className="relative">
-              <Icon size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${color} pointer-events-none`} />
-              <input className={`${field} pl-8`} placeholder={placeholder} value={idea[key]} onChange={e => setIdea({ ...idea, [key]: e.target.value })} onBlur={() => saveIdea()} />
-            </div>
+        <StepRail steps={steps} current={step} onPick={setStep} />
+
+        <StepCard n={1} title="Your story" summary={storySummary} done={!!(idea.logline.trim() || project.episodes.length)} open={step === 1} onOpen={() => setStep(1)}
+          next={{ label: "Next: pick the look", go: () => setStep(2) }}>
+          <p className="text-[11px] leading-relaxed text-neutral-500">Say what the series is about. Fill these in, or talk it through in the chat on the right and press <b>Fill the details from our discussion</b>.</p>
+          <Labeled label="Series title" icon={<Type size={13} className="text-rose-400" />}>
+            <input className={field} placeholder="e.g. Richie's Daily Life" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => saveDetails({ title })} />
+          </Labeled>
+          {IDEA_FIELDS.map(({ key, label, icon: Icon, color, placeholder }) => (
+            <Labeled key={key} label={label} icon={<Icon size={13} className={color} />}>
+              <input className={field} placeholder={placeholder} value={idea[key]} onChange={e => setIdea({ ...idea, [key]: e.target.value })} onBlur={() => saveIdea()} />
+            </Labeled>
           ))}
-          <div className="relative">
-            <Brush size={13} className="absolute left-3 top-3 text-fuchsia-400 pointer-events-none" />
-            <textarea className={`${field} pl-8 h-16 resize-none`} placeholder="Visual style (look, lighting, colour grade)" value={style} onChange={e => setStyle(e.target.value)} onBlur={() => saveDetails({ style })} />
-          </div>
-          <div className="relative">
-            <StickyNote size={13} className="absolute left-3 top-3 text-emerald-400 pointer-events-none" />
-            <textarea className={`${field} pl-8 h-24 resize-none`} placeholder="Constraints, sources, things to avoid" value={idea.notes} onChange={e => setIdea({ ...idea, notes: e.target.value })} onBlur={() => saveIdea()} />
-          </div>
+                  <button onClick={fillFromDiscussion} disabled={filling || busy || !planReady} title={planReady ? "Reads the conversation and fills in the title, niche, style and the rest" : "Talk it through first"}
+          className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900/60 hover:bg-neutral-800/80 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-neutral-100 transition">
+          {filling ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} className="text-fuchsia-400" />}
+          {filling ? "Filling in the details..." : "Fill the details from our discussion"}
+        </button>
+          <Fold title="More details (optional)" hint="subject area, things to avoid, story documents">
+            <Labeled label="Subject area" icon={<Tag size={13} className="text-teal-400" />}>
+              <input className={field} placeholder="e.g. ancient history, true crime, fashion" value={idea.niche || ""} onChange={e => setIdea({ ...idea, niche: e.target.value })} onBlur={() => saveIdea()} />
+            </Labeled>
+            <Labeled label="Rules and things to avoid" icon={<StickyNote size={13} className="text-emerald-400" />}>
+              <textarea className={`${field} h-24 resize-none`} placeholder="e.g. no real brands, keep it family friendly" value={idea.notes} onChange={e => setIdea({ ...idea, notes: e.target.value })} onBlur={() => saveIdea()} />
+            </Labeled>
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+          className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+          <button onClick={() => setShowStory(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
+            <FileText size={14} className="text-violet-400" /> Story material
+            <span className="ml-auto text-[11px] text-neutral-500">{sources.length} attached</span>
+          </button>
+          <AnimatePresence initial={false}>
+            {showStory && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                <StorySources project={project} onChanged={onSaved} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
-        {/* what kind of video: sets how lines are written, spoken and prompted */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
+          </Fold>
+        </StepCard>
+
+        <StepCard n={2} title="Look and voice" summary={lookSummary} done={!!project.format} open={step === 2} onOpen={() => setStep(2)}
+          next={{ label: "Next: add people and photos", go: () => setStep(3) }}>
+          <p className="text-[11px] leading-relaxed text-neutral-500">Pick the kind of video, and whether anyone talks in it.</p>
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
           className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
           <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
             <Clapperboard size={14} className="text-sky-400" /> Video style
@@ -483,111 +585,14 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           </label>
         </motion.div>
 
-        <button onClick={fillFromDiscussion} disabled={filling || busy || !planReady} title={planReady ? "Reads the conversation and fills in the title, niche, style and the rest" : "Talk it through first"}
-          className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900/60 hover:bg-neutral-800/80 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-neutral-100 transition">
-          {filling ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} className="text-fuchsia-400" />}
-          {filling ? "Filling in the details..." : "Fill the details from our discussion"}
-        </button>
-        {(rating.tier === "basic" || rating.tier === "weak") && (
-          <div className="space-y-1.5 rounded-lg border border-amber-700/50 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/90">
-            <div className="font-medium text-amber-200">{model} is a {TIER_LABEL[rating.tier]} planner</div>
-            <div>{rating.note} A plan needs a long, exact answer, so a small model may give empty shots or repeat the examples. It is asked to fix mistakes once, but a bigger model gives better episodes.</div>
-            <div className="flex flex-wrap gap-1.5">
-              {betterThan(better.offline) && <button onClick={() => pickModel(better.offline!.id)} className="rounded-md bg-amber-600/25 px-2.5 py-1 text-amber-100 hover:bg-amber-600/40">Use {better.offline!.name} (offline, {TIER_LABEL[rateModel(better.offline!, records[better.offline!.id]).tier]})</button>}
-              {betterThan(better.online) && <button onClick={() => pickModel(better.online!.id)} className="rounded-md bg-sky-600/25 px-2.5 py-1 text-sky-100 hover:bg-sky-600/40" title="The story and discussion are sent to that company">Use {better.online!.name} (online, {TIER_LABEL[rateModel(better.online!, records[better.online!.id]).tier]})</button>}
-              {!betterThan(better.offline) && !betterThan(better.online) && <span className="text-amber-200/80">No better model is set up yet. Add an online provider in Settings, or pull a larger Ollama model.</span>}
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-2 px-1 text-xs text-neutral-400">
-          <span>Episodes to write</span>
-          <select value={episodeCount} onChange={e => setEpisodeCount(Number(e.target.value))} className="rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
-            <option value={0}>All we discussed</option>
-            {[1, 2, 3, 4, 5, 6, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-        <motion.button
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          whileHover={{ scale: planning || busy || !planReady ? 1 : 1.015 }}
-          whileTap={{ scale: 0.985 }}
-          onClick={buildPlan}
-          title={planBlockedWhy}
-          disabled={planning || busy || !planReady}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-emerald-950/40 transition"
-        >
-          <motion.span animate={planning ? { rotate: 360 } : { rotate: 0 }} transition={planning ? { repeat: Infinity, duration: 1.1, ease: "linear" } : { duration: 0.2 }}>
-            {planning ? <Loader2 size={16} /> : <Sparkles size={16} />}
-          </motion.span>
-          {digesting
-            ? `Reading ${digesting.name} (${digesting.done}/${digesting.total})`
-            : planning ? "Writing the plan..." : "Build the episode plan"}
-        </motion.button>
-        <p className="px-1 text-xs text-neutral-500">
-          {planBlockedWhy || "Turns the story and discussion into episodes, scenes and reference stills. Running it again keeps clips you have already rendered."}
-        </p>
+          <Labeled label="The look (colours, light, camera feel)" icon={<Brush size={13} className="text-fuchsia-400" />}>
+            <textarea className={`${field} h-16 resize-none`} placeholder="e.g. warm natural light, handheld phone footage" value={style} onChange={e => setStyle(e.target.value)} onBlur={() => saveDetails({ style })} />
+          </Labeled>
+        </StepCard>
 
-        {/* the season so far, and the way to add the next episode */}
-        <motion.div ref={episodesCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
-          className={"rounded-xl border bg-neutral-900/40 p-4 space-y-3 " + (focusAdd ? "border-emerald-600/70" : "border-neutral-800")}>
-          <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
-            <Clapperboard size={14} className="text-emerald-400" /> Episodes
-            <span className="ml-auto text-[11px] text-neutral-500">{project.episodes.length} planned</span>
-          </h3>
-          {project.episodes.length === 0 ? (
-            <p className="text-[11px] leading-relaxed text-neutral-500">Nothing planned yet. Build the episode plan above first. After that, this is where you add each next episode.</p>
-          ) : (
-            <>
-              <ol className="space-y-1">
-                {project.episodes.map(e => (
-                  <li key={e.id} className="flex items-center gap-2 rounded-lg bg-neutral-900/60 px-2.5 py-1.5 text-xs text-neutral-300">
-                    <span className="w-5 shrink-0 text-neutral-500">{e.number}</span>
-                    <span className="min-w-0 flex-1 truncate">{e.title}</span>
-                    <span className="shrink-0 text-[10px] text-neutral-600">{e.scenes.filter(sc => sc.status === "done").length}/{e.scenes.length} clips</span>
-                  </li>
-                ))}
-              </ol>
-              <textarea className={field + " h-16 resize-none text-xs"} value={direction} onChange={e => setDirection(e.target.value)} placeholder="Next episode: what should happen? (optional - leave empty to let the model carry on from the last hook)" />
-              <button onClick={addNextEpisode} disabled={addingNext || planning || busy}
-                className="w-full flex items-center justify-center gap-2 rounded-lg border border-emerald-700/60 bg-emerald-600/15 hover:bg-emerald-600/25 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-emerald-100 transition">
-                {addingNext ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-                {addingNext ? "Writing the episode..." : "Write episode " + ((project.episodes[project.episodes.length - 1]?.number || 0) + 1)}
-              </button>
-              <p className="text-[11px] leading-relaxed text-neutral-500">Adds one more episode after the last one, using the story so far. Nothing already rendered is touched. Then open Produce to render its stills and clips.</p>
-            </>
-          )}
-        </motion.div>
-
-        <AnimatePresence>
-          {digesting && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden rounded-lg border border-violet-900/60 bg-violet-950/30 p-3">
-              <div className="text-[11px] text-violet-200">Summarising "{digesting.name}" so the whole story reaches the planner</div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded bg-neutral-800">
-                <motion.div className="h-full rounded bg-gradient-to-r from-violet-500 to-fuchsia-400"
-                  animate={{ width: `${digesting.total ? (digesting.done / digesting.total) * 100 : 0}%` }} transition={{ ease: "linear" }} />
-              </div>
-              <div className="mt-1 text-[10px] text-neutral-500">Done once per document - the summary is saved with the project.</div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
-          className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
-          <button onClick={() => setShowStory(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
-            <FileText size={14} className="text-violet-400" /> Story material
-            <span className="ml-auto text-[11px] text-neutral-500">{sources.length} attached</span>
-          </button>
-          <AnimatePresence initial={false}>
-            {showStory && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                <StorySources project={project} onChanged={onSaved} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* reference photos: attached once, used by every episode, scene and still */}
-        <motion.div ref={photosCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+        <StepCard n={3} title="People and photos" optional summary={photosSummary} done={seriesPhotos(project).length > 0} open={step === 3} onOpen={() => setStep(3)}
+          next={{ label: seriesPhotos(project).length ? "Next: write the episodes" : "Skip: no photos", go: () => setStep(4) }}>
+                  <motion.div ref={photosCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
           <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
             <ImagePlus size={14} className="text-pink-400" /> Reference photos
             <span className="ml-auto text-[11px] text-neutral-500">{seriesPhotos(project).length + pendingPhotos.length} attached</span>
@@ -642,10 +647,105 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           <WorkflowCheck project={project} onChanged={onSaved} />
         </motion.div>
 
-        <button onClick={() => setShowRaw(s => !s)} className="w-full text-center text-[11px] text-neutral-600 hover:text-neutral-300 transition">
+        </StepCard>
+
+        <StepCard n={4} title="Write the episodes" summary={planSummary} done={project.episodes.length > 0} open={step === 4} onOpen={() => setStep(4)}>
+          <div className="space-y-1">
+            <div className="text-[11px] text-neutral-500">Written by</div>
+            <select value={known ? talkModel : ""} onChange={e => pickModel(e.target.value)} className="w-full rounded-lg border border-neutral-700 bg-transparent px-2 py-1.5 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
+              <option value="">App's selected model</option>
+              {offline.length > 0 && <optgroup label="Offline (on this PC)">{offline.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
+              {online.length > 0 && <optgroup label="Online">{online.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
+            </select>
+          </div>
+                  {(rating.tier === "basic" || rating.tier === "weak") && (
+          <div className="space-y-1.5 rounded-lg border border-amber-700/50 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/90">
+            <div className="font-medium text-amber-200">{model} is a {TIER_LABEL[rating.tier]} planner</div>
+            <div>{rating.note} A plan needs a long, exact answer, so a small model may give empty shots or repeat the examples. It is asked to fix mistakes once, but a bigger model gives better episodes.</div>
+            <div className="flex flex-wrap gap-1.5">
+              {betterThan(better.offline) && <button onClick={() => pickModel(better.offline!.id)} className="rounded-md bg-amber-600/25 px-2.5 py-1 text-amber-100 hover:bg-amber-600/40">Use {better.offline!.name} (offline, {TIER_LABEL[rateModel(better.offline!, records[better.offline!.id]).tier]})</button>}
+              {betterThan(better.online) && <button onClick={() => pickModel(better.online!.id)} className="rounded-md bg-sky-600/25 px-2.5 py-1 text-sky-100 hover:bg-sky-600/40" title="The story and discussion are sent to that company">Use {better.online!.name} (online, {TIER_LABEL[rateModel(better.online!, records[better.online!.id]).tier]})</button>}
+              {!betterThan(better.offline) && !betterThan(better.online) && <span className="text-amber-200/80">No better model is set up yet. Add an online provider in Settings, or pull a larger Ollama model.</span>}
+            </div>
+          </div>
+        )}
+                  <div className="flex items-center gap-2 px-1 text-xs text-neutral-400">
+          <span>Episodes to write</span>
+          <select value={episodeCount} onChange={e => setEpisodeCount(Number(e.target.value))} className="rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
+            <option value={0}>All we discussed</option>
+            {[1, 2, 3, 4, 5, 6, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+                  <motion.button
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          whileHover={{ scale: planning || busy || !planReady ? 1 : 1.015 }}
+          whileTap={{ scale: 0.985 }}
+          onClick={buildPlan}
+          title={planBlockedWhy}
+          disabled={planning || busy || !planReady}
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-emerald-950/40 transition"
+        >
+          <motion.span animate={planning ? { rotate: 360 } : { rotate: 0 }} transition={planning ? { repeat: Infinity, duration: 1.1, ease: "linear" } : { duration: 0.2 }}>
+            {planning ? <Loader2 size={16} /> : <Sparkles size={16} />}
+          </motion.span>
+          {digesting
+            ? `Reading ${digesting.name} (${digesting.done}/${digesting.total})`
+            : planning ? "Writing the plan..." : "Build the episode plan"}
+        </motion.button>
+                  <p className="px-1 text-xs text-neutral-500">
+          {planBlockedWhy || "Turns the story and discussion into episodes, scenes and reference stills. Running it again keeps clips you have already rendered."}
+        </p>
+
+                  <AnimatePresence>
+          {digesting && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden rounded-lg border border-violet-900/60 bg-violet-950/30 p-3">
+              <div className="text-[11px] text-violet-200">Summarising "{digesting.name}" so the whole story reaches the planner</div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded bg-neutral-800">
+                <motion.div className="h-full rounded bg-gradient-to-r from-violet-500 to-fuchsia-400"
+                  animate={{ width: `${digesting.total ? (digesting.done / digesting.total) * 100 : 0}%` }} transition={{ ease: "linear" }} />
+              </div>
+              <div className="mt-1 text-[10px] text-neutral-500">Done once per document - the summary is saved with the project.</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+                  {/* the season so far, and the way to add the next episode */}
+        <motion.div ref={episodesCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
+          className={"rounded-xl border bg-neutral-900/40 p-4 space-y-3 " + (focusAdd ? "border-emerald-600/70" : "border-neutral-800")}>
+          <h3 className="flex items-center gap-2 text-sm font-medium text-neutral-200">
+            <Clapperboard size={14} className="text-emerald-400" /> Episodes
+            <span className="ml-auto text-[11px] text-neutral-500">{project.episodes.length} planned</span>
+          </h3>
+          {project.episodes.length === 0 ? (
+            <p className="text-[11px] leading-relaxed text-neutral-500">Nothing planned yet. Build the episode plan above first. After that, this is where you add each next episode.</p>
+          ) : (
+            <>
+              <ol className="space-y-1">
+                {project.episodes.map(e => (
+                  <li key={e.id} className="flex items-center gap-2 rounded-lg bg-neutral-900/60 px-2.5 py-1.5 text-xs text-neutral-300">
+                    <span className="w-5 shrink-0 text-neutral-500">{e.number}</span>
+                    <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                    <span className="shrink-0 text-[10px] text-neutral-600">{e.scenes.filter(sc => sc.status === "done").length}/{e.scenes.length} clips</span>
+                  </li>
+                ))}
+              </ol>
+              <textarea className={field + " h-16 resize-none text-xs"} value={direction} onChange={e => setDirection(e.target.value)} placeholder="Next episode: what should happen? (optional - leave empty to let the model carry on from the last hook)" />
+              <button onClick={addNextEpisode} disabled={addingNext || planning || busy}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-emerald-700/60 bg-emerald-600/15 hover:bg-emerald-600/25 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-emerald-100 transition">
+                {addingNext ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                {addingNext ? "Writing the episode..." : "Write episode " + ((project.episodes[project.episodes.length - 1]?.number || 0) + 1)}
+              </button>
+              <p className="text-[11px] leading-relaxed text-neutral-500">Adds one more episode after the last one, using the story so far. Nothing already rendered is touched. Then open Produce to render its stills and clips.</p>
+            </>
+          )}
+        </motion.div>
+
+          <Fold title="Advanced" hint="paste or fix the plan by hand">
+                    <button onClick={() => setShowRaw(s => !s)} className="w-full text-center text-[11px] text-neutral-600 hover:text-neutral-300 transition">
           {showRaw ? "Hide" : "Advanced:"} plan JSON (only needed if the model's plan could not be read)
         </button>
-        <AnimatePresence>
+                    <AnimatePresence>
           {showRaw && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-2 overflow-hidden">
               <textarea className={`${field} h-48 font-mono text-xs`} value={rawPlan} onChange={e => setRawPlan(e.target.value)} placeholder="Paste a plan JSON array here if the model's answer needs fixing." />
@@ -654,13 +754,15 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           )}
         </AnimatePresence>
 
-        <AnimatePresence>
+          </Fold>
+                  <AnimatePresence>
           {error && (
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-lg border border-rose-800/60 bg-rose-950/40 p-3 text-xs text-rose-200">
               {error}
             </motion.div>
           )}
         </AnimatePresence>
+        </StepCard>
       </div>
 
       {/* right: the conversation */}
