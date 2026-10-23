@@ -77,6 +77,8 @@ Nothing is mocked: every control in the UI talks to a real backend, and anything
 
 **Phone & other devices:** the server listens on the whole network so a phone on the same Wi-Fi can open the studio, so **Settings -> General -> Phone & other devices** puts an access code in front of it. Requests from this PC are never asked; any other device needs the six-digit code (typed once on a login page, or sent by the Android app) and then keeps a cookie. The card shows the code, the addresses to open (copy buttons), a **New code** button that signs every phone out, a switch that blocks all other devices, and the one-line Windows firewall command to allow the port on private networks. Wrong codes are slowed (five misses lock that address for a minute) and only this PC can change the settings.
 
+**Series Assemble summary bar:** the top of Assemble says how many episodes are rendered and joined, what to do next, and has **Join N ready episodes** to join every fully rendered one in a single press.
+
 **Series scenes show their pictures:** every scene card in Produce lists the pictures it is made from ("uses" chips with a thumbnail, in order), marked *(photo)* for your own attached photos, *(not made yet)* for a generated picture that is still missing, and struck through when skipped - so you can see at a glance that a scene is using your photo.
 
 **Series backup buttons:** each series tile has an archive icon (shown on hover, beside the bin) that zips the series into a folder you pick, with or without the rendered clips and exports; **Import a series backup...** under *Start a new series* opens a backup zip as a new series (paths fixed, unsafe zips refused) and opens it.

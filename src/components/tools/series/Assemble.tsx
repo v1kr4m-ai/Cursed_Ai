@@ -197,11 +197,31 @@ export function Assemble({ project, onChanged }: { project: Project; onChanged: 
   // Rows start folded (the first one open when there is only a handful); the choice is remembered.
   const [openIds, setOpenIds] = React.useState<string[]>(() => readOpen() ?? (project.episodes.length <= 1 ? project.episodes.map(e => e.id) : []));
   const setOpen = (ids: string[]) => { setOpenIds(ids); try { localStorage.setItem(OPEN_KEY, JSON.stringify(ids)); } catch { /* storage blocked */ } };
+  const [joining, setJoining] = React.useState("");
   if (!project.episodes.length) {
     return <div className="grid place-items-center h-full text-sm text-neutral-500">Nothing to assemble yet.</div>;
   }
+  const eps = project.episodes;
+  const rendered = eps.filter(e => e.scenes.length > 0 && e.scenes.every(sc => sc.status === "done" && sc.clipPath));
+  const joinable = rendered.filter(e => !e.exportPath);
+  const joined = eps.filter(e => !!e.exportPath);
+  const joinAll = async () => {
+    try {
+      for (const [i, e] of joinable.entries()) { setJoining(`Joining ${i + 1} of ${joinable.length}...`); await api.stitch(project.id, e.id); }
+      onChanged(await api.get(project.id));
+    } catch (err: any) { notifyError(err?.message || String(err), "series"); }
+    finally { setJoining(""); }
+  };
+  const next = rendered.length < eps.length ? `${eps.length - rendered.length} episode${eps.length - rendered.length === 1 ? " is" : "s are"} not fully rendered yet - finish them in Produce.` : joinable.length ? `${joinable.length} episode${joinable.length === 1 ? " is" : "s are"} ready to join.` : joined.length === eps.length ? "All joined. Add subtitles or music per episode, then export at the bottom." : "";
   return (
     <div className="h-full overflow-y-auto space-y-3 pr-1">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-neutral-100">{rendered.length} of {eps.length} rendered - {joined.length} joined</div>
+          <div className="text-[11px] text-neutral-500">{next}</div>
+        </div>
+        {joinable.length > 0 && <button onClick={joinAll} disabled={!!joining} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-60">{joining ? <Loader2 size={13} className="animate-spin" /> : <Scissors size={13} />}{joining || `Join ${joinable.length} ready episode${joinable.length === 1 ? "" : "s"}`}</button>}
+      </div>
       <p className="text-xs text-neutral-500">
         Scenes are normalised to {project.settings.width}x{project.settings.height} at {project.settings.fps} fps before joining, so clips rendered at different sizes still cut together.
       </p>
