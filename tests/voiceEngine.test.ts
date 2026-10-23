@@ -26,3 +26,15 @@ describe("resolveEngine", () => {
     expect(resolveEngine("whisper")).toBe("whisper");
   });
 });
+
+describe("voiceOfflineNotice", () => {
+  it("shows one short popup, however many times voice drops to offline", async () => {
+    const sent: any[] = [];
+    vi.stubGlobal("window", { dispatchEvent: (e: any) => sent.push(e.detail) });
+    vi.stubGlobal("CustomEvent", class { detail: any; constructor(_t: string, o: any) { this.detail = o.detail; } });
+    const { voiceOfflineNotice } = await import("../src/services/voiceEngine");
+    voiceOfflineNotice(); voiceOfflineNotice(); voiceOfflineNotice();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ message: "No internet - using offline voice.", kind: "warning" });
+  });
+});

@@ -1,4 +1,5 @@
 import { LocalVoiceRecorder } from "./localVoice";
+import { notifyWarning } from "../lib/notify";
 
 export type VoiceEnginePref = "auto" | "browser" | "whisper";
 
@@ -14,6 +15,14 @@ export function resolveEngine(pref: VoiceEnginePref | undefined, browserFailed =
   if (pref === "whisper") return "whisper";
   const canUseBrowser = browserSpeechAvailable() && navigator.onLine && !browserFailed;
   return canUseBrowser ? "browser" : "whisper";
+}
+
+let lastOfflineNotice = 0;
+/** The one short popup shown when voice drops to the offline model; repeats within a minute are swallowed so a flaky connection cannot flood the screen. */
+export function voiceOfflineNotice() {
+  if (Date.now() - lastOfflineNotice < 60_000) return;
+  lastOfflineNotice = Date.now();
+  notifyWarning("No internet - using offline voice.");
 }
 
 /** Can this device capture speech at all (either way)? */

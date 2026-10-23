@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { LocalVoiceRecorder } from "../../services/localVoice";
-import { resolveEngine, isOnline, micBlockedReason } from "../../services/voiceEngine";
+import { resolveEngine, micBlockedReason, voiceOfflineNotice } from "../../services/voiceEngine";
 import { MicModeButton } from "./MicModeButton";
 import { notify } from "../../lib/notify";
 import { notifyError } from "../../lib/notify";
@@ -42,6 +42,14 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
   onOpenStudioRef.current = onOpenStudio;
   const lastStudioRef = useRef<{ kind: StudioKind; at: number } | null>(null);
   const [browserFailed, setBrowserFailed] = useState(false);
+  const [, setNetTick] = useState(0); // re-render when the connection changes, so the engine choice follows it
+  useEffect(() => {
+    const back = () => { setBrowserFailed(false); setNetTick(n => n + 1); };  // internet is back: prefer the online recognizer again
+    const gone = () => { if (settingsRef.current.voiceEngine !== "whisper") voiceOfflineNotice(); setNetTick(n => n + 1); };
+    window.addEventListener("online", back);
+    window.addEventListener("offline", gone);
+    return () => { window.removeEventListener("online", back); window.removeEventListener("offline", gone); };
+  }, []);
   const usingWhisper = resolveEngine(settings.voiceEngine, browserFailed) === "whisper";
   const [level, setLevel] = useState(0);              // microphone loudness while listening offline
   const [transcribing, setTranscribing] = useState(false);
@@ -283,10 +291,9 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     };
     rec.onerror = (e: any) => {
       if (e.error === "no-speech" || e.error === "aborted") return; // normal silence
-      if (e.error === "network") {  // no internet: carry on with the offline model
+      if (e.error === "network") {  // no internet: switching the engine restarts listening on the offline model (see the usingWhisper effect)
+        voiceOfflineNotice();
         setBrowserFailed(true);
-        setError("No internet for browser speech - switched to the offline voice model.");
-        if (activeRef.current) setTimeout(() => startListeningRef.current(), 100);
         return;
       }
       setError(ERROR_TEXT[e.error] || `Speech recognition error: ${e.error}`);
@@ -308,7 +315,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     };
     recognitionRef.current = rec;
     return () => {
-      activeRef.current = false;
+      // Not activeRef=false here: this also runs when the engine switches, and the conversation must carry on; the unmount effect below ends it.
       rec.onend = null; rec.onresult = null; rec.onerror = null;
       try { rec.abort(); } catch {}
       recognitionRef.current = null;
@@ -349,7 +356,6 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     if (blocked && !activeRef.current) { setError(blocked); return; }
     if (activeRef.current) return stopAll();
     activeRef.current = true;
-    if (isOnline()) setBrowserFailed(false); // internet is back: use the online recognizer again
     startListening();
   };
 

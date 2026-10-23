@@ -39,7 +39,7 @@ import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
 import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
-import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speechErrorText } from "../../services/voiceEngine";
+import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speechErrorText, voiceOfflineNotice } from "../../services/voiceEngine";
 import { MicModeButton } from "../voice/MicModeButton";
 import { MicStatus, micPhase } from "../voice/MicStatus";
 import { cn } from "@/lib/utils";
@@ -222,7 +222,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       const code = e?.error || "unknown";
       if (code === "aborted") return;
       // No internet (or the browser's speech service is down): switch to the offline model and carry on.
-      if (code === "network" || code === "service-not-allowed") { notifyWarning(speechErrorText("network")); setBrowserSpeechFailed(true); startWhisperDictation(); return; }
+      if (code === "network" || code === "service-not-allowed") { voiceOfflineNotice(); setBrowserSpeechFailed(true); startWhisperDictation(); return; }
       notifyError(speechErrorText(code));
     };
     dictationRef.current = recognition;

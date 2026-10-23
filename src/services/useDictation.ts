@@ -8,8 +8,8 @@
  */
 import React from "react";
 import { LocalVoiceRecorder } from "./localVoice";
-import { isOnline, micBlockedReason, resolveEngine, speechErrorText, speechInputAvailable, type VoiceEnginePref } from "./voiceEngine";
-import { notifyError, notifyWarning } from "../lib/notify";
+import { isOnline, micBlockedReason, resolveEngine, speechErrorText, speechInputAvailable, voiceOfflineNotice, type VoiceEnginePref } from "./voiceEngine";
+import { notifyError } from "../lib/notify";
 import { micPhase, type MicPhase } from "../components/voice/MicStatus";
 
 export interface Dictation {
@@ -113,7 +113,7 @@ export function useDictation(value: string, onText: (next: string) => void, pref
       if (code === "aborted") return;
       // No internet, or the browser's speech service is down: fall back to the offline model.
       if (code === "network" || code === "service-not-allowed") {
-        notifyWarning(speechErrorText("network"));
+        voiceOfflineNotice();
         setBrowserFailed(true);
         startWhisper();
         return;
