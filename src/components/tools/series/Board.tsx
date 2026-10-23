@@ -189,6 +189,17 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
             {scene.durationS && <span className="text-[11px] text-neutral-500">{scene.durationS.toFixed(2)}s</span>}
           </div>
           <div className="mt-1 line-clamp-2 text-sm text-neutral-200">{scene.vo || <span className="text-neutral-600">No {fmt.lineLabel.toLowerCase()} yet</span>}</div>
+          {draft.refIds.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1" title="The pictures this scene is made from, in order">
+              <span className="text-[10px] text-neutral-600">uses</span>
+              {draft.refIds.map(id => episode.refs.find(r => r.id === id)).filter((r): r is Ref => !!r).map(r => (
+                <span key={r.id} className={"flex items-center gap-1 rounded-full border border-neutral-700 py-0.5 pl-0.5 pr-2 text-[10px] " + (r.skip ? "text-neutral-600 line-through" : "text-neutral-300")}>
+                  {r.file ? <img src={fileUrl(r.file)} alt="" className="h-4 w-4 rounded-full object-cover" /> : <span className="h-4 w-4 rounded-full bg-neutral-700" />}
+                  {r.person || r.name}{r.file && !r.prompt.trim() ? " (photo)" : !r.file ? " (not made yet)" : ""}
+                </span>
+              ))}
+            </div>
+          )}
         </button>
         <motion.button whileTap={{ scale: 0.9 }} onClick={() => api.generateScene(project.id, scene.id)}
           className="rounded-md border border-neutral-700 p-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white"
