@@ -6,6 +6,7 @@ import { registerSubtitles } from "./seriesTool/subtitles";
 import { registerExport } from "./seriesTool/exportEpisodes";
 import { registerFinish } from "./seriesTool/finish";
 import { registerTemplates } from "./seriesTool/templates";
+import { registerBackup } from "./seriesTool/backup";
 import { registerComfyLogs } from "./comfyLogs";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
@@ -1702,6 +1703,7 @@ async function startServer() {
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
+  registerBackup(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),
