@@ -289,7 +289,12 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
 }
 
 export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpenSettings }: { project: Project; onChanged: (p: Project) => void; focusEpisodeId?: string | null; onAddEpisode?: () => void; onOpenSettings?: () => void }) {
-  const [openEpisode, setOpenEpisode] = React.useState<string | null>(focusEpisodeId || project.episodes[0]?.id || null);
+  // Opens where the work is: the episode you came for, else the first one with clips still to make.
+  const [openEpisode, setOpenEpisode] = React.useState<string | null>(focusEpisodeId || (project.episodes.find(e => e.scenes.some(sc => sc.status !== "done")) || project.episodes[0])?.id || null);
+  const [onlyTodo, setOnlyTodo] = React.useState(false);
+  const allScenes = project.episodes.flatMap(e => e.scenes), allRefs = project.episodes.flatMap(e => e.refs);
+  const scenesLeft = allScenes.filter(sc => sc.status !== "done").length, refsLeft = allRefs.filter(r => r.status !== "done" && !r.skip && (r.prompt || "").trim()).length;
+  const failed = allScenes.filter(sc => sc.status === "failed").length + allRefs.filter(r => r.status === "failed").length;
   React.useEffect(() => { if (focusEpisodeId) setOpenEpisode(focusEpisodeId); }, [focusEpisodeId]);
   const running = project.running || null;
 
@@ -329,6 +334,17 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
       </AnimatePresence>
 
       <WorkflowCheck project={project} onChanged={onChanged} onOpenSettings={onOpenSettings} />
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-neutral-100">{scenesLeft === 0 && refsLeft === 0 ? "Everything is rendered" : `${scenesLeft} clip${scenesLeft === 1 ? "" : "s"} and ${refsLeft} picture${refsLeft === 1 ? "" : "s"} left to make`}</div>
+          <div className="text-[11px] text-neutral-500">{allScenes.length - scenesLeft} of {allScenes.length} clips done{failed ? ` - ${failed} failed (open the episode and press render again)` : ""}. {scenesLeft === 0 && refsLeft === 0 ? "Next: join the episodes in Assemble." : "Pictures are made first, then the clips."}</div>
+        </div>
+        <label className="flex items-center gap-1.5 text-[11px] text-neutral-400"><input type="checkbox" checked={onlyTodo} onChange={e => setOnlyTodo(e.target.checked)} /> only what needs work</label>
+        <button onClick={() => setOpenEpisode(openEpisode ? null : project.episodes[0].id)} className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-[11px] text-neutral-300 hover:bg-neutral-800">{openEpisode ? "Fold all" : "Open first"}</button>
+        {(scenesLeft > 0 || refsLeft > 0) && !running && (
+          <button onClick={async () => { for (const ep of project.episodes) if (ep.scenes.some(sc => sc.status !== "done") || ep.refs.some(r => r.status !== "done" && (r.prompt || "").trim())) { try { await api.generateEpisode(project.id, ep.id); } catch { break; } } }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500" title="Queue every picture and clip that is still missing, episode by episode">Render everything missing</button>
+        )}
+      </div>
       {onAddEpisode && (
         <button onClick={onAddEpisode} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-700/60 bg-emerald-600/10 px-3 py-2.5 text-sm text-emerald-200 transition hover:bg-emerald-600/20">
           <Plus size={15} /> Add the next episode (episode {(project.episodes[project.episodes.length - 1]?.number || 0) + 1})
@@ -381,8 +397,9 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                       <RefDrop project={project} episodeId={ep.id} onChanged={onChanged} compact />
                     </div>
                     <div className="space-y-2">
-                      <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">Scenes</h4>
-                      {[...ep.scenes].sort((a, b) => a.number - b.number).map(s => (
+                      <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">Scenes{onlyTodo ? " that need work" : ""}</h4>
+                      {onlyTodo && !ep.scenes.some(s => s.status !== "done") && <p className="text-xs text-emerald-300">All clips of this episode are done.</p>}
+                      {[...ep.scenes].sort((a, b) => a.number - b.number).filter(s => !onlyTodo || s.status !== "done").map(s => (
                         <SceneCard key={s.id} project={project} episode={ep} scene={s} running={running} onChanged={onChanged} />
                       ))}
                     </div>
