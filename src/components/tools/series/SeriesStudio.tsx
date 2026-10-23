@@ -1,7 +1,7 @@
 import React from "react";
 import { WorkflowPicker, WorkflowCheck } from "./WorkflowPicker";
 import { motion, AnimatePresence } from "motion/react";
-import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles } from "lucide-react";
+import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles, Archive } from "lucide-react";
 import { api, fileUrl, type Project, type ProjectSummary, type SeriesTemplate } from "./api";
 import "./series-theme.css";
 import { Ring, Tile, TileBoard, PageTitle, type TileDef } from "./DashKit";
@@ -9,6 +9,8 @@ import { Develop } from "./Develop";
 import { Board } from "./Board";
 import { Assemble } from "./Assemble";
 import { ProjectDashboard } from "./ProjectDashboard";
+import { nativeFolder } from "../../comfy/types";
+import { notify } from "../../../lib/notify";
 import type { AIModel } from "../../../types";
 
 /**
@@ -68,6 +70,29 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
       setTitle(""); onOpen(p.id);
     } catch (e: any) { setError(e?.message || String(e)); }
   }
+  /** Zips a series into a folder you pick. */
+  async function backUp(p: ProjectSummary) {
+    const withClips = confirm(`Back up "${p.title}".
+
+OK: include the rendered clips and exports (bigger file).
+Cancel: story, plan and pictures only (small; clips can be rendered again).`);
+    const dest = await nativeFolder();
+    if (!dest) return;
+    try {
+      const r = await api.backup(p.id, dest, withClips);
+      notify({ message: `Backup saved: ${r.file} (${(r.bytes / 1048576).toFixed(1)} MB)`, tab: "series" });
+    } catch (e: any) { setError(e?.message || String(e)); }
+  }
+  /** Brings a backup zip back as a new series. */
+  async function importOne() {
+    try {
+      const { path } = await api.pickBackup();
+      if (!path) return;
+      const r = await api.importBackup(path);
+      notify({ message: `Imported "${r.title}" (${r.episodes} episodes)`, tab: "series" });
+      refresh(); onOpen(r.id);
+    } catch (e: any) { setError(e?.message || String(e)); }
+  }
   async function remove(id: string, name: string) {
     if (!confirm(`Delete "${name}" and everything rendered in it? This cannot be undone.`)) return;
     await api.remove(id);
@@ -112,6 +137,7 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
             <motion.button whileHover={{ scale: title.trim() ? 1.03 : 1 }} whileTap={{ scale: 0.97 }} onClick={create} disabled={!title.trim()}
               className="flex shrink-0 items-center gap-2 rounded-full bg-zinc-900 text-white px-4 py-2 text-xs font-semibold shadow-lg disabled:opacity-40"><Plus size={14} /> Start a series</motion.button>
           </div>
+          <button onClick={importOne} className="mt-3 text-[11px] underline opacity-60 hover:opacity-100" title="Pick a series backup (.zip) made on this or another PC">Import a series backup...</button>
         </Tile>
 
 
@@ -150,6 +176,7 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
                   </div>
                 )}
                 <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); remove(p.id, p.title); }} className="absolute right-4 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Delete series"><Trash2 size={14} /></span>
+                <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); backUp(p); }} className="absolute right-10 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Back up this series to a zip"><Archive size={14} /></span>
               </Tile>
             </React.Fragment>
           );
