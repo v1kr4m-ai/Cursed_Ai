@@ -492,9 +492,9 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
       {/* left: the idea, attachments, and the button that turns talk into a plan */}
       {/* left: four short steps, one open at a time */}
       <div className="space-y-3 overflow-y-auto pr-1">
-        <StepRail steps={steps} current={step} onPick={setStep} />
+        <StepRail steps={steps} current={step} onPick={n => setStep(step === n ? 0 : n)} />
 
-        <StepCard n={1} title="Your story" summary={storySummary} done={!!(idea.logline.trim() || project.episodes.length)} open={step === 1} onOpen={() => setStep(1)}
+        <StepCard n={1} title="Your story" summary={storySummary} done={!!(idea.logline.trim() || project.episodes.length)} open={step === 1} onOpen={() => setStep(step === 1 ? 0 : 1)}
           next={{ label: "Next: pick the look", go: () => setStep(2) }}>
           <p className="text-[11px] leading-relaxed text-neutral-500">Say what the series is about. Fill these in, or talk it through in the chat on the right and press <b>Fill the details from our discussion</b>.</p>
           <Labeled label="Series title" icon={<Type size={13} className="text-rose-400" />}>
@@ -535,7 +535,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           </Fold>
         </StepCard>
 
-        <StepCard n={2} title="Look and voice" summary={lookSummary} done={!!project.format} open={step === 2} onOpen={() => setStep(2)}
+        <StepCard n={2} title="Look and voice" summary={lookSummary} done={!!project.format} open={step === 2} onOpen={() => setStep(step === 2 ? 0 : 2)}
           next={{ label: "Next: add people and photos", go: () => setStep(3) }}>
           <p className="text-[11px] leading-relaxed text-neutral-500">Pick the kind of video, and whether anyone talks in it.</p>
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
@@ -590,7 +590,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           </Labeled>
         </StepCard>
 
-        <StepCard n={3} title="People and photos" optional summary={photosSummary} done={seriesPhotos(project).length > 0} open={step === 3} onOpen={() => setStep(3)}
+        <StepCard n={3} title="People and photos" optional summary={photosSummary} done={seriesPhotos(project).length > 0} open={step === 3} onOpen={() => setStep(step === 3 ? 0 : 3)}
           next={{ label: seriesPhotos(project).length ? "Next: write the episodes" : "Skip: no photos", go: () => setStep(4) }}>
                   <motion.div ref={photosCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
           <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
@@ -649,7 +649,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
 
         </StepCard>
 
-        <StepCard n={4} title="Write the episodes" summary={planSummary} done={project.episodes.length > 0} open={step === 4} onOpen={() => setStep(4)}>
+        <StepCard n={4} title="Write the episodes" summary={planSummary} done={project.episodes.length > 0} open={step === 4} onOpen={() => setStep(step === 4 ? 0 : 4)}>
           <div className="space-y-1">
             <div className="text-[11px] text-neutral-500">Written by</div>
             <select value={known ? talkModel : ""} onChange={e => pickModel(e.target.value)} className="w-full rounded-lg border border-neutral-700 bg-transparent px-2 py-1.5 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
