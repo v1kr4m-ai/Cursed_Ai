@@ -350,6 +350,23 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     res.json({ ollama: models.filter(m => !/embed/i.test(m)), vision: models.filter(m => VISION_HINT.test(m)), gemini: !!opts.geminiKey() });
   });
 
+  /** One new pair from the passage an existing pair came from (used for "regenerate" and "add another" on a row). */
+  app.post("/api/train/pairs/one", async (req, res) => {
+    const ctx = String(req.body?.ctx || "");
+    const modelValue = String(req.body?.model || "");
+    if (!ctx.trim()) return bad(res, 400, "This example has no source passage to write from.");
+    if (!modelValue) return bad(res, 400, "Choose the model that writes the pairs.");
+    const sep = modelValue.indexOf("::");
+    const provider = sep < 0 ? "ollama" : modelValue.slice(0, sep);
+    const model = sep < 0 ? modelValue : modelValue.slice(sep + 2);
+    const avoid = Array.isArray(req.body?.avoid) ? req.body.avoid.map(String) : [];
+    try {
+      const r = await pairsFromChunk(provider, model, ctx, 1, String(req.body?.topic || ""), { ollamaUrl: opts.ollamaUrl, geminiKey: opts.geminiKey() }, avoid);
+      if (!r.kept.length) return bad(res, 422, "The model could not write a new pair from that passage.");
+      res.json({ example: { ...r.kept[0], source: String(req.body?.source || ""), ctx } });
+    } catch (e: any) { bad(res, 500, e?.message || String(e)); }
+  });
+
   app.post("/api/train/pairs/start", (req, res) => {
     if (isRunning("pairs")) return bad(res, 409, "Pairs are already being generated.");
     const sources: Source[] = Array.isArray(req.body?.sources) ? req.body.sources : [];
@@ -379,7 +396,8 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
           ctx.progress(Math.round((i / chunks.length) * 100), `chunk ${i + 1}/${chunks.length} of ${s.label}`);
           try {
             const r = await pairsFromChunk(provider, model, chunks[i], count, topic, { ollamaUrl: opts.ollamaUrl, geminiKey: opts.geminiKey() });
-            examples.push(...r.kept); rejected += r.rejected;
+            // Each pair remembers its source and the passage it came from, so a single row can be redone later.
+            examples.push(...r.kept.map(p => ({ ...p, source: s.label, ctx: chunks[i] }))); rejected += r.rejected;
             ctx.log(`  chunk ${i + 1}/${chunks.length}: +${r.kept.length}${r.rejected ? ` (${r.rejected} filtered as filler)` : ""} - total ${examples.length}`);
           } catch (e: any) { ctx.log(`  chunk ${i + 1}/${chunks.length} failed: ${e.message}`); }
         }

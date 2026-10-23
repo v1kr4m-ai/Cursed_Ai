@@ -61,10 +61,11 @@ export function finishPairs(raw: any[]): { kept: Pair[]; rejected: number } {
   return { kept, rejected: cleaned.length - kept.length };
 }
 
-export function buildPairPrompt(o: { count: number; topic?: string; chunk: string }): string {
+export function buildPairPrompt(o: { count: number; topic?: string; chunk: string; avoid?: string[] }): string {
+  const avoid = (o.avoid || []).filter(Boolean).slice(0, 30);
   return `You are building a fine-tuning dataset from a real source document. Read the SOURCE TEXT below and write up to ${o.count} distinct instruction/response training pairs using ONLY facts, figures, steps, or explanations actually present in it${o.topic ? ` (topic: ${o.topic})` : ""}.
 
-Rules:
+Rules:${avoid.length ? `\n- These questions already exist, so write DIFFERENT ones (other facts or other wording):\n${avoid.map(a => `  * ${a}`).join("\n")}` : ""}
 - Every answer must contain the actual information (numbers, names, steps, definitions) from the source - never describe the source itself (never write things like "as mentioned in the document" or "the text discusses X" as the answer).
 - If the source text below is too short, garbled, or lacking real content to write genuine pairs from, respond with an empty array [] instead of inventing filler.
 - Respond with ONLY a JSON array, no commentary, no markdown fences, in this exact shape:
@@ -76,8 +77,8 @@ ${o.chunk}`;
 
 export interface Providers { ollamaUrl: string; geminiKey?: string }
 
-export async function pairsFromChunk(provider: string, model: string, chunk: string, count: number, topic: string, env: Providers): Promise<{ kept: Pair[]; rejected: number }> {
-  const prompt = buildPairPrompt({ count, topic, chunk });
+export async function pairsFromChunk(provider: string, model: string, chunk: string, count: number, topic: string, env: Providers, avoid?: string[]): Promise<{ kept: Pair[]; rejected: number }> {
+  const prompt = buildPairPrompt({ count, topic, chunk, avoid });
   if (provider === "gemini") {
     if (!env.geminiKey) throw new Error("No Gemini key - add one in Settings > Integrations.");
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model || "gemini-2.5-flash")}:generateContent`, {

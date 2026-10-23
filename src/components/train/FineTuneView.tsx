@@ -1,15 +1,19 @@
 import React from "react";
-import { ArrowRight, BookOpen, Check, Cloud, Download, FileText, GraduationCap, Globe, ImagePlus, Link2, Loader2, Play, Plus, Settings2, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Cloud, Download, FileText, GraduationCap, Globe, ImagePlus, Link2, Loader2, Play, Plus, RefreshCw, Settings2, Sparkles, Trash2, Upload } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, useJob, useTrainStatus } from "./trainApi";
 import { GuideButton, FineTuneGuide } from "./Guide";
 import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField } from "./ui";
 
 type Tab = "dataset" | "train";
-interface Example { instruction: string; input: string; output: string }
+/** source = which material it came from; ctx = the passage it was written from (kept so one row can be redone). Neither is saved into the .jsonl. */
+interface Example { instruction: string; input: string; output: string; source?: string; ctx?: string }
 interface Source { type: "pdf" | "docx" | "image" | "url" | "text"; value: string; label: string }
 
 const KEY = "cursed.finetune";
+const LIST_KEY = "cursed.finetune.work";
+/** The sources and the unsaved pairs survive a refresh. */
+const loadWork = (): { sources: Source[]; examples: Example[] } => { try { const w = JSON.parse(localStorage.getItem(LIST_KEY) || "{}"); return { sources: Array.isArray(w.sources) ? w.sources : [], examples: Array.isArray(w.examples) ? w.examples : [] }; } catch { return { sources: [], examples: [] }; } };
 interface Form {
   baseModelDir: string; datasetFile: string; outputDir: string; rank: number; alpha: number; epochs: number; learningRate: string; batchSize: number; maxSeqLength: number; exportGguf: boolean; ollamaName: string;
   pairModel: string; visionModel: string; count: number; topic: string; fileName: string;
@@ -46,8 +50,10 @@ export function FineTuneView() {
   const [tab, setTab] = React.useState<Tab>("dataset");
   const [f, setF] = React.useState<Form>(load);
   const set = (patch: Partial<Form>) => setF(prev => { const n = { ...prev, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch { /* storage blocked */ } return n; });
-  const [sources, setSources] = React.useState<Source[]>([]);
-  const [examples, setExamples] = React.useState<Example[]>([]);
+  const [sources, setSources] = React.useState<Source[]>(() => loadWork().sources);
+  const [examples, setExamples] = React.useState<Example[]>(() => loadWork().examples);
+  const [busyRow, setBusyRow] = React.useState<number | null>(null);
+  React.useEffect(() => { try { localStorage.setItem(LIST_KEY, JSON.stringify({ sources, examples })); } catch { /* storage full or blocked: the work just will not survive a refresh */ } }, [sources, examples]);
   const [hand, setHand] = React.useState<Example>({ instruction: "", input: "", output: "" });
   const [url, setUrl] = React.useState("");
   const [pasted, setPasted] = React.useState("");
@@ -117,6 +123,16 @@ export function FineTuneView() {
   const openDataset = (p: string) => guard(async () => { const r = await api<{ examples: Example[] }>("/api/train/llm/dataset/load", { path: p }); setExamples(r.examples); set({ fileName: p.split(/[\\/]/).pop()!.replace(/\.jsonl$/i, "") }); });
   const saveDataset = () => guard(async () => { const r = await api<{ file: string; count: number }>("/api/train/llm/dataset/save", { fileName: f.fileName, examples }); set({ datasetFile: r.file }); notify({ message: `Saved ${r.count} examples - ready to train on`, tab: "finetune" }); reload(); });
   const edit = (i: number, patch: Partial<Example>) => setExamples(l => l.map((e, j) => (j === i ? { ...e, ...patch } : e)));
+  /** Ask the pair model for a new pair from the same passage as row i: replace the row ("redo") or put it underneath ("more"). */
+  const another = (i: number, mode: "redo" | "more") => guard(async () => {
+    const row = examples[i];
+    setBusyRow(i);
+    try {
+      const sameCtx = examples.filter(e => e.ctx === row.ctx).map(e => e.instruction);
+      const r = await api<{ example: Example }>("/api/train/pairs/one", { model: f.pairModel, ctx: row.ctx, source: row.source, topic: f.topic, avoid: sameCtx });
+      setExamples(l => mode === "redo" ? l.map((e, j) => (j === i ? r.example : e)) : [...l.slice(0, i + 1), r.example, ...l.slice(i + 1)]);
+    } finally { setBusyRow(null); }
+  });
 
   const sourceIcon = (t: Source["type"]) => t === "image" ? <ImagePlus size={14} /> : t === "url" ? <Globe size={14} /> : <FileText size={14} />;
   const pairOptions = [...pairModels.ollama.map(m => ({ value: "ollama::" + m, label: m + (/cloud/.test(m) ? " (online)" : " (offline)") })), ...(pairModels.gemini ? [{ value: "gemini::gemini-2.5-flash", label: "Gemini 2.5 Flash (online)" }, { value: "gemini::gemini-2.5-pro", label: "Gemini 2.5 Pro (online)" }] : [])];
@@ -203,10 +219,20 @@ export function FineTuneView() {
                 {!examples.length ? <p className="text-xs text-zinc-600">No examples yet - write some above, import a file, or build them from your material.</p> : (
                   <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
                     {examples.map((e, i) => (
-                      <div key={i} className="grid gap-2 rounded-xl border border-white/5 p-2.5 md:grid-cols-[1fr_1.4fr_auto]">
-                        <textarea value={e.instruction} onChange={ev => edit(i, { instruction: ev.target.value })} rows={2} className={inputCls + " resize-none text-xs"} />
-                        <textarea value={e.output} onChange={ev => edit(i, { output: ev.target.value })} rows={2} className={inputCls + " resize-none text-xs"} />
-                        <button onClick={() => setExamples(l => l.filter((_, j) => j !== i))} title="Delete" className="self-start p-2 text-zinc-600 hover:text-rose-400"><Trash2 size={14} /></button>
+                      <div key={i} className="rounded-xl border border-white/5 p-2.5">
+                        <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_auto]">
+                          <textarea value={e.instruction} onChange={ev => edit(i, { instruction: ev.target.value })} rows={2} placeholder="Instruction" className={inputCls + " resize-none text-xs"} />
+                          <textarea value={e.input} onChange={ev => edit(i, { input: ev.target.value })} rows={2} placeholder="Input (optional)" className={inputCls + " resize-none text-xs"} />
+                          <textarea value={e.output} onChange={ev => edit(i, { output: ev.target.value })} rows={2} placeholder="Output" className={inputCls + " resize-none text-xs"} />
+                          <div className="flex flex-col items-center">
+                            {busyRow === i ? <Loader2 size={14} className="m-2 animate-spin text-zinc-500" /> : <>
+                              <button onClick={() => another(i, "redo")} disabled={!e.ctx || !f.pairModel || busyRow !== null} title={e.ctx ? "Write this pair again from the same passage" : "Only pairs written from material can be redone"} className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-30"><RefreshCw size={14} /></button>
+                              <button onClick={() => another(i, "more")} disabled={!e.ctx || !f.pairModel || busyRow !== null} title={e.ctx ? "Add another, different pair from the same passage" : "Only pairs written from material can be extended"} className="p-1.5 text-zinc-600 hover:text-white disabled:opacity-30"><Plus size={14} /></button>
+                            </>}
+                            <button onClick={() => setExamples(l => l.filter((_, j) => j !== i))} title="Delete" className="p-1.5 text-zinc-600 hover:text-rose-400"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                        <p className="mt-1 truncate text-[10px] text-zinc-600">{e.source ? `From: ${e.source}` : "Written or imported by hand"}</p>
                       </div>
                     ))}
                   </div>
