@@ -210,7 +210,7 @@ describe("several people", () => {
   it("finds the people and gives each a still made only from their own photos", () => {
     const p = world();
     expect(peopleOf(p).map(x => x.name)).toEqual(["Ann", "Bo"]);
-    const eps = ensureCast(p);
+    const eps = ensureCast({ ...p, stillPeople: ["Ann", "Bo"] } as Project);
     const stills = eps[0].refs.filter(r => r.prompt && r.kind === "person");
     expect(stills.map(r => r.person)).toEqual(["Ann", "Bo"]);
     expect(stills[0].fromRefIds).toEqual(["a1", "a2"]);
@@ -218,14 +218,25 @@ describe("several people", () => {
   });
 
   it("puts a scene's cast in its picture list, style first, and leaves out the people who are not in it", () => {
-    const eps = ensureCast(world());
+    const eps = ensureCast({ ...world(), stillPeople: ["Ann", "Bo"] } as Project);
     const names = (i: number) => eps[0].scenes[i].refIds.map(id => eps[0].refs.find(r => r.id === id)!.name);
     expect(names(0)).toEqual(["style_plate", "Ann", "Bo"]);
     expect(names(1)).toEqual(["style_plate", "Bo"]);
   });
 
+  it("uses a person's own photo as it is unless a generated picture was asked for, and drops a picture the planner invented for them", () => {
+    const w = world();
+    const invented = { id: "inv", name: "Ann", role: "character" as const, kind: "person", prompt: "a woman", negative: "", seed: 1, file: null, status: "pending" as const, error: null };
+    const ep = { ...w.episodes[0], refs: [...w.episodes[0].refs, invented] };
+    ep.scenes = ep.scenes.map(sc => ({ ...sc, refIds: ["s", "inv"] }));
+    const eps = ensureCast({ ...w, episodes: [ep] } as Project);
+    expect(eps[0].refs.filter(r => r.prompt && r.kind === "person").length).toBe(1);
+    const names = eps[0].scenes[0].refIds.map(id => eps[0].refs.find(r => r.id === id)!.name);
+    expect(names).toEqual(["style_plate", "Ann photo", "Bo photo"]);
+  });
+
   it("says who is who when two people share a shot, and leaves skipped pictures out", () => {
-    const eps = ensureCast(world());
+    const eps = ensureCast({ ...world(), stillPeople: ["Ann", "Bo"] } as Project);
     const project = { ...world(), episodes: eps } as Project;
     const prompt = buildScenePrompt(project as unknown as Project, eps[0] as any, eps[0].scenes[0] as any);
     expect(prompt).toContain("2 different people");

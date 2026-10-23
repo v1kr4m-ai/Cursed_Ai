@@ -235,7 +235,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
                     {people.map(person => {
                       const on = (draft.cast || []).some(n => n.toLowerCase() === person.name.toLowerCase());
                       return (
-                        <button key={person.name} onClick={() => { const cast = on ? (draft.cast || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()) : [...(draft.cast || []), person.name]; save({ cast, refIds: placeCast(episode, { ...draft, cast }, people).refIds }); }}
+                        <button key={person.name} onClick={() => { const cast = on ? (draft.cast || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()) : [...(draft.cast || []), person.name]; save({ cast, refIds: placeCast(episode, { ...draft, cast }, people, project.stillPeople).refIds }); }}
                           className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${on ? "border-emerald-600 bg-emerald-600/20 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}>{person.name}</button>
                       );
                     })}

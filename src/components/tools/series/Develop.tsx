@@ -12,7 +12,7 @@ import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
 import { isChatModel, loadRecords, noteOutcome, rateModel, recommend, TIER_LABEL, tierRank } from "./modelRating";
-import { castInstruction, ensureCast, peopleOf, renamePerson, setSkip, type Person } from "./people";
+import { castInstruction, ensureCast, peopleOf, renamePerson, setSkip, wantsStill, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
@@ -43,14 +43,19 @@ ${cast ? "" : `,
     ]
   }`;
 
-function rulesFor(fmt: SeriesFormat, people: Person[]) {
+/** Scenes asked for in one answer; longer episodes are written in parts so a small model never has to send a huge reply. */
+const PART = 10;
+/** How many clips an episode needs to last `seconds`; the old fixed length (8) when nothing was chosen. */
+const sceneTarget = (project: Project) => (project.episodeSeconds ? Math.max(2, Math.round(project.episodeSeconds / Math.max(1, project.settings.seconds || 7))) : 8);
+
+function rulesFor(fmt: SeriesFormat, people: Person[], scenes = 8) {
   const lineRule = fmt.speech === "none"
     ? `- The "vo" line is only a short note (${fmt.lineWords} words) for the editor: nothing is spoken in the clip.`
     : `- Every "vo" line is ${fmt.lineWords} words: it is ${fmt.speech === "voiceover" ? "spoken over" : fmt.speech === "sung" ? "sung during" : "said on camera in"} one short clip.`;
   return `Video style: ${fmt.label}. ${fmt.plan}
 Rules:
 - Every episode gets exactly one ref with role "style" named "style_plate", listed first in every scene's refs.
-- 8 scenes per episode unless we agreed otherwise.
+${scenes > PART ? `- Each episode will have ${scenes} scenes in all. Write only the first ${PART} now; the rest are asked for next, so leave the episode open and do not wrap it up yet.` : `- ${scenes} scenes per episode.`}
 ${lineRule}
 - A good shot looks like this (do not copy it, write your own for every scene): "${fmt.shotExample}". The "vo" is: ${fmt.lineHint}
 - Every scene needs a real, specific "shot" (what the camera sees and what the person does) and a real "vo". Never leave them empty and never repeat the same text in two fields.
@@ -62,7 +67,7 @@ ${people.length ? castInstruction(people) : `- If a person must look exactly lik
 }
 
 /** Asks for the whole plan: every episode of the season, or exactly `count` of them. */
-function planInstruction(fmt: SeriesFormat, count: number, people: Person[]) {
+function planInstruction(fmt: SeriesFormat, count: number, people: Person[], scenes = 8) {
   return `Turn our discussion into a production plan and reply with JSON only - no commentary, no code fences.
 ${count > 0 ? `Write exactly ${count} episode${count > 1 ? "s" : ""}.` : "Write every episode we discussed."}
 
@@ -71,11 +76,11 @@ Shape - a JSON array of episodes:
   ${episodeShape(people.length > 0)}
 ]
 
-${rulesFor(fmt, people)}`;
+${rulesFor(fmt, people, scenes)}`;
 }
 
 /** Asks for one more episode that carries on from the ones already planned. */
-function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[]) {
+function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[], scenes = 8) {
   const number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
   const recap = project.episodes.map(e => `Episode ${e.number} "${e.title}" (${e.era || "no period"}): ${e.scenes.slice(0, 2).map(sc => sc.vo).filter(Boolean).join(" / ")}${e.hookOut ? ` - ends with: ${e.hookOut}` : ""}`).join("\n");
   return `Write the NEXT episode, number ${number}, and reply with JSON only - no commentary, no code fences.
@@ -89,7 +94,7 @@ ${direction.trim() ? `What I want in this episode: ${direction.trim()}
 Shape - one JSON object (a single episode, not an array):
 ${episodeShape(people.length > 0).replace('"number": 1', `"number": ${number}`)}
 
-${rulesFor(fmt, people)}`;
+${rulesFor(fmt, people, scenes)}`;
 }
 
 /** The plan the page already holds, written back in the shape the planner uses, so one more episode can be added without losing renders. */
@@ -236,6 +241,7 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const [streaming, setStreaming] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [planning, setPlanning] = React.useState(false);
+  const [partNote, setPartNote] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [rawPlan, setRawPlan] = React.useState("");
   const [episodeCount, setEpisodeCount] = React.useState(0);
@@ -247,6 +253,13 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const [showAttach, setShowAttach] = React.useState(false);
   const photosCard = React.useRef<HTMLDivElement>(null);
   // Four steps, one open at a time. A new series starts at 1, one with a story at 2, one with episodes at 4.
+  // The steps and the chat share the width: drag the bar between them (double-click resets, arrow keys nudge).
+  const WIDTH_KEY = "cursed.series.developWidth";
+  const [leftW, setLeftW] = React.useState<number>(() => { try { const v = Number(localStorage.getItem(WIDTH_KEY)); return Number.isFinite(v) && v >= 300 ? v : 380; } catch { return 380; } });
+  const layoutRef = React.useRef<HTMLDivElement>(null);
+  const clampW = (w: number) => Math.round(Math.min(Math.max(300, w), Math.max(300, (layoutRef.current?.clientWidth || 1200) - 240)));
+  const saveW = (w: number) => { const c = clampW(w); setLeftW(c); try { localStorage.setItem(WIDTH_KEY, String(c)); } catch { /* storage blocked */ } };
+  const dragFrom = React.useRef<{ x: number; w: number } | null>(null);
   const [step, setStep] = React.useState<number>(() => (project.episodes.length ? 4 : project.idea.logline.trim() ? 2 : 1));
   /** Opens the Reference photos card and brings it into view. */
   /** Builds a training dataset from one person's photos, then opens Train LoRA with it chosen and the trigger word filled in. */
@@ -283,7 +296,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
   const systemPrompt =
     `You are helping plan a short-form video series for YouTube Shorts / Reels. ` +
     `Video style: ${projectFormat(project).label} - ${projectFormat(project).blurb} ` +
-    `Each episode is about eight 7-second vertical clips with one ${projectFormat(project).lineLabel.toLowerCase()} line each. ` +
+    `Each episode is about ${sceneTarget(project)} ${project.settings.seconds || 7}-second vertical clips with one ${projectFormat(project).lineLabel.toLowerCase()} line each. ` +
     `Idea: ${idea.logline || "(not stated yet)"}. Audience: ${idea.audience || "general"}. Tone: ${idea.tone || "documentary"}. ` +
     `Notes: ${idea.notes || "none"}. ` +
     `You are a creative writing partner for the user's own fictional video series, so help with scripts, scenes and outlines whenever asked. ` +
@@ -351,6 +364,29 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
     onSaved(JSON.stringify(episodes) !== JSON.stringify(synced.project.episodes) ? await api.patch(project.id, { episodes }) : synced.project);
   }
 
+  /** An episode asked for in parts: keeps asking for the next scenes until it has as many as the length chosen. */
+  async function extendScenes(base: { role: string; content: string }[], list: any[]) {
+    const target = sceneTarget(project);
+    if (target <= PART) return list;
+    for (const ep of list) {
+      if (!Array.isArray(ep?.scenes)) continue;
+      for (let round = 0; round < 12 && ep.scenes.length < target; round++) {
+        const have = ep.scenes.length, upto = Math.min(have + PART, target);
+        setPartNote(`Episode ${ep.number}: scenes ${have + 1}-${upto} of ${target}`);
+        const recent = ep.scenes.slice(-3).map((sc: any) => `${sc.number}. ${sc.shot} | ${sc.vo}`).join("\n");
+        const ask = `Episode ${ep.number} "${ep.title}" has ${have} scenes so far. The last ones:\n${recent}\n\nWrite scenes ${have + 1} to ${upto} of ${target}, carrying on from there, and reply with a JSON array of scene objects only (same shape as before, numbered from ${have + 1}, no commentary, no code fences). ${upto === target ? "These are the last scenes: bring the episode to its closing beat." : "Do not wrap up the episode yet."} Each scene needs its own real shot and line. Ref names must come from: ${(ep.refs || []).map((r: any) => r.name).join(", ")}.`;
+        let more: any;
+        try { more = tidyPlan(extractJson(await askModel([...base, { role: "assistant", content: JSON.stringify(list).slice(0, 4000) }, { role: "user", content: ask }], model))); } catch { break; }
+        const arr = Array.isArray(more) ? more : Array.isArray(more?.scenes) ? more.scenes : null;
+        const fresh = (arr || []).filter((sc: any) => sc && typeof sc === "object" && String(sc.shot || "").trim());
+        if (!fresh.length) break;
+        fresh.slice(0, upto - have).forEach((sc: any, i: number) => ep.scenes.push({ ...sc, number: have + i + 1 }));
+      }
+    }
+    setPartNote("");
+    return list;
+  }
+
   /** Writes episode N+1 from what is already planned and adds it, leaving every rendered clip alone. */
   async function addNextEpisode() {
     setAddingNext(true);
@@ -363,10 +399,11 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
 ${(s.digest || s.text).slice(0, 12000)}` })),
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction, peopleOf(project)), a => setRawPlan(a));
+      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction, peopleOf(project), sceneTarget(project)), a => setRawPlan(a));
       const next = Array.isArray(got) ? got[0] : got;
       if (!next || typeof next !== "object" || !Array.isArray(next.scenes)) throw new Error("The model did not write an episode with scenes.");
       next.number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
+      await extendScenes(base, [next]);
       const planned = await api.savePlan(project.id, [...planJson(project), next], true);
       await finishPlan(planned, []);
       setDirection("");
@@ -414,10 +451,11 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         ...storyBlocks,
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project)), a => setRawPlan(a));
+      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project), sceneTarget(project)), a => setRawPlan(a));
       // Asked for one episode, a model often sends the episode itself rather than a list of one.
       const list = Array.isArray(episodes) ? episodes : Array.isArray(episodes?.episodes) ? episodes.episodes : episodes && typeof episodes === "object" && Array.isArray(episodes.scenes) ? [episodes] : null;
       if (!list) throw new Error("The plan must be a list of episodes.");
+      await extendScenes(base, list);
       // Photos picked before the plan existed are attached now, and every episode gets the series photos.
       const planned = await api.savePlan(project.id, list);
       await finishPlan(planned, pendingPhotos);
@@ -488,7 +526,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
   ];
 
   return (
-    <div className="grid lg:grid-cols-[380px_1fr] gap-4 h-full min-h-0">
+    <div ref={layoutRef} style={{ ["--left" as any]: `${leftW}px` }} className="grid grid-cols-1 gap-4 lg:grid-cols-[var(--left)_14px_minmax(0,1fr)] lg:gap-0 h-full min-h-0">
       {/* left: the idea, attachments, and the button that turns talk into a plan */}
       {/* left: four short steps, one open at a time */}
       <div className="space-y-3 overflow-y-auto pr-1">
@@ -635,10 +673,11 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                 <div key={person.name} className="flex items-center gap-2 text-xs text-neutral-300">
                   <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
                   <span className="shrink-0 text-[10px] text-neutral-500">{person.photos.length} photo{person.photos.length === 1 ? "" : "s"}</span>
+                  <label className="flex shrink-0 items-center gap-1 text-[10px] text-neutral-400" title="Off: this person appears as their own photo, used as it is. On: ComfyUI first makes a new picture from the photos and the scenes use that."><input type="checkbox" checked={wantsStill(project, person.name)} onChange={async e => { const stillPeople = e.target.checked ? [...(project.stillPeople || []), person.name] : (project.stillPeople || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()); const next = { ...project, stillPeople }; onSaved(await api.patch(project.id, { stillPeople, episodes: ensureCast(next) })); }} />make a picture</label>
                   <button onClick={() => trainPerson(person.name)} title="Build a LoRA dataset from this person's photos and open Train LoRA with their trigger word" className="shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-[10px] text-neutral-300 hover:border-violet-500 hover:text-violet-200">Train a LoRA</button>
                 </div>
               ))}
-              <p className="text-[10px] leading-relaxed text-neutral-600">Each person gets a picture made only from their own photos. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
+              <p className="text-[10px] leading-relaxed text-neutral-600">Each person appears as their own photo, used as it is. Tick "make a picture" only if you want ComfyUI to make a new picture of them first. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
             </div>
           )}
           {project.episodes.length > 1 && seriesPhotos(project).length > 0 && (
@@ -675,7 +714,13 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <option value={0}>All we discussed</option>
             {[1, 2, 3, 4, 5, 6, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
+          <span className="ml-2">each about</span>
+          <select value={project.episodeSeconds || 0} onChange={async e => onSaved(await api.patch(project.id, { episodeSeconds: Number(e.target.value) || undefined }))} className="rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black" title="How long each finished episode should run. Longer episodes are written in parts of 10 scenes.">
+            <option value={0}>1 minute (8 clips)</option>
+            {[[30, "30 seconds"], [120, "2 minutes"], [180, "3 minutes"], [300, "5 minutes"], [600, "10 minutes"]].map(([sec, label]) => <option key={sec} value={sec}>{label} ({Math.max(2, Math.round(Number(sec) / Math.max(1, project.settings.seconds || 7)))} clips)</option>)}
+          </select>
         </div>
+        {partNote && <div className="px-1 text-[11px] text-sky-300">Writing {partNote}...</div>}
                   <motion.button
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           whileHover={{ scale: planning || busy || !planReady ? 1 : 1.015 }}
@@ -763,6 +808,17 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           )}
         </AnimatePresence>
         </StepCard>
+      </div>
+
+      {/* the bar between the steps and the chat */}
+      <div role="separator" aria-orientation="vertical" aria-label="Resize the steps and the chat" tabIndex={0} title="Drag to resize. Double-click to reset."
+        className="group hidden cursor-col-resize items-center justify-center lg:flex touch-none select-none focus:outline-none"
+        onPointerDown={e => { dragFrom.current = { x: e.clientX, w: leftW }; (e.target as HTMLElement).setPointerCapture(e.pointerId); }}
+        onPointerMove={e => { if (dragFrom.current) setLeftW(clampW(dragFrom.current.w + e.clientX - dragFrom.current.x)); }}
+        onPointerUp={e => { if (dragFrom.current) { saveW(dragFrom.current.w + e.clientX - dragFrom.current.x); dragFrom.current = null; } }}
+        onDoubleClick={() => saveW(380)}
+        onKeyDown={e => { if (e.key === "ArrowLeft") { e.preventDefault(); saveW(leftW - 40); } else if (e.key === "ArrowRight") { e.preventDefault(); saveW(leftW + 40); } }}>
+        <div className="h-16 w-1 rounded-full bg-neutral-700 transition-colors group-hover:bg-sky-500 group-focus:bg-sky-500" />
       </div>
 
       {/* right: the conversation */}

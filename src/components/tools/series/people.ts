@@ -7,6 +7,7 @@ import type { Episode, Project, Ref, Scene } from "./api";
 import { kindOf } from "../../../../seriesTool/refKinds";
 
 const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+const mentions = (text: string, name: string) => text.toLowerCase().split(/[^a-z0-9']+/).includes(name.trim().toLowerCase());
 const isPhoto = (r: Ref) => !!r.file && !r.prompt.trim();
 const newId = () => Math.random().toString(36).slice(2, 10);
 
@@ -32,6 +33,9 @@ export function castInstruction(people: Person[]): string {
     + `Do not write a ref for the people: each person's picture is added automatically. Write only the style_plate, plus refs for places, products or outfits if a scene needs them.`;
 }
 
+/** Whether a person gets a generated still. By default a person is their own photo, used as it is. */
+export const wantsStill = (project: Pick<Project, "stillPeople">, name: string) => (project.stillPeople || []).some(n => same(n, name));
+
 /** The still that stands for a person in an episode: a generated character ref, not an attached photo. */
 const stillOf = (ep: Episode, name: string) => ep.refs.find(r => !!r.prompt.trim() && kindOf(r) === "person" && (same(r.person, name) || same(r.name, name)));
 
@@ -48,23 +52,35 @@ export function ensureCast(project: Project): Episode[] {
   return project.episodes.map(ep => {
     let refs = ep.refs.map(r => ({ ...r }));
     for (const person of people) {
+      if (!wantsStill(project, person.name)) continue;
       const photos = refs.filter(r => isPhoto(r) && same(r.person, person.name) && kindOf(r) === "person");
       const still = refs.find(r => !!r.prompt.trim() && kindOf(r) === "person" && (same(r.person, person.name) || same(r.name, person.name)));
       if (still) { still.person = person.name; if (!still.fromRefIds?.length && photos.length) still.fromRefIds = photos.map(p => p.id); }
       else if (photos.length) refs.push({ id: newId(), name: person.name, role: "character", kind: "person", person: person.name, prompt: DEFAULT_STILL, negative: DEFAULT_NEGATIVE, seed: Math.floor(Math.random() * 100000), fromRefIds: photos.map(p => p.id), file: null, status: "pending", error: null });
     }
     const draft: Episode = { ...ep, refs };
-    const scenes = ep.scenes.map(sc => placeCast(draft, sc, people));
+    // A plan written before anyone was named has no cast: read it from the picture the planner invented or the name in the shot.
+    const castOf = (sc: Scene) => {
+      if (sc.cast?.length) return sc;
+      const named = people.filter(x => sc.refIds.some(id => same(refs.find(r => r.id === id)?.name, x.name)) || mentions(`${sc.shot} ${sc.vo}`, x.name)).map(x => x.name);
+      return named.length ? { ...sc, cast: named } : sc;
+    };
+    const scenes = ep.scenes.map(sc => placeCast(draft, castOf(sc), people, project.stillPeople));
     return { ...draft, scenes };
   });
 }
 
 /** One scene's picture list from its cast. */
-export function placeCast(ep: Episode, scene: Scene, people: Person[]): Scene {
+export function placeCast(ep: Episode, scene: Scene, people: Person[], stills: string[] = []): Scene {
   const cast = (scene.cast || []).filter(n => people.some(p => same(p.name, n)));
   if (!cast.length) return scene;
-  const isPersonRef = (r: Ref) => kindOf(r) === "person" && !!r.person;
-  const mine = cast.map(n => stillOf(ep, n) || ep.refs.find(r => isPhoto(r) && same(r.person, n))).filter((r): r is Ref => !!r);
+  // A picture the planner invented for a named person ("Richie") counts as that person, so it never sits next to their photo.
+  const isPersonRef = (r: Ref) => kindOf(r) === "person" && (!!r.person || people.some(x => same(x.name, r.name)));
+  // A person is their own photo unless they were asked to have a generated still.
+  const mine = cast.map(n => {
+    const photo = ep.refs.find(r => isPhoto(r) && same(r.person, n) && !r.skip) || ep.refs.find(r => isPhoto(r) && same(r.person, n));
+    return stills.some(s => same(s, n)) ? stillOf(ep, n) || photo : photo || stillOf(ep, n);
+  }).filter((r): r is Ref => !!r);
   // Every named person is replaced by this scene's cast; pictures that belong to nobody (style, outfit, place) stay where they were.
   const keep = scene.refIds.map(id => ep.refs.find(r => r.id === id)).filter((r): r is Ref => !!r && !isPersonRef(r));
   const style = keep.filter(r => r.role === "style");

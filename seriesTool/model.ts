@@ -139,6 +139,10 @@ export interface Project {
   voice?: VoiceMode;
   /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
   allowTextCards?: boolean;
+  /** People who get a picture generated from their photos. Everyone else appears as their own photo, used as it is. */
+  stillPeople?: string[];
+  /** How long each episode should run, in seconds. Missing means eight clips. */
+  episodeSeconds?: number;
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {

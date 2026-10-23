@@ -60,6 +60,8 @@ export interface Project {
   voice?: "auto" | "off" | "on";
   /** Burn each scene's text card into the picture. Off by default. */
   allowTextCards?: boolean;
+  stillPeople?: string[];
+  episodeSeconds?: number;
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;
 }
 
