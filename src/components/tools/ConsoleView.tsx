@@ -1,6 +1,7 @@
 import React from "react";
 import { Terminal, Trash2, Pause, Play } from "lucide-react";
 import { LogLine } from "../../types";
+import { ComfyConsole } from "./ComfyConsole";
 
 const LEVEL_COLOR: Record<string, string> = {
   log: "text-zinc-400",
@@ -12,6 +13,7 @@ const LEVEL_COLOR: Record<string, string> = {
 export function ConsoleView() {
   const [lines, setLines] = React.useState<LogLine[]>([]);
   const [paused, setPaused] = React.useState(false);
+  const [source, setSource] = React.useState<"app" | "comfy">("app");
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const linesRef = React.useRef<LogLine[]>([]);
 
@@ -60,9 +62,14 @@ export function ConsoleView() {
               <Terminal className="text-emerald-500" size={32} />
               Console
             </h1>
-            <p className="text-zinc-500 text-sm font-medium uppercase tracking-[0.2em]">Live server log • Real, not simulated</p>
+            <p className="text-zinc-500 text-sm font-medium uppercase tracking-[0.2em]">{source === "app" ? "Live server log • Real, not simulated" : "ComfyUI's own console • Live"}</p>
+            <div className="mt-4 flex gap-1.5">
+              {([["app", "App"], ["comfy", "ComfyUI"]] as const).map(([id, label]) => (
+                <button key={id} onClick={() => setSource(id)} className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${source === id ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>{label}</button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-3">
+          <div className={source === "app" ? "flex gap-3" : "hidden"}>
             <button
               onClick={() => setPaused(p => !p)}
               className="glass px-4 py-2.5 rounded-xl border-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
@@ -79,7 +86,8 @@ export function ConsoleView() {
           </div>
         </header>
 
-        <div className="flex-1 glass rounded-[2rem] border-white/5 overflow-hidden flex flex-col">
+        {source === "comfy" && <ComfyConsole />}
+        <div className={source === "app" ? "flex-1 glass rounded-[2rem] border-white/5 overflow-hidden flex flex-col" : "hidden"}>
           <div className="flex-1 overflow-y-auto p-6 font-mono text-xs space-y-1.5">
             {lines.length === 0 && (
               <p className="text-zinc-600 text-center py-20">No log lines yet — do something (send a chat message, load a model) and it'll show up here.</p>
