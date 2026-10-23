@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AIModel, AppSettings, Message, MessageRole } from "../../types";
 import { AIService } from "../../services/aiService";
 import { LocalVoiceRecorder } from "../../services/localVoice";
+import { holdOpen } from "../../services/voicePause";
 import { resolveEngine, micBlockedReason, voiceOfflineNotice } from "../../services/voiceEngine";
 import { MicModeButton } from "./MicModeButton";
 import { notify } from "../../lib/notify";
@@ -313,6 +314,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
         setTimeout(() => { if (activeRef.current && stateRef.current === "listening") { try { rec.start(); } catch {} } }, 200);
       }
     };
+    holdOpen(rec); // a pause to think does not end your turn; the length is set in Settings > Voice
     recognitionRef.current = rec;
     return () => {
       // Not activeRef=false here: this also runs when the engine switches, and the conversation must carry on; the unmount effect below ends it.

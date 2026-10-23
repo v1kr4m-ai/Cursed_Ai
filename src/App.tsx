@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { PAUSE_DEFAULT_MS } from "./services/voicePause";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { readSavedSettings, saveSettings, savedSetting } from "./lib/settingsStore";
 import { requestStudio } from "./lib/studioBridge";
@@ -89,6 +90,7 @@ function defaultSettings(): AppSettings {
     apiEnabled: false,
     memoryEnabled: true,
     voiceEnabled: true,
+    voicePauseMs: PAUSE_DEFAULT_MS,
     voiceEngine: ((): "auto" | "browser" | "whisper" => { try { const v = localStorage.getItem("cursed.voiceEngine"); return v === "browser" || v === "whisper" ? v : "auto"; } catch { return "auto"; } })(),
     temperature: 0.7,
     topP: 0.9,

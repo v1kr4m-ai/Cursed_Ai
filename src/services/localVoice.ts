@@ -1,4 +1,5 @@
-/**
+
+import { getVoicePauseMs, LONG_RECORDING_MS } from "./voicePause";/**
  * Local, offline voice transcription — records the mic, decodes/resamples
  * to 16kHz mono PCM in-browser (Web Audio API), and posts the raw samples
  * to /api/voice/transcribe, which runs a real local Whisper model
@@ -125,7 +126,7 @@ export class LocalVoiceRecorder {
    * Resolves "" if nothing was said.
    */
   async listenOnce(opts: { onLevel?: (level: number) => void; onSpeechStart?: () => void; onReady?: () => void; onPartial?: (text: string) => void; onEnd?: () => void; silenceMs?: number; maxWaitMs?: number; maxMs?: number } = {}): Promise<string> {
-    const { onLevel, onSpeechStart, onReady, onPartial, onEnd, silenceMs = 650, maxWaitMs = 10000, maxMs = 30000 } = opts;
+    const { onLevel, onSpeechStart, onReady, onPartial, onEnd, silenceMs = getVoicePauseMs(), maxWaitMs = 10000, maxMs = LONG_RECORDING_MS } = opts;
     this.cancelled = false;
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const AudioCtx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;

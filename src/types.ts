@@ -75,6 +75,8 @@ export interface AppSettings {
   /** 'browser' = Web Speech API (fast, needs Chrome + isn't fully offline).
    *  'whisper' = real local Whisper model via /api/voice/transcribe (offline, slower). */
   voiceEngine: 'auto' | 'browser' | 'whisper';
+  /** How long a pause in speech is allowed before dictation and the voice assistant decide you have finished (ms). */
+  voicePauseMs: number;
   temperature: number;
   topP: number;
   maxTokens: number;

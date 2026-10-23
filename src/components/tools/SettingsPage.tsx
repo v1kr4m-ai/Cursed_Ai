@@ -1,4 +1,5 @@
 import React from "react";
+import { PAUSE_DEFAULT_MS, PAUSE_MAX_MS } from "../../services/voicePause";
 import { Bell, Bot, Cloud, Cpu, Download, FolderOpen, HardDrive, Image as ImageIcon, Info, Keyboard, Mic, Palette, Plug, RotateCcw, Search, Settings as SettingsIcon, Shield, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { AppSettings, Chat } from "../../types";
 import { AIService } from "../../services/aiService";
@@ -199,6 +200,9 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
           <>
             <Row title="Speech recognition" stack note={settings.voiceEngine === "whisper" ? "Always the local Whisper model: every browser, fully offline (first use downloads ~40 MB)." : settings.voiceEngine === "browser" ? "The browser's built-in recognizer (Chrome / Edge, needs internet); Whisper is the fallback." : "Automatic: the browser's live recognizer when it is available and online, otherwise offline Whisper."}>
               <Seg value={settings.voiceEngine} onChange={v => set({ voiceEngine: v })} options={[{ value: "auto", label: "Auto" }, { value: "browser", label: "Browser" }, { value: "whisper", label: "Offline" }]} />
+            </Row>
+            <Row title="Pause before it stops listening" stack note="How long you can stay silent while talking before dictation and the voice assistant decide you are done. Raise it if you stop to think mid-sentence; lower it for quicker replies.">
+              <Range value={Math.round((settings.voicePauseMs ?? PAUSE_DEFAULT_MS) / 100) / 10} min={1} max={PAUSE_MAX_MS / 1000} step={0.5} onChange={v => set({ voicePauseMs: Math.round(v * 1000) })} display={`${((settings.voicePauseMs ?? PAUSE_DEFAULT_MS) / 1000).toFixed(1)} s`} />
             </Row>
             <div className="py-2 -mx-6"><MicTest pref={settings.voiceEngine} /></div>
             <div className="py-2 -mx-6"><VoiceSpeechSettings /></div>

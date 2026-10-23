@@ -8,6 +8,7 @@
  */
 import React from "react";
 import { LocalVoiceRecorder } from "./localVoice";
+import { holdOpen } from "./voicePause";
 import { isOnline, micBlockedReason, resolveEngine, speechErrorText, speechInputAvailable, voiceOfflineNotice, type VoiceEnginePref } from "./voiceEngine";
 import { notifyError } from "../lib/notify";
 import { micPhase, type MicPhase } from "../components/voice/MicStatus";
@@ -123,6 +124,7 @@ export function useDictation(value: string, onText: (next: string) => void, pref
     recognition.current = r;
     setReady(false); setHeard(false);
     setListening(true);
+    holdOpen(r); // listen through pauses; stop after the pause chosen in Settings > Voice
     r.start();
   };
 

@@ -39,6 +39,7 @@ import { Chat, Message, MessageRole, AIModel, AppSettings } from "@/src/types";
 import { pickFile, Picked } from "../../services/attachments";
 import { AIService } from "@/src/services/aiService";
 import { LocalVoiceRecorder } from "@/src/services/localVoice";
+import { holdOpen } from "../../services/voicePause";
 import { resolveEngine, speechInputAvailable, isOnline, micBlockedReason, speechErrorText, voiceOfflineNotice } from "../../services/voiceEngine";
 import { MicModeButton } from "../voice/MicModeButton";
 import { MicStatus, micPhase } from "../voice/MicStatus";
@@ -225,6 +226,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       if (code === "network" || code === "service-not-allowed") { voiceOfflineNotice(); setBrowserSpeechFailed(true); startWhisperDictation(); return; }
       notifyError(speechErrorText(code));
     };
+    holdOpen(recognition); // listen through pauses; stop after the pause chosen in Settings > Voice
     dictationRef.current = recognition;
     setMicReady(false); setMicHeard(false);
     setIsDictating(true);
