@@ -12,6 +12,7 @@ import { notify } from "../../lib/notify";
 import { notifyError } from "../../lib/notify";
 import { makeUtterance } from "../../services/tts";
 import { parseStudioCommand, StudioKind, StudioRequest } from "../../services/studioIntent";
+import { parseComfyCommand } from "../../services/comfyIntent";
 
 interface VoiceAssistantProps {
   selectedModel: AIModel;
@@ -181,6 +182,42 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     setLive("");
     setReply("");
     setVoiceState("thinking");
+
+    // Says a reply of our own (no model involved), then goes back to listening.
+    const sayLocally = (replyText: string) => {
+      const sp0 = speechRef.current;
+      sp0.pending = 0; sp0.ended = false; sp0.skipped = false; sp0.done = () => {};
+      enqueueSpeech(replyText);
+      const aMsg0: Message = { id: (Date.now() + 1).toString(), role: MessageRole.ASSISTANT, content: replyText, timestamp: Date.now() };
+      historyRef.current = [...historyRef.current, aMsg0];
+      setHistory(historyRef.current);
+      onNewMessageRef.current(aMsg0);
+      setReply("");
+      sp0.done = () => { if (activeRef.current) startListening(); };
+      sp0.ended = true;
+      if (sp0.pending <= 0) sp0.done();
+    };
+
+    // "Start ComfyUI" / "is ComfyUI running?": answered here. Already on is said so; otherwise it is started and a notice says when it is up.
+    const comfyCmd = parseComfyCommand(text);
+    if (comfyCmd) {
+      let answer: string;
+      try {
+        const st = await (await fetch("/api/comfyui/status")).json();
+        if (st.running) answer = "ComfyUI is already running.";
+        else if (comfyCmd === "status") answer = st.starting ? "ComfyUI is still starting up." : "ComfyUI is not running.";
+        else if (!st.canLaunch) answer = "I do not know where ComfyUI is installed. Set its folder in the Engine tab first.";
+        else {
+          answer = st.starting ? "ComfyUI is already starting. A notice will pop up when it is ready." : "Starting ComfyUI now, with no extra window. A notice will pop up when it is ready.";
+          fetch("/api/comfyui/start", { method: "POST" })
+            .then(async r => ({ ok: r.ok, d: await r.json().catch(() => ({})) }))
+            .then(({ ok, d }) => notify(ok ? { message: "ComfyUI is running", tab: "console" } : { message: d?.error || "ComfyUI could not be started", kind: "error", tab: "console" }))
+            .catch(() => notify({ message: "ComfyUI could not be started", kind: "error", tab: "console" }));
+        }
+      } catch { answer = "I could not reach the app to check ComfyUI."; }
+      sayLocally(answer);
+      return;
+    }
 
     // "Create an image of ..." / "open the video generator" / "generate it": open the studio instead of asking the model.
     const studio = settingsRef.current.assistantStudio !== false && onOpenStudioRef.current ? parseStudioCommand(text, lastStudioRef.current) : null;

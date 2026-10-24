@@ -1,14 +1,16 @@
 import React from "react";
-import { Copy, Pause, Play, Trash2 } from "lucide-react";
+import { Copy, Minimize2, Maximize2, Pause, Play, Trash2 } from "lucide-react";
+import { setPipped } from "./consolePip";
 import { appendChunks, emptyLines, toneOf, type ComfyLines, type Tone } from "./comfyLines";
 
 const TONE: Record<Tone, string> = { error: "text-red-400", warn: "text-yellow-400", run: "text-cyan-300", progress: "text-emerald-300", plain: "text-zinc-300" };
 
 /** ComfyUI's own console (model loading, prompts, progress bars, errors), followed live. */
-export function ComfyConsole() {
+export function ComfyConsole({ floating = false }: { floating?: boolean }) {
   const [state, setState] = React.useState<ComfyLines>(emptyLines);
   const [up, setUp] = React.useState<boolean | null>(null);
   const [supported, setSupported] = React.useState(true);
+  const [startup, setStartup] = React.useState<string[]>([]);
   const [paused, setPaused] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const since = React.useRef("");
@@ -26,6 +28,7 @@ export function ComfyConsole() {
         const d = await r.json();
         if (stop) return;
         setUp(!!d.up); setSupported(d.supported !== false);
+        setStartup(Array.isArray(d.startup) ? d.startup : []);
         if (d.restarted) live = emptyLines();
         if (d.entries?.length) {
           live = appendChunks(live, d.entries);
@@ -41,22 +44,27 @@ export function ComfyConsole() {
 
   React.useEffect(() => { if (!paused) bottom.current?.scrollIntoView({ block: "end" }); }, [state, paused]);
 
-  const shown = state.partial ? [...state.lines, state.partial] : state.lines;
+  // While ComfyUI is not answering (still starting, or it crashed) show what it wrote to its console file, so a start is never silent.
+  const live = state.partial ? [...state.lines, state.partial] : state.lines;
+  const shown = live.length === 0 && up === false && startup.length ? startup : live;
   const copyAll = () => navigator.clipboard?.writeText(shown.join("\n")).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }).catch(() => {});
   const btn = "glass px-3 py-2 rounded-xl border-white/5 text-zinc-400 hover:text-white transition-colors flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest";
 
   return (
-    <div className="flex-1 glass rounded-[2rem] border-white/5 overflow-hidden flex flex-col min-h-0">
-      <div className="flex shrink-0 items-center gap-2 border-b border-white/5 px-5 py-3">
+    <div className={floating ? "flex-1 overflow-hidden flex flex-col min-h-0" : "flex-1 glass rounded-[2rem] border-white/5 overflow-hidden flex flex-col min-h-0"}>
+      <div className={"flex shrink-0 items-center gap-2 border-b border-white/5 " + (floating ? "px-3 py-1.5" : "px-5 py-3")}>
         <span className={`h-2 w-2 rounded-full ${up ? "bg-emerald-400" : up === false ? "bg-red-500" : "bg-zinc-600"}`} />
         <span className="text-xs text-zinc-400">{up ? "ComfyUI is running" : up === false ? "ComfyUI is not reachable" : "Checking ComfyUI..."}</span>
         <div className="ml-auto flex gap-2">
           <button onClick={() => setPaused(p => !p)} className={btn}>{paused ? <Play size={12} /> : <Pause size={12} />}{paused ? "Resume" : "Pause"}</button>
           <button onClick={copyAll} className={btn}><Copy size={12} />{copied ? "Copied" : "Copy"}</button>
           <button onClick={() => { setState(emptyLines()); held.current = null; }} className={btn}><Trash2 size={12} />Clear</button>
+          {floating
+            ? <button onClick={() => setPipped(false)} className={btn} title="Put the console back in the Console page"><Minimize2 size={12} />Dock</button>
+            : <button onClick={() => setPipped(true)} className={btn} title="Float the console over the app so you can watch it while you work"><Maximize2 size={12} />Pop out</button>}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-5 font-mono text-[11px] leading-relaxed">
+      <div className={"flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed " + (floating ? "p-3" : "p-5")}>
         {shown.length === 0 && (
           <p className="py-16 text-center text-zinc-600">
             {up === false

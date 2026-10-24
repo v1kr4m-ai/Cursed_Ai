@@ -2,6 +2,7 @@ import React from "react";
 import { Terminal, Trash2, Pause, Play } from "lucide-react";
 import { LogLine } from "../../types";
 import { ComfyConsole } from "./ComfyConsole";
+import { setPipped, usePipped } from "./consolePip";
 
 const LEVEL_COLOR: Record<string, string> = {
   log: "text-zinc-400",
@@ -11,6 +12,7 @@ const LEVEL_COLOR: Record<string, string> = {
 };
 
 export function ConsoleView() {
+  const pipped = usePipped();
   const [lines, setLines] = React.useState<LogLine[]>([]);
   const [paused, setPaused] = React.useState(false);
   const [source, setSource] = React.useState<"app" | "comfy">("app");
@@ -86,7 +88,16 @@ export function ConsoleView() {
           </div>
         </header>
 
-        {source === "comfy" && <ComfyConsole />}
+        {source === "comfy" && (pipped
+          ? (
+            <div className="flex-1 glass rounded-[2rem] border-white/5 grid place-items-center text-center p-8">
+              <div className="space-y-3">
+                <p className="text-sm text-zinc-300">ComfyUI's console is floating over the app.</p>
+                <button onClick={() => setPipped(false)} className="glass px-4 py-2.5 rounded-xl border-white/5 text-zinc-300 hover:text-white text-xs font-bold uppercase tracking-widest">Bring it back here</button>
+              </div>
+            </div>
+          )
+          : <ComfyConsole />)}
         <div className={source === "app" ? "flex-1 glass rounded-[2rem] border-white/5 overflow-hidden flex flex-col" : "hidden"}>
           <div className="flex-1 overflow-y-auto p-6 font-mono text-xs space-y-1.5">
             {lines.length === 0 && (

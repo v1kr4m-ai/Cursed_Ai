@@ -8,6 +8,7 @@ import { registerFinish } from "./seriesTool/finish";
 import { registerTemplates } from "./seriesTool/templates";
 import { registerBackup } from "./seriesTool/backup";
 import { registerComfyLogs } from "./comfyLogs";
+import { directLaunch, tailLines } from "./comfyLaunch";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
@@ -1440,7 +1441,8 @@ async function startServer() {
     }
     for (const bat of ["run_nvidia_gpu.bat", "run_amd_gpu.bat", "run.bat", "run_cpu.bat"]) {
       const p = path.join(target, bat);
-      if (fs.existsSync(p)) return { cmd: p, args: [], cwd: target, shell: true };
+      // Run what the start file runs, directly: no command window; the output goes to comfy-console.log for the app Console.
+      if (fs.existsSync(p)) { const d = directLaunch(p); return d ? { ...d, shell: false } : { cmd: p, args: [], cwd: target, shell: true }; }
     }
     const main = [path.join(target, "main.py"), path.join(target, "ComfyUI", "main.py")].find(fs.existsSync);
     if (main) {
@@ -1452,6 +1454,7 @@ async function startServer() {
   }
 
   let comfyStarting: Promise<void> | null = null;
+  const COMFY_LOG = path.join(process.cwd(), "comfy-console.log");
 
   app.get("/api/comfyui/status", async (req, res) => {
     res.json({
@@ -1485,7 +1488,8 @@ async function startServer() {
       if (!comfyStarting) {
         console.log(`[ComfyUI] Not running - launching ${launch.cmd} ${launch.args.join(" ")} (cwd ${launch.cwd})`);
         comfyStarting = (async () => {
-          const child = spawn(launch.cmd, launch.args, { detached: true, stdio: "ignore", cwd: launch.cwd, shell: launch.shell, windowsHide: true });
+          const logFd = fs.openSync(COMFY_LOG, "w");
+          const child = spawn(launch.cmd, launch.args, { detached: true, stdio: ["ignore", logFd, logFd], cwd: launch.cwd, shell: launch.shell, windowsHide: true });
           child.unref();
           for (let i = 0; i < 90; i++) { // up to ~3 minutes: first launch loads models/nodes
             await new Promise(r => setTimeout(r, 2000));
@@ -1706,7 +1710,7 @@ async function startServer() {
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerBackup(app, { projectsRoot: path.join(process.cwd(), "series") });
-  registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL });
+  registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL, startupLog: () => tailLines(COMFY_LOG) });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     transcribe: async samples => {
