@@ -70,6 +70,11 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   }
   const runs = new Map<string, RunState>();
 
+  // The node list is kept on disk too, so workflows stay readable while ComfyUI is stopped (for example during training).
+  const objectInfoFile = path.join(process.cwd(), "comfy-object-info.json");
+  const saveObjectInfo = (data: Json) => { fs.promises.writeFile(objectInfoFile, JSON.stringify(data)).catch(() => {}); };
+  const loadObjectInfo = (): Json | null => { try { return JSON.parse(fs.readFileSync(objectInfoFile, "utf8")) as Json; } catch { return null; } };
+
   // --- ComfyUI's node list: needed to read UI-format workflows and to tell which custom nodes are missing ---
   let objectInfoCache: { at: number; url: string; data: Json } | null = null;
   async function objectInfo(force = false): Promise<Json | null> {
@@ -79,9 +84,14 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
       const r = await fetch(`${url}/object_info`, { signal: AbortSignal.timeout(20000) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       objectInfoCache = { at: Date.now(), url, data: (await r.json()) as Json };
+      saveObjectInfo(objectInfoCache.data);
       return objectInfoCache.data;
     } catch {
-      return objectInfoCache && objectInfoCache.url === url ? objectInfoCache.data : null;
+      if (objectInfoCache && objectInfoCache.url === url) return objectInfoCache.data;
+      // ComfyUI is off (or still starting): read workflows with the node list saved the last time it was up.
+      const saved = loadObjectInfo();
+      if (saved) objectInfoCache = { at: Date.now() - 50000, url, data: saved };
+      return saved;
     }
   }
   const comfyReachable = async () => { try { return (await fetch(`${opts.getComfyUrl()}/system_stats`, { signal: AbortSignal.timeout(2000) })).ok; } catch { return false; } };
@@ -340,6 +350,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
 
     (async () => {
       try {
+        if (!(await comfyReachable())) throw new Error("ComfyUI is not running. Start it (Settings > Integrations, or the ComfyUI button) and run this again.");
         const c = store.loadConfig();
         const oi = await objectInfo();
         const roles = c.workflowRoles[b.workflowPath];
