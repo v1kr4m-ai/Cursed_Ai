@@ -56,9 +56,11 @@ html[data-ui="large"] { font-size: 16px; }
     @apply max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed mb-3;
   }
 
+  /* The model's bubble carries a cool teal tint and a left edge, yours the theme's accent, so the two read apart at a glance. */
   .ai-bubble {
     @apply backdrop-blur-[20px] border rounded-bl-sm;
-    background: var(--t-glass); border-color: var(--t-glass-border);
+    background: linear-gradient(rgba(20, 184, 166, 0.10), rgba(20, 184, 166, 0.10)), var(--t-glass);
+    border-color: var(--t-glass-border); border-left: 3px solid rgba(45, 212, 191, 0.55);
   }
 
   .user-bubble {

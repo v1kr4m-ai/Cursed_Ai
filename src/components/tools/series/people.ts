@@ -103,3 +103,31 @@ export function renamePerson(project: Project, from: string, to: string): Episod
 export function setSkip(project: Project, ref: Ref, skip: boolean): Episode[] {
   return project.episodes.map(ep => ({ ...ep, refs: ep.refs.map(r => (r.name === ref.name && (r.person || "") === (ref.person || "") && isPhoto(r) === isPhoto(ref) ? { ...r, skip } : r)) }));
 }
+
+/**
+ * The planner sometimes writes a character picture ("richie", to be made in ComfyUI) for someone who already has
+ * an attached photo. The photo wins: that picture is dropped, the photo takes the name, and the scenes that used
+ * it get the person in their cast. A planned character with no matching photo is left alone, and so is
+ * a plan with several planned characters and only unnamed photos (there is no telling who is who).
+ */
+export function adoptPlannedPeople(project: Project): Episode[] {
+  return project.episodes.map(ep => {
+    const photos = ep.refs.filter(r => isPhoto(r) && kindOf(r) === "person" && !r.skip);
+    if (!photos.length) return ep;
+    const planned = ep.refs.filter(r => !!r.prompt.trim() && !r.file && kindOf(r) === "person" && !r.person && !wantsStill(project, r.name));
+    if (!planned.length) return ep;
+    let refs = ep.refs.map(r => ({ ...r }));
+    let scenes = ep.scenes.map(s => ({ ...s }));
+    for (const made of planned) {
+      let owned = photos.filter(p => same(p.person, made.name) || (!p.person && same(p.name, made.name)));
+      if (!owned.length && planned.length === 1) owned = photos.filter(p => !p.person);
+      if (!owned.length) continue;
+      const ids = new Set(owned.map(p => p.id));
+      refs = refs.filter(r => r.id !== made.id).map(r => (ids.has(r.id) ? { ...r, person: made.name } : r));
+      scenes = scenes.map(s => (s.refIds.includes(made.id)
+        ? { ...s, refIds: s.refIds.filter(id => id !== made.id), cast: s.cast?.some(n => same(n, made.name)) ? s.cast : [...(s.cast || []), made.name] }
+        : s));
+    }
+    return { ...ep, refs, scenes };
+  });
+}

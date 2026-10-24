@@ -8,7 +8,7 @@ import { kindOf, kindRank } from "../seriesTool/refKinds";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { peopleOf, ensureCast, renamePerson, setSkip } from "../src/components/tools/series/people";
+import { peopleOf, ensureCast, renamePerson, setSkip, adoptPlannedPeople } from "../src/components/tools/series/people";
 import { fillSlots, refSourceFiles } from "../seriesTool/refSources";
 import { projectFormat, SERIES_FORMATS } from "../seriesTool/formats";
 import { isChatModel, paramsFromName, rateModel, recommend } from "../src/components/tools/series/modelRating";
@@ -252,6 +252,21 @@ describe("several people", () => {
     expect(fillSlots(["a.png"], [false, true, false], 3)).toEqual(["a.png", "", "a.png"]);
     expect(fillSlots([], [false, false], 2)).toEqual(["", ""]);
     expect(fillSlots(["a", "b", "c"], [], 2)).toEqual(["a", "b"]);
+  });
+
+  it("drops a character the planner made for someone who already has a photo, and gives the photo that name", () => {
+    const w = world();
+    const photo = { ...w.episodes[0].refs.find(r => r.id === "b1")!, id: "ph", name: "my photo", person: undefined };
+    const made = { id: "mk", name: "Richie", role: "character" as const, kind: "person", prompt: "a young woman", negative: "", seed: 1, file: null, status: "pending" as const, error: null };
+    const ep = { ...w.episodes[0], refs: [w.episodes[0].refs[0], photo, made], scenes: [{ ...w.episodes[0].scenes[0], cast: [], refIds: ["s", "mk"] }] };
+    const out = adoptPlannedPeople({ ...w, episodes: [ep] } as Project)[0];
+    expect(out.refs.some(r => r.id === "mk")).toBe(false);
+    expect(out.refs.find(r => r.id === "ph")!.person).toBe("Richie");
+    expect(out.scenes[0].cast).toEqual(["Richie"]);
+    expect(out.scenes[0].refIds).toEqual(["s"]);
+    // two planned characters and one unnamed photo: nothing can be matched, so nothing is dropped
+    const two = { ...ep, refs: [...ep.refs, { ...made, id: "mk2", name: "Bo2" }] };
+    expect(adoptPlannedPeople({ ...w, episodes: [two] } as Project)[0].refs.length).toBe(4);
   });
 
   it("keeps another person's photo out of a person's still", () => {

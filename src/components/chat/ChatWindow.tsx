@@ -51,6 +51,7 @@ import { makeUtterance } from "../../services/tts";
 import { ProgressBar } from "../layout/ProgressBar";
 import { fitFor, useSystemInfo } from "../../lib/ramFit";
 import { useGpuInfo, gpuLabel } from "../../lib/gpuInfo";
+import { ThinkingWords } from "../ui/ThinkingWords";
 
 interface ChatWindowProps {
   chat: Chat | null;
@@ -694,8 +695,9 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
               {m.role === MessageRole.ASSISTANT ? (
                 <div className="markdown-body">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>
-                    {m.content || (isGenerating && idx === chat.messages.length - 1 ? "▋" : "")}
+                    {m.content || (isGenerating && idx === chat.messages.length - 1 ? "​" : "")}
                   </ReactMarkdown>
+                  {!m.content && isGenerating && idx === chat.messages.length - 1 && <ThinkingWords className="text-sm text-zinc-400" />}
                   {m.content && !(isGenerating && idx === chat.messages.length - 1) && (
                     <div className="mt-3 flex items-center gap-1">
                       <button

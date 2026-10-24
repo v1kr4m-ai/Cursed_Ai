@@ -1,18 +1,19 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus, Check, ChevronDown, ChevronRight, Paperclip, Download } from "lucide-react";
 import { SERIES_FORMATS, projectFormat, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
 import { savedSetting } from "../../../lib/settingsStore";
+import { ThinkingWords } from "../../ui/ThinkingWords";
 import { notify } from "../../../lib/notify";
 import { api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
 import { isChatModel, loadRecords, noteOutcome, rateModel, recommend, TIER_LABEL, tierRank } from "./modelRating";
-import { castInstruction, ensureCast, peopleOf, renamePerson, setSkip, wantsStill, type Person } from "./people";
+import { adoptPlannedPeople, castInstruction, ensureCast, peopleOf, renamePerson, setSkip, wantsStill, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
@@ -48,7 +49,7 @@ const PART = 10;
 /** How many clips an episode needs to last `seconds`; the old fixed length (8) when nothing was chosen. */
 const sceneTarget = (project: Project) => (project.episodeSeconds ? Math.max(2, Math.round(project.episodeSeconds / Math.max(1, project.settings.seconds || 7))) : 8);
 
-function rulesFor(fmt: SeriesFormat, people: Person[], scenes = 8) {
+function rulesFor(fmt: SeriesFormat, people: Person[], scenes = 8, photos = 0) {
   const lineRule = fmt.speech === "none"
     ? `- The "vo" line is only a short note (${fmt.lineWords} words) for the editor: nothing is spoken in the clip.`
     : `- Every "vo" line is ${fmt.lineWords} words: it is ${fmt.speech === "voiceover" ? "spoken over" : fmt.speech === "sung" ? "sung during" : "said on camera in"} one short clip.`;
@@ -61,13 +62,13 @@ ${lineRule}
 - Every scene needs a real, specific "shot" (what the camera sees and what the person does) and a real "vo". Never leave them empty and never repeat the same text in two fields.
 - Always leave "textCard" empty. Subtitles and captions are added later by the editor, never inside the clips.
 - Image prompts should describe a photographic still, with lighting and grade, not a character sheet.
-${people.length ? castInstruction(people) : `- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.`}
+${people.length ? castInstruction(people) : photos > 0 ? `- ${photos} reference photo${photos === 1 ? " is" : "s are"} already attached for the people of this series. Do NOT write a "character" ref for anyone who appears in an attached photo: the photo itself is used in the scenes. Name that person in each scene's "cast" and write refs only for outfits, products and places.` : `- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.`}
 - A ref may carry a "kind": person, outfit, product, location, pose, prop, palette or style. Give each outfit or product its own ref with that kind.
 - Scene "refs" lists ref names from the same episode, style_plate first.`;
 }
 
 /** Asks for the whole plan: every episode of the season, or exactly `count` of them. */
-function planInstruction(fmt: SeriesFormat, count: number, people: Person[], scenes = 8) {
+function planInstruction(fmt: SeriesFormat, count: number, people: Person[], scenes = 8, photos = 0) {
   return `Turn our discussion into a production plan and reply with JSON only - no commentary, no code fences.
 ${count > 0 ? `Write exactly ${count} episode${count > 1 ? "s" : ""}.` : "Write every episode we discussed."}
 
@@ -76,11 +77,11 @@ Shape - a JSON array of episodes:
   ${episodeShape(people.length > 0)}
 ]
 
-${rulesFor(fmt, people, scenes)}`;
+${rulesFor(fmt, people, scenes, photos)}`;
 }
 
 /** Asks for one more episode that carries on from the ones already planned. */
-function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[], scenes = 8) {
+function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[], scenes = 8, photos = 0) {
   const number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
   const recap = project.episodes.map(e => `Episode ${e.number} "${e.title}" (${e.era || "no period"}): ${e.scenes.slice(0, 2).map(sc => sc.vo).filter(Boolean).join(" / ")}${e.hookOut ? ` - ends with: ${e.hookOut}` : ""}`).join("\n");
   return `Write the NEXT episode, number ${number}, and reply with JSON only - no commentary, no code fences.
@@ -94,7 +95,7 @@ ${direction.trim() ? `What I want in this episode: ${direction.trim()}
 Shape - one JSON object (a single episode, not an array):
 ${episodeShape(people.length > 0).replace('"number": 1', `"number": ${number}`)}
 
-${rulesFor(fmt, people, scenes)}`;
+${rulesFor(fmt, people, scenes, photos)}`;
 }
 
 /** The plan the page already holds, written back in the shape the planner uses, so one more episode can be added without losing renders. */
@@ -293,14 +294,50 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
   const firstEpisode = project.episodes[0];
   const attachedRefs = project.episodes.flatMap(e => e.refs).filter(r => r.file);
 
+  const nPhotos = seriesPhotos(project).length + pendingPhotos.length;
   const systemPrompt =
     `You are helping plan a short-form video series for YouTube Shorts / Reels. ` +
     `Video style: ${projectFormat(project).label} - ${projectFormat(project).blurb} ` +
     `Each episode is about ${sceneTarget(project)} ${project.settings.seconds || 7}-second vertical clips with one ${projectFormat(project).lineLabel.toLowerCase()} line each. ` +
     `Idea: ${idea.logline || "(not stated yet)"}. Audience: ${idea.audience || "general"}. Tone: ${idea.tone || "documentary"}. ` +
     `Notes: ${idea.notes || "none"}. ` +
+    (nPhotos > 0 ? `The user has attached ${nPhotos} reference photo${nPhotos === 1 ? "" : "s"} of the people in the series; you cannot see them, but they will appear in the scenes, so never invent how those people look. ` : "") +
     `You are a creative writing partner for the user's own fictional video series, so help with scripts, scenes and outlines whenever asked. ` +
     `Push back on vague ideas, ask one sharp question at a time, and keep answers short unless a script is requested.`;
+
+  const attachInput = React.useRef<HTMLInputElement>(null);
+  const [attaching, setAttaching] = React.useState(false);
+  /** Documents become story material the chat and the plan can read; pictures become reference photos. */
+  async function attach(files: FileList | null) {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    setAttaching(true);
+    setError(null);
+    try {
+      let current = project;
+      const images = list.filter(f => f.type.startsWith("image/")), docs = list.filter(f => !f.type.startsWith("image/"));
+      for (const f of docs) await api.uploadSource(project.id, f);
+      if (docs.length) { current = await api.get(project.id); onSaved(current); }
+      if (images.length) {
+        if (current.episodes.length) {
+          for (const f of images) await api.uploadRef(current.id, current.episodes[0].id, f, f.name.replace(/\.[^.]+$/, ""), "character", "person");
+          const r = await syncPhotos(await api.get(current.id));
+          onSaved(r.project);
+        } else setPendingPhotos(p => [...p, ...images]);
+      }
+      notify({ message: `${docs.length ? `${docs.length} document${docs.length === 1 ? "" : "s"} added to the story material` : ""}${docs.length && images.length ? " and " : ""}${images.length ? `${images.length} picture${images.length === 1 ? "" : "s"} added as reference photos` : ""}`, tab: "series" });
+    } catch (e: any) { setError(e?.message || String(e)); }
+    finally { setAttaching(false); if (attachInput.current) attachInput.current.value = ""; }
+  }
+  /** The whole discussion as a text file. */
+  function saveChat() {
+    const text = `# ${project.title} - discussion\n\n` + messages.map(m => `**${m.role === "user" ? "You" : "Model"}** (${m.at ? new Date(m.at).toLocaleString() : ""})\n\n${m.content}\n`).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+    a.download = `${project.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "series"}-discussion.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   const saveIdea = async (next = idea, discussion = messages) => onSaved(await api.patch(project.id, { idea: next, discussion }));
 
@@ -314,8 +351,11 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
     setBusy(true);
     setStreaming("");
     try {
+      // Saved before the model answers, so a failed or interrupted answer never loses what you said.
+      await saveIdea(idea, next);
       let acc = "";
-      const history = [{ role: "system", content: systemPrompt }, ...next.map(m => ({ role: m.role, content: m.content }))];
+      const material = sources.map(s => ({ role: "user", content: `Attached document "${s.name}":\n\n${(s.digest || s.text).slice(0, 6000)}` }));
+      const history = [{ role: "system", content: systemPrompt }, ...material, ...next.map(m => ({ role: m.role, content: m.content }))];
       let answer = await askModel(history, model, t => { acc += t; setStreaming(acc); });
       // Some models (phi4 is one) turn down an ordinary creative request. Say plainly what this is and ask once more.
       if (REFUSAL.test(answer.trim()) && answer.trim().length < 240) {
@@ -360,7 +400,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
   /** After a plan is saved: every episode gets the series photos, every person gets a still of their own, and each scene gets its cast's pictures. */
   async function finishPlan(planned: Project, extra: File[]) {
     const synced = await syncPhotos(planned, extra);
-    const episodes = ensureCast(synced.project);
+    const episodes = ensureCast({ ...synced.project, episodes: adoptPlannedPeople(synced.project) });
     onSaved(JSON.stringify(episodes) !== JSON.stringify(synced.project.episodes) ? await api.patch(project.id, { episodes }) : synced.project);
   }
 
@@ -399,7 +439,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
 ${(s.digest || s.text).slice(0, 12000)}` })),
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction, peopleOf(project), sceneTarget(project)), a => setRawPlan(a));
+      const got = await askForJson(base, nextEpisodeInstruction(fmt, project, direction, peopleOf(project), sceneTarget(project), photoCount), a => setRawPlan(a));
       const next = Array.isArray(got) ? got[0] : got;
       if (!next || typeof next !== "object" || !Array.isArray(next.scenes)) throw new Error("The model did not write an episode with scenes.");
       next.number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
@@ -451,7 +491,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         ...storyBlocks,
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project), sceneTarget(project)), a => setRawPlan(a));
+      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project), sceneTarget(project), photoCount), a => setRawPlan(a));
       // Asked for one episode, a model often sends the episode itself rather than a list of one.
       const list = Array.isArray(episodes) ? episodes : Array.isArray(episodes?.episodes) ? episodes.episodes : episodes && typeof episodes === "object" && Array.isArray(episodes.scenes) ? [episodes] : null;
       if (!list) throw new Error("The plan must be a list of episodes.");
@@ -856,8 +896,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
               >
                 {m.role === "assistant" && <Bot size={14} className="mt-2 shrink-0 text-violet-400" />}
                 <div className={m.role === "user"
-                  ? "rounded-2xl rounded-tr-sm bg-neutral-700/50 px-3 py-2 text-sm text-neutral-100"
-                  : "rounded-2xl rounded-tl-sm bg-neutral-800/70 px-3 py-2 text-sm text-neutral-200 whitespace-pre-wrap"}>
+                  ? "rounded-2xl rounded-tr-sm border border-violet-500/30 bg-violet-600/25 px-3 py-2 text-sm text-violet-50"
+                  : "rounded-2xl rounded-tl-sm border border-teal-500/25 border-l-2 border-l-teal-400/60 bg-teal-900/20 px-3 py-2 text-sm text-neutral-200 whitespace-pre-wrap"}>
                   {m.content}
                 </div>
                 {m.role === "user" && <User size={14} className="mt-2 shrink-0 text-neutral-500" />}
@@ -865,12 +905,12 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             ))}
           </AnimatePresence>
           {busy && !streaming && (
-            <div className="mr-auto flex max-w-[88%] items-center gap-2 text-xs text-neutral-500"><Loader2 size={13} className="animate-spin text-violet-400" /> Waiting for the model... a big model that is not loaded yet can take a minute or two to wake up.</div>
+            <div className="mr-auto flex max-w-[88%] items-center gap-2 text-xs text-neutral-500"><ThinkingWords className="text-xs text-violet-300" /></div>
           )}
           {streaming && (
             <motion.div layout className="mr-auto flex max-w-[88%] items-start gap-2">
               <Bot size={14} className="mt-2 shrink-0 text-violet-400" />
-              <div className="rounded-2xl rounded-tl-sm bg-neutral-800/70 px-3 py-2 text-sm text-neutral-200 whitespace-pre-wrap">
+              <div className="rounded-2xl rounded-tl-sm border border-teal-500/25 border-l-2 border-l-teal-400/60 bg-teal-900/20 px-3 py-2 text-sm text-neutral-200 whitespace-pre-wrap">
                 {streaming}
                 <motion.span animate={{ opacity: [1, 0.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-violet-400" />
               </div>
@@ -899,6 +939,12 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                 )}
               </AnimatePresence>
             </div>
+
+            <input ref={attachInput} type="file" multiple accept=".txt,.md,.csv,.doc,.docx,.pdf,.xls,.xlsx,.ppt,.pptx,image/*" className="hidden" onChange={e => attach(e.target.files)} />
+            <button onClick={() => attachInput.current?.click()} disabled={attaching || busy} title="Attach a document (story, notes, script) or a picture (a reference photo) to the discussion" className="rounded-lg border border-neutral-700 p-2.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-40">
+              {attaching ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+            </button>
+            {messages.length > 0 && <button onClick={saveChat} title="Save this discussion as a text file" className="rounded-lg border border-neutral-700 p-2.5 text-neutral-300 hover:bg-neutral-800"><Download size={16} /></button>}
 
             <MicModeButton
               pref={voicePref}
