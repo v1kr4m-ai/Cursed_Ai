@@ -27,7 +27,7 @@ export function holdOpen(rec: any, pauseMs: () => number = getVoicePauseMs) {
   rec.onresult = (e: any) => {
     onresult?.(e);
     clear();
-    timer = setTimeout(() => { try { rec.stop(); } catch { /* already stopped */ } }, pauseMs());
+    timer = setTimeout(() => { rec.__paused = true; try { rec.stop(); } catch { /* already stopped */ } }, pauseMs());
   };
   const onend = rec.onend;
   rec.onend = (e: any) => { clear(); onend?.(e); };

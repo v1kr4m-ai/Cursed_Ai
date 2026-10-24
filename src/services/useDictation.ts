@@ -38,6 +38,8 @@ export function useDictation(value: string, onText: (next: string) => void, pref
   const [browserFailed, setBrowserFailed] = React.useState(false);
 
   const recognition = React.useRef<any>(null);
+  const wanted = React.useRef(false);   // the user still wants the online recognizer to listen
+  const restarts = React.useRef(0);
   const recorder = React.useRef<LocalVoiceRecorder | null>(null);
   // Read at click time rather than through the closure, so a half-typed line is not lost.
   const latest = React.useRef(value);
@@ -50,6 +52,7 @@ export function useDictation(value: string, onText: (next: string) => void, pref
   }, []);
 
   React.useEffect(() => () => {
+    wanted.current = false;
     try { recognition.current?.stop(); } catch { /* already gone */ }
     recorder.current?.finish();
   }, []);
@@ -93,22 +96,36 @@ export function useDictation(value: string, onText: (next: string) => void, pref
     const engineNow = resolveEngine(pref, browserFailed);
     if (listening) {
       if (engineNow === "whisper") recorder.current?.finish();
-      else { recognition.current?.stop(); setListening(false); }
+      else { wanted.current = false; recognition.current?.stop(); setListening(false); }
       return;
     }
     if (engineNow === "whisper") { startWhisper(); return; }
+    restarts.current = 0;
 
+    wanted.current = true;
+    startBrowser();
+  };
+
+  /** One browser recognizer session. The browser can end a session by itself (a hiccup, its own time limit); while you have not stopped it and have not paused, listening carries on. */
+  const startBrowser = () => {
     const Recognizer = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const r = new Recognizer();
     r.continuous = false;
     r.interimResults = true;
     r.lang = "en-US";
     const base = latest.current;
+    let failed = false;
     r.onresult = (event: any) => append(base, Array.from(event.results).map((x: any) => x[0].transcript).join(""));
     r.onaudiostart = () => setReady(true);
     r.onspeechstart = () => setHeard(true);
-    r.onend = () => setListening(false);
+    r.onend = () => {
+      if (wanted.current && !failed && !r.__paused && restarts.current < 20) { restarts.current++; setTimeout(() => { if (wanted.current) startBrowser(); }, 150); return; }
+      wanted.current = false;
+      setListening(false);
+    };
     r.onerror = (e: any) => {
+      failed = true;
+      wanted.current = false;
       setListening(false);
       const code = e?.error || "unknown";
       if (code === "aborted") return;
@@ -125,7 +142,7 @@ export function useDictation(value: string, onText: (next: string) => void, pref
     setReady(false); setHeard(false);
     setListening(true);
     holdOpen(r); // listen through pauses; stop after the pause chosen in Settings > Voice
-    r.start();
+    try { r.start(); } catch { wanted.current = false; setListening(false); }
   };
 
   return {

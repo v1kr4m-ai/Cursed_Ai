@@ -171,10 +171,14 @@ export class LocalVoiceRecorder {
         for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length);
         const now = performance.now();
-        if (now - t0 < 350) noise = Math.max(noise * 0.9, rms); // learn the room's background level first
+        // Learn the room's background level first. It is capped: someone who starts talking at once must not
+        // teach the recorder that their own voice is the room, or it hears them "stop" after a few words.
+        if (now - t0 < 350) noise = Math.min(Math.max(noise * 0.9, rms), 0.012);
+        else if (!spoke && rms < noise * 3) noise += (rms - noise) * 0.05; // follow slow changes in the room
         const threshold = Math.max(0.003, noise * 3); // sensitive enough for quiet microphones
         onLevel?.(Math.min(1, rms * 8));
-        if (rms > threshold) {
+        // Once you are talking, a softer sound still counts as talking (word endings and quiet words are weaker).
+        if (rms > (spoke ? threshold * 0.55 : threshold)) {
           if (!spoke) { spoke = true; speechStartIdx = idx; onSpeechStart?.(); }
           lastLoud = now; lastLoudChunk.i = idx; quietChunks = 0;
           speculative = null; // still talking: any early transcription is stale
