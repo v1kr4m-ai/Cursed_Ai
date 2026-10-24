@@ -34,9 +34,11 @@ export function directLaunch(batFile: string): { cmd: string; args: string[]; cw
 }
 
 /** The last `count` lines of a log file (empty if there is none yet). */
-export function tailLines(file: string, count = 300): string[] {
+export function tailLines(file: string, count = 300, maxAgeMs = Infinity): string[] {
   try {
-    const size = fs.statSync(file).size;
+    const st = fs.statSync(file);
+    if (Date.now() - st.mtimeMs > maxAgeMs) return []; // an old session's output would only confuse
+    const size = st.size;
     const len = Math.min(size, 200_000);
     const fd = fs.openSync(file, "r");
     try {

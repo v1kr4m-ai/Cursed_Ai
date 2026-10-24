@@ -1710,7 +1710,7 @@ async function startServer() {
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerBackup(app, { projectsRoot: path.join(process.cwd(), "series") });
-  registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL, startupLog: () => tailLines(COMFY_LOG) });
+  registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL, startupLog: () => tailLines(COMFY_LOG, 300, 15 * 60_000) });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     transcribe: async samples => {
