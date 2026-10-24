@@ -1,6 +1,7 @@
 import React from "react";
+import { notify } from "../../lib/notify";
 
-export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download";
+export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv";
 
 export interface JobState {
   kind: JobKind; label: string; running: boolean; startedAt: number | null; endedAt: number | null; code: number | null;
@@ -44,6 +45,37 @@ let source: EventSource | null = null;
 const viewOf = (k: JobKind): JobView => views.get(k) || { state: null, lines: [], progress: null };
 const put = (k: JobKind, v: Partial<JobView>) => { views.set(k, { ...viewOf(k), ...v }); subs.forEach(f => f()); };
 
+/** Friendly names and the tab each job belongs to, for the popups when a job ends. */
+const JOB_INFO: Record<JobKind, { name: string; tab: string }> = {
+  lora: { name: "LoRA training", tab: "trainlora" },
+  llm: { name: "Fine-tune", tab: "finetune" },
+  caption: { name: "Captioning", tab: "trainlora" },
+  sketch: { name: "Character sketch", tab: "trainlora" },
+  pairs: { name: "Writing pairs", tab: "finetune" },
+  download: { name: "Download", tab: "finetune" },
+  stt: { name: "Speech-to-text training", tab: "trainspeech" },
+  tts: { name: "Text-to-speech training", tab: "trainspeech" },
+  speechprep: { name: "Clip preparation", tab: "trainspeech" },
+  speechenv: { name: "Speech setup or download", tab: "trainspeech" },
+};
+const took = (ms: number) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
+/** The line that best explains a failure: the last error-looking line of the log. */
+const whyFailed = (lines: string[]) => {
+  const tail = lines.slice(-60).map(l => l.trim()).filter(l => l && !/^\[(exited|finished|stopped)/.test(l));
+  const hit = [...tail].reverse().find(l => /(error|exception|failed|could not|not found|out of memory)/i.test(l)) || tail[tail.length - 1] || "";
+  return hit.replace(/^\[[a-z.]+\]\s*/i, "").slice(0, 180);
+};
+/** A popup when a job that was running ends: done (with how long it took and any score), or failed (with the reason). A job you stopped yourself says nothing. */
+function announce(k: JobKind, next: JobState, lines: string[]) {
+  const { name, tab } = JOB_INFO[k] || { name: k, tab: "finetune" };
+  if (next.stopped) return;
+  const failed = next.failed || (next.code != null && next.code !== 0);
+  if (failed) { notify({ kind: "error", tab, message: `${name} failed: ${whyFailed(lines) || "see the log"}` }); return; }
+  if (k === "pairs") return; // the Fine-tune page already says how many pairs were added
+  const score = [...lines].reverse().find(l => l.startsWith("[speech] RESULT"))?.replace("[speech] RESULT", "").trim();
+  notify({ kind: "success", tab, message: `${name} finished${next.startedAt && next.endedAt ? ` in ${took(next.endedAt - next.startedAt)}` : ""}${score ? `. ${score}` : ""}` });
+}
+
 /** One shared stream for every job on the page (a stream per job used up the browser's connections). */
 function connect() {
   if (source) return;
@@ -55,7 +87,11 @@ function connect() {
     if (m.type === "replay") put(k, { lines: m.lines.slice(-1500), state: m.state, progress: m.state?.progress ?? null });
     else if (m.type === "line") { const l = viewOf(k).lines; put(k, { lines: l.length > 1500 ? [...l.slice(-1200), m.text] : [...l, m.text] }); }
     else if (m.type === "progress") put(k, { progress: { pct: m.pct, text: m.text } });
-    else if (m.type === "state") put(k, { state: m.state, progress: m.state?.progress ?? viewOf(k).progress });
+    else if (m.type === "state") {
+      const before = viewOf(k);
+      put(k, { state: m.state, progress: m.state?.progress ?? before.progress });
+      if (before.state?.running && m.state && !m.state.running) announce(k, m.state, before.lines);
+    }
   };
 }
 

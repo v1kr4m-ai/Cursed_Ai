@@ -3,7 +3,7 @@ import { ArrowRight, Camera, Check, ExternalLink, ImagePlus, Loader2, Palette, P
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, imgUrl, useJob, useTrainStatus } from "./trainApi";
 import { GuideButton, LoraGuide } from "./Guide";
-import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField } from "./ui";
+import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField, TrainProgress } from "./ui";
 
 type Tab = "dataset" | "train";
 const KEY = "cursed.trainlora";
@@ -119,6 +119,8 @@ export function TrainLoraView() {
           <button onClick={() => setSetupOpen(v => !v)} title="Folders" className={`p-2 transition-colors ${setupOpen ? "text-violet-400" : "text-zinc-500 hover:text-white"}`}><Settings2 size={18} /></button>
         </div>
       </div>
+
+      <TrainProgress jobs={[{ title: "Train LoRA", job: lora }, { title: "Sketch", job: sketch }, { title: "Captions", job: caption }]} />
 
       {setupOpen && (
         <div className="grid shrink-0 gap-3 border-b border-white/5 bg-white/[0.02] px-8 py-4 md:grid-cols-3">

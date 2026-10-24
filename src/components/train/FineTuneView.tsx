@@ -3,7 +3,70 @@ import { ArrowRight, BookOpen, Check, Cloud, Download, FileText, GraduationCap, 
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, useJob, useTrainStatus } from "./trainApi";
 import { GuideButton, FineTuneGuide } from "./Guide";
-import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField } from "./ui";
+import { Badge, btn, btnDanger, btnPrimary, Card, type CardInfo, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField, TrainProgress } from "./ui";
+
+/** The text behind the (i) button of each card: the job of the step, why it matters, and what its settings do. */
+const INFO: Record<string, CardInfo> = {
+  material: {
+    job: "Turns your documents, web pages and pictures into question-and-answer training pairs, so you do not write them by hand.",
+    why: "A fine-tuned model only knows what the pairs say. This step is where its knowledge comes from, so clear source text and a careful review of the pairs decide how good the model is.",
+    settings: [
+      ["Model that writes the pairs", "Reads each passage and writes the pairs. A bigger or online model writes better pairs; online ones send your text to that service."],
+      ["Reads pictures with", "Turns a picture into text first, so it can become pairs."],
+      ["Pairs per chunk", "How many pairs are written from each passage of about 3,000 characters. 3 to 6 is a good range; higher numbers start repeating themselves."],
+      ["Topic hint", "Keeps the writer on one subject, so side material in the document produces fewer pairs."],
+    ],
+  },
+  hand: {
+    job: "Lets you add exact examples yourself, or import a .jsonl, .json or .csv file made elsewhere (for example in ChatGPT).",
+    why: "Hand-written pairs are the most reliable. Use them for facts that must be exactly right, such as names, numbers and signals, and to add the same fact in several wordings.",
+    settings: [
+      ["Instruction", "The question or request the model will be given."],
+      ["Input (optional)", "Extra context the instruction refers to. Leave empty for plain questions."],
+      ["Expected output", "The answer you want the model to give. Training copies this."],
+    ],
+  },
+  dataset: {
+    job: "Lists every training example so you can fix, delete, redo or add to them, then saves them as one .jsonl file.",
+    why: "Training reads only this saved file. A wrong pair teaches the model something wrong, so delete or correct bad rows before you save.",
+    settings: [
+      ["Open a saved dataset", "Loads an earlier file back into the list to keep working on it."],
+      ["Save as", "The file name. Saved files appear in the Fine-tune step."],
+      ["Redo / Add buttons on a row", "Redo writes that pair again from the same passage; Add writes a different pair from it. Only pairs written from your material have them."],
+    ],
+  },
+  model: {
+    job: "Chooses what to train (the base model), what to train it on (the dataset) and where the result goes.",
+    why: "The base model sets how much the model already knows, which languages it handles and how big it is. For a GGUF export it must be the full-precision version; training loads it in 4-bit by itself.",
+    settings: [
+      ["Base model", "The downloaded model that is improved. Small ones (0.5 to 4 billion parameters) train quickly on an 8 GB card."],
+      ["Training dataset", "The saved .jsonl file from step 1."],
+      ["Save the result to", "A folder for the adapter and GGUF. Leave empty for a new folder in outputs."],
+      ["Need a base model?", "Downloads one from Hugging Face. It needs internet once; afterwards everything runs offline."],
+    ],
+  },
+  settings: {
+    job: "Sets how strongly and for how long the model learns from the examples.",
+    why: "Too little training and the model barely changes; too much and it repeats the examples word for word and forgets how to answer anything else.",
+    settings: [
+      ["LoRA rank", "How much the model can learn. 8 to 16 is light; 32 to 64 holds many facts but uses more memory."],
+      ["LoRA alpha", "How strongly the learned part counts. Usually the same number as the rank."],
+      ["Epochs", "How many times the model reads the whole dataset. 3 is typical; small datasets often need 5 to 8."],
+      ["Learning rate", "The size of each learning step. 2e-4 is a safe default; lower it if answers get worse or the loss jumps around."],
+      ["Batch size", "Examples handled at once. Lower it if you run out of memory."],
+      ["Max length", "The longest example, in tokens. Lower it to save memory if your examples are short."],
+      ["Export a GGUF", "Makes a single file Ollama can run. It adds several minutes, needs the full-precision base model and about twice the model size in free disk."],
+      ["Ollama model name", "If set, the model is added to Ollama as soon as the export finishes."],
+    ],
+  },
+  finished: {
+    job: "Shows the trained results: the adapter (the small learned layer) and any GGUF files, and adds a GGUF to Ollama.",
+    why: "An adapter alone cannot be chatted with in Ollama. Only a GGUF added to Ollama appears in your model list.",
+    settings: [
+      ["Add to Ollama", "Registers the GGUF under the name you type. Use a new name for each version so older ones stay available."],
+    ],
+  },
+};
 
 type Tab = "dataset" | "train";
 /** source = which material it came from; ctx = the passage it was written from (kept so one row can be redone). Neither is saved into the .jsonl. */
@@ -21,12 +84,12 @@ interface Form {
 const DEFAULTS: Form = { baseModelDir: "", datasetFile: "", outputDir: "", rank: 16, alpha: 16, epochs: 3, learningRate: "2e-4", batchSize: 2, maxSeqLength: 2048, exportGguf: true, ollamaName: "", pairModel: "", visionModel: "", count: 5, topic: "", fileName: "" };
 const load = (): Form => { try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { return DEFAULTS; } };
 
-/** Base models that fit a small card in 4-bit; downloaded once, then everything runs offline. */
+/** Full-precision base models: training loads them in 4-bit itself (fits a small card), and the same files are what the GGUF export needs, so one download does both. Downloaded once, then everything runs offline. */
 const SUGGESTED = [
-  { repo: "unsloth/Phi-3.5-mini-instruct-bnb-4bit", note: "3.8B, about 2.3 GB - the safest fit for 8 GB cards" },
-  { repo: "unsloth/Llama-3.2-3B-Instruct-bnb-4bit", note: "3B, about 2 GB" },
-  { repo: "unsloth/Qwen2.5-3B-Instruct-bnb-4bit", note: "3B, about 2 GB, good in many languages" },
-  { repo: "unsloth/gemma-2-2b-it-bnb-4bit", note: "2B, about 1.7 GB, the lightest" },
+  { repo: "unsloth/Phi-3.5-mini-instruct", note: "3.8B, about 7.6 GB download - the safest fit for 8 GB cards" },
+  { repo: "unsloth/Llama-3.2-3B-Instruct", note: "3B, about 6.4 GB download" },
+  { repo: "unsloth/Qwen2.5-3B-Instruct", note: "3B, about 6.2 GB download, good in many languages" },
+  { repo: "unsloth/gemma-2-2b-it", note: "2B, about 5.2 GB download, the lightest" },
 ];
 
 /** Same text train.py builds from an example, so there is no guessing what the model sees. */
@@ -34,6 +97,27 @@ const preview = (e: Partial<Example>) => {
   const inp = (e.input || "").trim();
   return `### Instruction:\n${(e.instruction || "").trim()}\n${inp ? `\n### Input:\n${inp}\n` : ""}\n### Response:\n${(e.output || "").trim()}`;
 };
+
+/** One row from another tool's dataset: instruction/input/output, prompt/completion, question/answer, or a chat "messages" list (system text becomes the input). */
+function toExample(e: any): Example | null {
+  const s = (v: any) => (typeof v === "string" ? v : v == null ? "" : String(v)).trim();
+  let instruction = s(e?.instruction ?? e?.prompt ?? e?.question ?? e?.query ?? e?.human);
+  let input = s(e?.input ?? e?.context);
+  let output = s(e?.output ?? e?.response ?? e?.completion ?? e?.answer ?? e?.assistant);
+  if (Array.isArray(e?.messages)) {
+    const m = e.messages as { role?: string; content?: any }[];
+    instruction = s(m.find(x => x.role === "user")?.content);
+    output = s(m.find(x => x.role === "assistant")?.content);
+    input = s(m.find(x => x.role === "system")?.content);
+  }
+  return instruction && output ? { instruction, input, output } : null;
+}
+/** .jsonl (one object per line) or .json (a list) in any of the shapes above. */
+function parseJsonRows(text: string): Example[] {
+  const t = text.trim();
+  const rows: any[] = t.startsWith("[") ? JSON.parse(t) : t.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
+  return rows.map(toExample).filter((x): x is Example => !!x);
+}
 
 function parseCsv(text: string): Example[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -114,7 +198,8 @@ export function FineTuneView() {
     if (!file) return;
     await guard(async () => {
       const text = await file.text();
-      const rows: Example[] = file.name.toLowerCase().endsWith(".csv") ? parseCsv(text) : text.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l)).map((e: any) => ({ instruction: String(e.instruction || ""), input: String(e.input || ""), output: String(e.output || "") })).filter(e => e.instruction && e.output);
+      const rows: Example[] = file.name.toLowerCase().endsWith(".csv") ? parseCsv(text) : parseJsonRows(text);
+      if (!rows.length) throw new Error("No usable examples found. Each row needs an instruction (or prompt / question) and an output (or response / answer).");
       setExamples(prev => [...prev, ...rows]);
       notify({ message: `Imported ${rows.length} examples`, tab: "finetune" });
     });
@@ -160,6 +245,8 @@ export function FineTuneView() {
         </div>
       </div>
 
+      <TrainProgress jobs={[{ title: "Fine-tune", job: llm }, { title: "Writing pairs", job: pairs }, { title: "Download", job: dl }]} />
+
       {setupOpen && (
         <div className="grid shrink-0 gap-3 border-b border-white/5 bg-white/[0.02] px-8 py-4 md:grid-cols-3">
           <FolderField label="Training folder" value={trainRoot} onChange={setTrainRoot} hint="Holds llm_finetune/ with the Python environment, models, datasets and outputs." />
@@ -173,7 +260,7 @@ export function FineTuneView() {
           {tab === "dataset" ? (
             <>
               <div className="grid gap-4 lg:grid-cols-2">
-                <Card title="Build from your material" icon={<BookOpen size={15} />} note="Add PDFs, Word files, pictures, web pages or text. A model reads each one and writes question-and-answer pairs from what is really in it; answers that only describe the source are thrown away.">
+                <Card title="Build from your material" info={INFO.material} icon={<BookOpen size={15} />} note="Add PDFs, Word files, pictures, web pages or text. A model reads each one and writes question-and-answer pairs from what is really in it; answers that only describe the source are thrown away.">
                   <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.txt,.md,image/png,image/jpeg,image/webp" hidden onChange={e => addFiles(e.target.files)} />
                   <div className="flex flex-wrap gap-2"><button onClick={() => fileRef.current?.click()} className={btn}><Upload size={14} />Add files...</button></div>
                   <div className="flex gap-2"><input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && addUrl()} placeholder="https://..." className={inputCls} /><button onClick={addUrl} className={btn}><Link2 size={14} />Add page</button></div>
@@ -196,20 +283,20 @@ export function FineTuneView() {
                   </div>
                 </Card>
 
-                <Card title="Write examples by hand" icon={<FileText size={15} />} note="Each example is one thing you ask and the answer you want. The box below shows exactly what the trainer will see.">
+                <Card title="Write examples by hand" info={INFO.hand} icon={<FileText size={15} />} note="Each example is one thing you ask and the answer you want. The box below shows exactly what the trainer will see.">
                   <TextField label="Instruction" value={hand.instruction} onChange={v => setHand({ ...hand, instruction: v })} placeholder="What should the model be asked to do?" />
                   <TextField label="Input (optional)" value={hand.input} onChange={v => setHand({ ...hand, input: v })} placeholder="Extra context the instruction refers to" />
                   <Field label="Expected output"><textarea value={hand.output} onChange={e => setHand({ ...hand, output: e.target.value })} rows={3} placeholder="The answer the model should learn to give" className={inputCls + " resize-none"} /></Field>
                   <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-black/30 px-3 py-2 font-mono text-[11px] text-zinc-500">{preview(hand)}</pre>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={addExample} disabled={!hand.instruction.trim() || !hand.output.trim()} className={btnPrimary}><Plus size={14} />Add example</button>
-                    <input ref={importRef} type="file" accept=".jsonl,.csv" hidden onChange={e => importFile(e.target.files?.[0])} />
-                    <button onClick={() => importRef.current?.click()} className={btn}><Upload size={14} />Import .jsonl / .csv...</button>
+                    <input ref={importRef} type="file" accept=".jsonl,.json,.csv" hidden onChange={e => importFile(e.target.files?.[0])} />
+                    <button onClick={() => importRef.current?.click()} className={btn}><Upload size={14} />Import .jsonl / .json / .csv...</button>
                   </div>
                 </Card>
               </div>
 
-              <Card title={`Your dataset (${examples.length} example${examples.length === 1 ? "" : "s"})`} icon={<Check size={15} />} note="Fix or delete anything wrong, then save it - the saved file shows up in the Fine-tune step.">
+              <Card title={`Your dataset (${examples.length} example${examples.length === 1 ? "" : "s"})`} info={INFO.dataset} icon={<Check size={15} />} note="Fix or delete anything wrong, then save it - the saved file shows up in the Fine-tune step.">
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="w-64"><SelectField label="Open a saved dataset" value="" onChange={v => v && openDataset(v)} options={[{ value: "", label: "Choose..." }, ...datasetOptions]} /></div>
                   <div className="w-64"><TextField label="Save as" value={f.fileName} onChange={v => set({ fileName: v })} placeholder="e.g. my_character_chat" /></div>
@@ -242,7 +329,7 @@ export function FineTuneView() {
           ) : (
             <>
               <div className="grid gap-4 lg:grid-cols-2">
-                <Card title="Model and data" icon={<GraduationCap size={15} />}>
+                <Card title="Model and data" info={INFO.model} icon={<GraduationCap size={15} />}>
                   <SelectField label="Base model (what is fine-tuned)" value={f.baseModelDir} onChange={v => set({ baseModelDir: v })} options={status.llm.baseModels.map(m => ({ value: m.path, label: m.name }))} empty="No base model downloaded yet" hint="A downloaded 4-bit checkpoint. Small ones (3-4B) train comfortably on 8 GB." />
                   <SelectField label="Training dataset" value={f.datasetFile} onChange={v => set({ datasetFile: v })} options={datasetOptions} empty="No saved datasets yet - build one in step 1" />
                   <FolderField label="Save the result to" value={f.outputDir} onChange={v => set({ outputDir: v })} placeholder="defaults to a new folder in outputs" />
@@ -255,7 +342,7 @@ export function FineTuneView() {
                     <p className="mt-1.5 text-[10px] text-zinc-600">{SUGGESTED.find(s => s.repo === repo)?.note}</p>
                   </div>
                 </Card>
-                <Card title="Settings" icon={<Settings2 size={15} />} note="Defaults suit a 3-4B model on 8 GB. Lower the batch size or sequence length if it runs out of memory.">
+                <Card title="Settings" info={INFO.settings} icon={<Settings2 size={15} />} note="Defaults suit a 3-4B model on 8 GB. Lower the batch size or sequence length if it runs out of memory.">
                   <div className="grid grid-cols-3 gap-3">
                     <NumberField label="LoRA rank" value={f.rank} onChange={v => set({ rank: v })} min={1} max={256} />
                     <NumberField label="LoRA alpha" value={f.alpha} onChange={v => set({ alpha: v })} min={1} max={256} />
@@ -269,7 +356,7 @@ export function FineTuneView() {
                 </Card>
               </div>
 
-              <Card title="Finished models" icon={<Check size={15} />} note={`In ${status.llm.outputDir}. The adapter is the small trained layer; a GGUF is the whole model, ready for Ollama.`} right={<button onClick={reload} className="text-[11px] text-zinc-500 hover:text-white">Refresh</button>}>
+              <Card title="Finished models" info={INFO.finished} icon={<Check size={15} />} note={`In ${status.llm.outputDir}. The adapter is the small trained layer; a GGUF is the whole model, ready for Ollama.`} right={<button onClick={reload} className="text-[11px] text-zinc-500 hover:text-white">Refresh</button>}>
                 {!status.llm.outputs.length ? <p className="text-xs text-zinc-600">Nothing trained yet.</p> : (
                   <div className="space-y-2">{status.llm.outputs.map(o => (
                     <div key={o.path} className="rounded-xl border border-white/5 p-3 text-xs">

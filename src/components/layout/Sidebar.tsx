@@ -105,6 +105,7 @@ export function Sidebar({
     { id: "series", label: "Series", icon: Clapperboard },
     { id: "trainlora", label: "Train LoRA", icon: Palette },
     { id: "finetune", label: "FineTune LLM", icon: GraduationCap },
+    { id: "trainspeech", label: "Train Speech", icon: Mic },
     { id: "models", label: "Models", icon: Database },
     { id: "memory", label: "Memory", icon: BrainCircuit },
     { id: "engine", label: "Engine", icon: Cpu },
@@ -321,7 +322,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "ollamaclaude", "vision", "image", "video", "series", "trainlora", "finetune", "models", "memory", "engine", "console", "settings"].map((tab) => (
+               {["chat", "ollamaclaude", "vision", "image", "video", "series", "trainlora", "finetune", "trainspeech", "models", "memory", "engine", "console", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cursed_Ai Training Handbook</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1c1c28; margin: 0; }
+  h1 { font-size: 26pt; margin: 0 0 4pt; letter-spacing: -0.5px; color: #3b1d8f; }
+  h2 { font-size: 16pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 2px solid #6d4aff; color: #2a1670; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 14pt 0 4pt; color: #3b1d8f; page-break-after: avoid; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt 0; padding-left: 18pt; }
+  li { margin-bottom: 3pt; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9.2pt; background: #f1eefc; padding: 1pt 4pt; border-radius: 3pt; }
+  pre { font-family: Consolas, "Courier New", monospace; font-size: 8.8pt; background: #f6f5fb; border: 1px solid #ddd8f3; border-left: 4px solid #6d4aff; padding: 7pt 9pt; margin: 4pt 0 9pt; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; font-size: 9.6pt; page-break-inside: auto; }
+  th { background: #3b1d8f; color: #fff; text-align: left; padding: 4pt 6pt; font-weight: 600; }
+  td { padding: 4pt 6pt; border-bottom: 1px solid #e3e0f2; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  tr:nth-child(even) td { background: #faf9fe; }
+  .box { border-radius: 6pt; padding: 7pt 10pt; margin: 6pt 0 10pt; page-break-inside: avoid; }
+  .tip { background: #eaf7ee; border: 1px solid #b7e1c4; }
+  .warn { background: #fff4e0; border: 1px solid #f1cf8a; }
+  .note { background: #eef3ff; border: 1px solid #c3d3f7; }
+  .box b.t { display: block; margin-bottom: 2pt; }
+  .cover { padding: 36mm 0 0; page-break-after: always; }
+  .cover .sub { font-size: 13pt; color: #55557a; margin-bottom: 18pt; }
+  .cover .meta { font-size: 10pt; color: #55557a; margin-top: 26pt; }
+  .toc a { color: inherit; text-decoration: none; }
+  .toc li { margin-bottom: 4pt; }
+  .step { counter-increment: s; }
+  .check li { list-style: none; margin-left: -14pt; }
+  .check li:before { content: "\2610  "; font-size: 12pt; }
+  .small { font-size: 9pt; color: #55557a; }
+  .pb { page-break-before: always; }
+  .cols { display: flex; gap: 10pt; }
+  .cols > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Cursed_Ai Training Handbook</h1>
+  <div class="sub">How to teach your own models, offline: language models, speech recognition for your accent, voices, and office documents</div>
+  <p>Written for this PC (RTX 5060 laptop GPU with 8 GB, Windows) and for the Cursed_Ai app as it stands after the Fine-tune and Train Speech pages were added.</p>
+  <div class="box note"><b class="t">How to use this handbook</b>
+    Read <b>Part 1</b> first (10 minutes). Then follow the recipe that matches your goal in <b>Part 3</b>. Part 4 lists what to do while you still have internet. Part 6 is for when something goes wrong.</div>
+  <div class="meta">Everything in this handbook that was measured on this PC is marked <b>measured</b>. Anything not tried yet is marked <b>untested</b>.</div>
+  <h3 style="margin-top:26pt">Contents</h3>
+  <ol class="toc">
+    <li>The big picture and the words you need</li>
+    <li>Where everything lives on this PC</li>
+    <li>Recipes: subject expert, office letters, Indian-accent speech recognition, a voice, image LoRA</li>
+    <li>Before you go offline: the download checklist</li>
+    <li>Step-by-step: training a language model in the app</li>
+    <li>Troubleshooting</li>
+    <li>Settings, times and sizes</li>
+    <li>Quick reference: formats, prompts, commands</li>
+    <li>Glossary</li>
+  </ol>
+</div>
+
+<h2>1. The big picture and the words you need</h2>
+<p>Training here means <b>fine-tuning</b>: you start from a model that already works and nudge it with your own examples. You never train from nothing; that would need huge data and many GPUs.</p>
+<table>
+  <tr><th style="width:24%">What you train</th><th>What it learns</th><th style="width:25%">Page in the app</th></tr>
+  <tr><td>Language model (LLM)</td><td>A subject, a writing style, or a document format, from question-and-answer examples</td><td>FineTune LLM</td></tr>
+  <tr><td>Speech to text</td><td>To hear your accent, vocabulary and recording conditions (Whisper)</td><td>Train Speech, mode "Speech to text"</td></tr>
+  <tr><td>Text to speech</td><td>To speak in one voice or language (XTTS-v2) <span class="small">(untested)</span></td><td>Train Speech, mode "Text to speech"</td></tr>
+  <tr><td>Image LoRA</td><td>A character or look for Flux image generation</td><td>Train LoRA</td></tr>
+</table>
+
+<h3>Words you will meet</h3>
+<table>
+  <tr><td style="width:22%"><b>Base model</b></td><td>The model you start from. Bigger knows more but trains slower and needs more memory.</td></tr>
+  <tr><td><b>Dataset</b></td><td>Your examples. For a language model: a file where each line is one instruction and its ideal answer. For speech: audio clips with a text file of what is said.</td></tr>
+  <tr><td><b>Adapter / LoRA</b></td><td>A small add-on that holds what was learned. The base model is not changed; the adapter is applied on top. This is why training fits an 8 GB card.</td></tr>
+  <tr><td><b>Epoch</b></td><td>One full pass over all your examples. 3 to 8 is typical.</td></tr>
+  <tr><td><b>Loss</b></td><td>A score of how wrong the model is on your examples. It should fall (for example from 2.5 to about 1). Lower is not always better: too low means it memorised your examples.</td></tr>
+  <tr><td><b>WER / CER</b></td><td>Word (or character) error rate for speech. 0% is perfect. The page scores clips the model never trained on, before and after.</td></tr>
+  <tr><td><b>GGUF</b></td><td>One compressed file Ollama can run. Training produces an adapter; the app merges it into the model and converts it to GGUF so it shows up in your Ollama list.</td></tr>
+  <tr><td><b>4-bit vs full precision</b></td><td>A 4-bit model is small but cannot be merged and exported. A full-precision model can. Training always loads the model in 4-bit by itself, so you only need to download the full-precision one.</td></tr>
+</table>
+
+<div class="box warn"><b class="t">What fine-tuning is good at, and what it is not</b>
+Fine-tuning is good at <b>style, format, habits and vocabulary</b>: how your office writes a letter, a tone, a layout, an accent. It is only fair at <b>exact facts</b> (numbers, signal patterns, article numbers): a small model needs each fact repeated many times in different wording, and may still get some wrong. <b>Measured:</b> the IRPCS test model learned the rules' wording but still gave wrong answers on two facts that were in its training data. For facts, keep the source documents and check the answer against them.</div>
+
+<h2>2. Where everything lives on this PC</h2>
+<table>
+  <tr><th style="width:42%">Folder (under D:\Claude\In_Progress\02_Web_Apps\Cursed_Ai)</th><th>What is in it</th></tr>
+  <tr><td class="mono">train\llm_finetune\models</td><td>Base language models. Present now: <b>Phi-3.5-mini-instruct</b> (full precision, 7.6 GB), Phi-3.5-mini-instruct-bnb-4bit (cannot export), <b>Qwen2.5-0.5B-Instruct</b> (full precision, 1 GB)</td></tr>
+  <tr><td class="mono">train\llm_finetune\datasets</td><td>Your language-model datasets (<span class="mono">.jsonl</span>), for example irpcs_combined_v2.jsonl</td></tr>
+  <tr><td class="mono">train\llm_finetune\outputs\&lt;run&gt;</td><td>Each training run: <span class="mono">adapter\</span> and, if exported, <span class="mono">gguf\</span> with the GGUF file and its Modelfile</td></tr>
+  <tr><td class="mono">train\llm_finetune\env</td><td>The Python environment that does the training (do not move or edit it)</td></tr>
+  <tr><td class="mono">train\speech\datasets\&lt;name&gt;</td><td>Speech clips with transcripts: clip01.wav and clip01.txt side by side</td></tr>
+  <tr><td class="mono">train\speech\models</td><td>Whisper models (whisper-tiny is present) and, later, XTTS-v2</td></tr>
+  <tr><td class="mono">train\speech\outputs\&lt;run&gt;</td><td>Speech results: <span class="mono">model\</span> (speech to text), <span class="mono">final\</span> (a trained voice)</td></tr>
+  <tr><td class="mono">train\speech\tts</td><td>The separate Python environment for voice training (made by the Set up button)</td></tr>
+  <tr><td class="mono">C:\pinokio\api\fluxgym.git</td><td>FluxGym, used by the Train LoRA page (images)</td></tr>
+</table>
+<p><b>Starting the app:</b> double-click the Cursed_Ai shortcut or <span class="mono">Cursed_Ai.bat</span>; it opens at <span class="mono">http://localhost:3000</span>. <b>Do not close or restart the app while a training job is running</b>: it stops the job.</p>
+
+<h2>3. Recipes</h2>
+
+<h3>Recipe A: a subject expert (for example collision regulations, IRPCS)</h3>
+<ol>
+  <li>Put your reference PDFs or Word files into <b>FineTune LLM → Dataset → Build from your material</b>. Choose a local writer model such as <span class="mono">qwen2.5:7b</span> (works offline).</li>
+  <li>Let it write pairs, then <b>read and fix them</b>. Delete pairs about court cases, tables, or anything a person would never ask.</li>
+  <li>Add <b>hand-written pairs for the facts that must be exact</b>, each asked three or four different ways, with a short direct answer (see "How to write good pairs", Part 5).</li>
+  <li>Train (settings in Part 5), export to Ollama, then ask the model questions it was not trained on.</li>
+  <li>If answers are wrong: add more wordings of the missing facts, raise epochs by 2, then retrain. Repeat.</li>
+</ol>
+<div class="box note"><b class="t">What to expect (measured, IRPCS on Phi-3.5-mini)</b>
+182 pairs, 3 epochs: wording learned, many facts wrong. 519 pairs, rank 32, 5 epochs: better (head-on rule, sternlight arc and flash rate right) but the port-turn signal and the lights of a vessel not under command were still wrong. More wordings and more epochs help; a larger base model helps more.</div>
+
+<h3>Recipe B: an office assistant for letters, applications, faxes and emails</h3>
+<p><b>Goal:</b> a local model that writes in <i>your</i> office's format and language. <b>Base model:</b> Qwen2.5-3B-Instruct (strong in Chinese, Arabic and many languages; good English) or Phi-3.5-mini (English). If your office writes in Hindi, try Qwen2.5-3B first and compare. Download it while online (Part 4).</p>
+<ol>
+  <li><b>Collect 200 to 500 real documents</b> (letters, leave and transfer applications, circulars, fax cover sheets, emails). Use final, correct versions only.</li>
+  <li><b>Remove private details</b>: replace names, phone numbers, addresses, account numbers with plausible dummies ("Mr. A. Sharma", "[Ref. No.]"). The model learns the pattern, not the person.</li>
+  <li><b>For each document write the request that would produce it</b>, as a person would type it: "Leave application to the Principal for 3 days for a family function." The document itself is the answer. The in-app pair writer makes questions about facts, so for letters make these pairs yourself or with a chat assistant (a ready prompt is in Part 8).</li>
+  <li><b>Cover the variety</b>: at least 10 to 20 examples of each document type, in the languages you really use, and a few examples that include the details (dates, names) in the request so the model learns to use them.</li>
+  <li><b>Put the layout in the answer exactly as you want it</b>: letterhead lines, "To", subject line, salutation, closing, enclosures. Whatever is consistent in your examples becomes the model's habit.</li>
+  <li>Train 4 to 6 epochs at rank 16 to 32. Export to Ollama. Test with 10 requests you did not train on.</li>
+  <li><b>Keep an exact template in the prompt for strict parts</b> (reference-number format, official wording). Fine-tuning gives style; a pasted template gives exactness.</li>
+</ol>
+<div class="box tip"><b class="t">Start small</b>
+Train first on 50 documents of one type (say applications). If the layout comes out right, add the other types. It is far quicker to fix a small dataset than a large one.</div>
+
+<h3>Recipe C: speech recognition that understands Indian-accented English</h3>
+<p>The default speech models are weakest on accents and vocabulary they heard little of. Fine-tuning Whisper on recordings of Indian speakers is exactly the fix. Choose <b>language: English</b> (not Hindi) when the speech is English with an Indian accent.</p>
+<ol>
+  <li><b>Record the clips.</b> Several different speakers (at least 5 to 10), the same kind of speech you want recognised (office talk, dictation, meetings), a quiet room, the same microphone you will use later. Each clip <b>3 to 15 seconds</b>, never over 30 seconds. wav, mp3, m4a, flac, ogg all work.</li>
+  <li><b>How much:</b> about 30 minutes is enough to see a change; 2 to 5 hours gives a solid improvement. Quality matters more than quantity.</li>
+  <li>In <b>Train Speech → Clips</b>: create a dataset, add the recordings, then press <b>Write draft transcripts</b> (use whisper-small or bigger for better drafts) or import a sheet you already have.</li>
+  <li><b>Correct every transcript</b> so it is exactly what was said, including names and local words. This is the most important step; wrong text teaches wrong spellings.</li>
+  <li>Download <b>whisper-small</b> (about 970 MB, online) if you have not. <b>Train</b>: method LoRA, rank 32, epochs 5, learning rate 1e-3, batch 8 (lower to 4 if memory runs out), keep 10% back for scoring.</li>
+  <li>Read the result: the log ends with <span class="mono">RESULT WER 18.0% -> 11.0%</span> (example). If it got worse, use fewer epochs (3), more clips, or a lower learning rate (5e-4).</li>
+  <li><b>Try it:</b> record yourself, run the base model, then your trained model on the same recording.</li>
+</ol>
+<div class="box warn"><b class="t">Important limit</b>
+The app's microphone button currently uses a very small English-only Whisper (whisper-tiny.en). A model you train on this page is <b>not yet connected to that button</b>; use the Try it step to check it. Connecting a trained model to the microphone needs a format conversion that has not been built. A cheaper first step is to switch the microphone button to a larger Whisper such as small.</div>
+<p><b>Measured:</b> the whole chain (draft transcripts, LoRA and full training, before-and-after scoring, Try it) ran correctly on whisper-tiny with 20 English clips. That test only proves the process works; it says nothing about accuracy on Indian accents.</p>
+
+<h3>Recipe D: a voice (text to speech) <span class="small">(untested)</span></h3>
+<p>The page trains <b>XTTS-v2</b>, which can speak Hindi, Arabic and Chinese. It is <b>licensed for non-commercial use only</b>. Even without any training, XTTS-v2 can copy a voice from a short reference clip; training makes the copy more faithful and the pronunciation better.</p>
+<ol>
+  <li>Press <b>Set up</b> (about 4 GB, online) and <b>Download XTTS-v2</b> (about 2 GB, online). The code for this was written but <b>not yet run</b>; expect to fix things on the first run.</li>
+  <li>Record <b>one speaker</b>, clean audio, no music or echo, <b>30 minutes or more</b>, in clips of 1 to 11 seconds, each with an exact transcript.</li>
+  <li>Press <b>Prepare for voice training</b> (converts to 22 kHz, drops clips outside 1 to 11 s, picks a reference clip).</li>
+  <li>Train: 6 epochs, batch 2, accumulation 8, learning rate 5e-6. Keep the batch at 1 or 2 on 8 GB.</li>
+  <li>Try it: choose the voice, type a sentence in that language, press Say it.</li>
+</ol>
+
+<h3>Recipe E: image LoRA (Train LoRA page)</h3>
+<ol>
+  <li>Dataset tab: create a folder, add 15 to 40 varied pictures of the character, write a made-up <b>trigger word</b> (for example <span class="mono">richie01</span>), and caption the pictures (the page can write captions).</li>
+  <li>Train tab: choose the Flux base model and VRAM preset (8G), start. The page's own <b>Guide</b> button explains each step with pictures.</li>
+  <li>Copy the finished <span class="mono">.safetensors</span> to ComfyUI's loras folder with the page's button, then use the trigger word in prompts.</li>
+</ol>
+
+<h2 class="pb">4. Before you go offline: the download checklist</h2>
+<p><b>Works offline:</b> all training, merging and exporting to GGUF, adding to Ollama, writing pairs with local Ollama models, draft transcripts with a downloaded Whisper, trying results. <b>Needs internet:</b> downloading models, the one-time voice setup, cloud models (the ":cloud" ones and Gemini), and Hugging Face downloads of any kind.</p>
+<div class="box warn"><b class="t">Test once before you travel</b>
+Turn Wi-Fi off and run a very short training (1 epoch on a handful of examples, no export). Training and exporting should work offline, because the models and tools are all on this PC and the GGUF tool (llama.cpp) was already installed during the first export, but this has not been tried with the network off.</div>
+<table>
+  <tr><th style="width:44%">Download</th><th style="width:16%">Size</th><th>Status on this PC</th></tr>
+  <tr><td>unsloth/Phi-3.5-mini-instruct (language model)</td><td>7.6 GB</td><td>Downloaded</td></tr>
+  <tr><td>unsloth/Qwen2.5-0.5B-Instruct (small, fast)</td><td>1.0 GB</td><td>Downloaded</td></tr>
+  <tr><td>unsloth/Qwen2.5-3B-Instruct (multilingual, for the office assistant)</td><td>6.2 GB</td><td>Not downloaded</td></tr>
+  <tr><td>unsloth/Llama-3.2-3B-Instruct (alternative)</td><td>6.4 GB</td><td>Not downloaded</td></tr>
+  <tr><td>unsloth/gemma-2-2b-it (lightest 2B)</td><td>5.2 GB</td><td>Not downloaded</td></tr>
+  <tr><td>openai/whisper-tiny</td><td>0.15 GB</td><td>Downloaded</td></tr>
+  <tr><td><b>openai/whisper-small</b> (recommended for accents)</td><td>1.0 GB</td><td><b>Not downloaded: get this first</b></td></tr>
+  <tr><td>openai/whisper-medium (best, needs LoRA)</td><td>3 GB</td><td>Not downloaded</td></tr>
+  <tr><td>Voice setup (Python environment)</td><td>about 4 GB</td><td>Not set up</td></tr>
+  <tr><td>coqui/XTTS-v2 (voice model)</td><td>about 2 GB</td><td>Not downloaded</td></tr>
+</table>
+<p>Use the page's <b>Download</b> buttons ("Need a base model?" on FineTune LLM, "Need a Whisper model?" on Train Speech). They keep what was already downloaded if the connection drops, so just press the button again. Keep at least <b>25 GB free</b> on drive D: for a language-model export.</p>
+<div class="box note"><b class="t">Also bring your material</b>
+Copy your reference PDFs and documents, recordings and any ChatGPT-made datasets onto this PC before you go offline, so you only need the app.</div>
+
+<h2 class="pb">5. Step by step: training a language model in the app</h2>
+
+<h3>Step 1: choose the base model</h3>
+<table>
+  <tr><th>Model</th><th>Good for</th><th>Notes</th></tr>
+  <tr><td>Qwen2.5-0.5B-Instruct</td><td>Quick experiments, very narrow tasks</td><td>Fast and small; holds little, makes more mistakes <span class="small">(not yet tested on your data)</span></td></tr>
+  <tr><td>Phi-3.5-mini (3.8B)</td><td>English subject experts, letters</td><td>Safest fit for 8 GB. Used for the IRPCS tests</td></tr>
+  <tr><td>Qwen2.5-3B</td><td>Office assistant, Hindi, Arabic, Chinese</td><td>Best multilingual choice among these</td></tr>
+  <tr><td>Llama-3.2-3B, gemma-2-2b</td><td>Alternatives</td><td>Try if the others disappoint</td></tr>
+</table>
+<p>Always use the <b>full-precision</b> download (names without "bnb-4bit") so the GGUF export works.</p>
+
+<h3>Step 2: build the dataset</h3>
+<p>Open <b>FineTune LLM → 1 Dataset</b>. There are three ways in, and you can mix them:</p>
+<ul>
+  <li><b>Build from your material:</b> add PDF, Word, text, pictures or web links; a writer model makes question-and-answer pairs. Press <b>Write pairs</b>.</li>
+  <li><b>Write examples by hand:</b> type instruction, optional input, expected output.</li>
+  <li><b>Import:</b> a <span class="mono">.jsonl</span>, <span class="mono">.json</span> or <span class="mono">.csv</span> file made elsewhere (for example in ChatGPT). Columns accepted: instruction / input / output, prompt / completion, question / answer, or chat "messages".</li>
+</ul>
+<p>In <b>Your dataset</b> every row is editable: instruction, input and output. The two small buttons on a row (redo, add) write a new pair from the same passage. The line under a row says where it came from. When happy, type a name and press <b>Save as .jsonl</b>. <b>Your work is kept if you refresh the page</b>, but save it anyway.</p>
+
+<h3>How to write good pairs</h3>
+<ul>
+  <li><b>Ask each fact several ways.</b> "What sound signal means a turn to port?", "How do I signal altering to port by whistle?", "What does two short blasts mean?" all get the same answer. This teaches the fact, not one sentence.</li>
+  <li><b>Short, direct answers</b> for facts ("Two short blasts."), full documents for letters.</li>
+  <li><b>Never contradict yourself.</b> Two pairs with different answers to the same question teach confusion. Search the file for the key words after you write.</li>
+  <li><b>Delete junk:</b> pairs that say "according to the text", questions nobody would ask, tables copied as text.</li>
+  <li><b>Test questions are not training questions.</b> Keep a separate list of 10 questions you never train on; they tell you the truth.</li>
+</ul>
+<table>
+  <tr><th>Your goal</th><th>Pairs to aim for</th></tr>
+  <tr><td>One narrow task (one letter type)</td><td>50 to 150</td></tr>
+  <tr><td>A subject with many facts</td><td>500 to 2,000, several wordings per fact</td></tr>
+  <tr><td>An office assistant (many document types)</td><td>200 to 500 real documents</td></tr>
+</table>
+
+<h3>Step 3: set the training</h3>
+<p>Go to <b>2 Fine-tune</b>. Pick the base model and your saved dataset. Settings (the (i) button on each card explains them):</p>
+<table>
+  <tr><th style="width:22%">Setting</th><th style="width:20%">Starting value</th><th>Change it when</th></tr>
+  <tr><td>LoRA rank</td><td>16 (32 for many facts)</td><td>Raise to 32 or 64 if the model will not learn facts; costs more memory</td></tr>
+  <tr><td>LoRA alpha</td><td>same as rank</td><td>Rarely</td></tr>
+  <tr><td>Epochs</td><td>3 (5 for small datasets)</td><td>Raise by 2 if answers are vague; lower if it repeats training text or ignores other questions</td></tr>
+  <tr><td>Learning rate</td><td>2e-4</td><td>Lower (1e-4) if answers get worse or the loss jumps around</td></tr>
+  <tr><td>Batch size</td><td>2</td><td>Set 1 if you run out of memory</td></tr>
+  <tr><td>Max length</td><td>1024 (512 for short pairs)</td><td>Raise only for long documents; longer means more memory</td></tr>
+  <tr><td>Export a GGUF</td><td>on</td><td>Off for a quick try; on to use the model in Ollama</td></tr>
+  <tr><td>Ollama model name</td><td>for example irpcs-v1</td><td>Use a new name for every version</td></tr>
+</table>
+<p>Press <b>Start fine-tune</b>. The band under the title shows the stage and a percent bar; the log at the bottom can be enlarged with the expand button. A popup tells you when it is finished or failed, on any tab.</p>
+
+<h3>Step 4: export and use it</h3>
+<ol>
+  <li>With export on, after training the app merges the adapter into the model, converts it to GGUF, and registers it in Ollama under your name (<b>measured:</b> about 6 to 12 extra minutes for Phi-3.5-mini).</li>
+  <li>The model then appears in <span class="mono">ollama list</span> and in the app's model list. Run it with <span class="mono">ollama run your-name</span>.</li>
+  <li><b>It was trained on a fixed prompt layout</b> ("### Instruction: ... ### Response:"). When the export registers the model itself (the "Ollama model name" setting), it sets this layout and a context of 4096 for Ollama. <b>Use that setting rather than the separate "Add to Ollama" button on the Finished models card</b>, which still writes a plain Modelfile without the layout. If you load the GGUF in another program (LM Studio, llama.cpp) you must set the same template, or answers get worse (Part 8).</li>
+  <li><b>Keep the adapter and your dataset.</b> To improve the model later, add examples to the dataset and train again from the base model; do not stack training on top of an exported model, because each round tends to blur what the last one learned.</li>
+</ol>
+
+<h3>Step 5: test and improve</h3>
+<ol>
+  <li>Ask 10 questions that were <b>not</b> in the training set, and 3 unrelated ones ("What is the capital of France?") to confirm it still behaves normally.</li>
+  <li>Note which answers are wrong. For each, check the dataset: missing? contradicted? asked only one way?</li>
+  <li>Add several wordings of each missing fact, retrain, and compare with the previous version by keeping both models in Ollama under different names.</li>
+</ol>
+<p><b>Topics:</b> to teach a second topic, add its pairs to the same dataset and retrain, including some pairs from the first topic. Training only on the new topic tends to make the model forget the old one.</p>
+
+<h2 class="pb">6. Troubleshooting</h2>
+<table>
+  <tr><th style="width:30%">What you see</th><th>What it means and what to do</th></tr>
+  <tr><td>"Out of memory" or the run stops early</td><td>Batch size 1, max length 512, close Ollama models, ComfyUI and other GPU programs, or pick a smaller model. For speech use a smaller batch or LoRA.</td></tr>
+  <tr><td>Export fails: "base model should be a 16bit ... base model"</td><td>You trained from a 4-bit model. Download the full-precision version and train from it. After the app is restarted it blocks this choice before training starts.</td></tr>
+  <tr><td>Download stuck at the same number of MB</td><td>Press Stop, then Download again; it resumes. Or download the file yourself in your browser or downloader into the model's folder with exactly the same file names.</td></tr>
+  <tr><td>Download error "getaddrinfo failed"</td><td>Your internet dropped. Reconnect and press Download again.</td></tr>
+  <tr><td>Ollama: "model requires more system memory (45 GiB)"</td><td>The model's context window is too large. A model registered through the "Ollama model name" setting already has <span class="mono">num_ctx 4096</span>. For an older one, add <span class="mono">PARAMETER num_ctx 4096</span> to its Modelfile and run <span class="mono">ollama create name -f Modelfile</span> again.</td></tr>
+  <tr><td>The job disappeared or the log is empty</td><td>The app was restarted, which stops running jobs. Start it again, and do not restart during training.</td></tr>
+  <tr><td>Answers are wrong or vague</td><td>More wordings per fact, 2 more epochs, higher rank (32), a bigger base model, and a check for contradicting pairs.</td></tr>
+  <tr><td>It repeats training text, or gets odd on other questions</td><td>Too many epochs or too high a learning rate. Lower both, or add varied examples.</td></tr>
+  <tr><td>Not enough disk space during export</td><td>The export briefly needs about 3 times the model size (merged copy, intermediate file, final file). Free at least 25 GB for a 3.8B model.</td></tr>
+  <tr><td>Speech: "ffmpeg was not found"</td><td>ffmpeg must be on PATH (it is on this PC). Restart the app after installing it.</td></tr>
+  <tr><td>Speech: draft transcripts are poor</td><td>Use whisper-small or medium for the drafts, and correct them by hand.</td></tr>
+  <tr><td>Speech error rate got worse after training</td><td>Fewer epochs, lower learning rate, more and more varied clips, check the transcripts for mistakes.</td></tr>
+  <tr><td>Voice setup says Python 3.10 to 3.12 is needed</td><td>Voice training does not support newer Python. Install Python 3.10, 3.11 or 3.12 and press Set up again.</td></tr>
+</table>
+
+<h2>7. Settings, times and sizes</h2>
+<h3>Times measured on this PC (RTX 5060 laptop, 8 GB)</h3>
+<table>
+  <tr><th>Run</th><th>Time</th></tr>
+  <tr><td>Phi-3.5-mini, 182 pairs, 3 epochs, rank 16 (training only)</td><td>about 3 minutes</td></tr>
+  <tr><td>Phi-3.5-mini, 519 pairs, 5 epochs, rank 32 (training)</td><td>about 9 minutes</td></tr>
+  <tr><td>GGUF export and registering in Ollama (Phi-3.5-mini)</td><td>about 6 to 12 minutes more</td></tr>
+  <tr><td>Whisper-tiny, 20 clips (test of the whole chain)</td><td>under a minute plus model loading</td></tr>
+</table>
+<p>As a rough guide, Phi-3.5-mini takes <b>0.2 to 0.35 seconds per example per pass</b>: pairs times epochs times that. A 0.5B model should be several times faster, but this has not been measured. Writing pairs with a local 7B model took about 15 minutes for 40 passages.</p>
+<h3>Space</h3>
+<table>
+  <tr><td>Phi-3.5-mini full-precision base</td><td>7.6 GB</td></tr>
+  <tr><td>Exported GGUF of Phi-3.5-mini</td><td>2.3 GB each version</td></tr>
+  <tr><td>Adapter and checkpoints per run</td><td>a few hundred MB</td></tr>
+</table>
+<p>Delete old runs you do not need (the run folders in <span class="mono">outputs</span>) and old Ollama models with <span class="mono">ollama rm name</span>.</p>
+
+<h2 class="pb">8. Quick reference</h2>
+<h3>Dataset file format (language model)</h3>
+<p>One JSON object per line, UTF-8, extension <span class="mono">.jsonl</span>:</p>
+<pre>{"instruction": "Write a leave application to the Principal for 3 days.", "input": "", "output": "To,\nThe Principal,\n...\nYours faithfully,\n..."}
+{"instruction": "What sound signal means I am altering course to port?", "input": "", "output": "Two short blasts."}</pre>
+<p>Line breaks inside a text are written as <span class="mono">\n</span>. Hindi, Arabic and Chinese text can be typed as is.</p>
+
+<h3>A prompt to make training pairs from your real documents with a chat assistant</h3>
+<p>Paste a document after this prompt, remove private details first, and import the answer with <b>Import .jsonl</b>:</p>
+<pre>I am building a training file for a small local model that writes office documents.
+Below is a real document. Reply with ONE line of JSON Lines, nothing else, in this shape:
+{"instruction": "...", "input": "", "output": "..."}
+Rules:
+- "instruction" is the short request a clerk would type to get this document
+  (who it is to, what it is about, key details such as dates and amounts).
+- "output" is the document exactly as given, with the same layout and line breaks (use \n).
+- Keep the language of the document. Do not add or change anything.
+- Replace any real name, phone number or account number with a dummy.
+
+DOCUMENT:
+&lt;paste the document here&gt;</pre>
+<p>For many documents, ask for one line per document and paste several at once, separated by a line of dashes.</p>
+
+<h3>Prompt layout the exported models expect</h3>
+<pre>### Instruction:
+&lt;your question&gt;
+
+### Response:
+</pre>
+<p>If you use a trained GGUF in another program, set this as the prompt template, and add "### Instruction:" as a stop word. The app does this for you inside Ollama.</p>
+
+<h3>Useful commands (Windows Command Prompt or PowerShell)</h3>
+<pre>ollama list                      (show your models)
+ollama run irpcs-colregs-v2      (chat with a model; type /bye to leave)
+ollama rm name                   (delete a model)
+ollama create name -f Modelfile  (register a GGUF again after editing its Modelfile)</pre>
+
+<h3>Speech clips: layout on disk</h3>
+<pre>train\speech\datasets\hindi_office\
+    clip01.wav     clip01.txt    (text file holds exactly what is said)
+    clip02.mp3     clip02.txt
+    ...</pre>
+<p>A sheet to import transcripts can be lines like <span class="mono">clip01.wav|the words spoken</span> or a Common Voice <span class="mono">.tsv</span> (columns <span class="mono">path</span> and <span class="mono">sentence</span>).</p>
+
+<h3>Checklist: one training session</h3>
+<ul class="check">
+  <li>Base model downloaded (full precision) and enough free disk (25 GB or more)</li>
+  <li>Dataset saved; contradicting and junk pairs removed; test questions kept apart</li>
+  <li>Ollama models and ComfyUI closed if memory is tight</li>
+  <li>Settings checked; unique name for this version</li>
+  <li>App left running and untouched until the "finished" popup</li>
+  <li>10 unseen questions asked; results noted; next changes decided</li>
+</ul>
+
+<h2>9. Glossary</h2>
+<table>
+  <tr><td style="width:24%"><b>Accumulation</b></td><td>How many small batches are combined before one learning step. Lets a small GPU act like a bigger batch.</td></tr>
+  <tr><td><b>Checkpoint</b></td><td>A saved copy of training at the end of an epoch.</td></tr>
+  <tr><td><b>Context window</b></td><td>How much text a model can read at once. Bigger uses more memory in Ollama.</td></tr>
+  <tr><td><b>Hugging Face</b></td><td>The website the models are downloaded from.</td></tr>
+  <tr><td><b>Overfitting</b></td><td>The model memorised the examples and does worse on anything new.</td></tr>
+  <tr><td><b>Quantisation (q4_k_m)</b></td><td>Shrinking a model to about a quarter of its size with little quality loss. The export uses q4_k_m.</td></tr>
+  <tr><td><b>Trigger word</b></td><td>A made-up word that calls a trained character up in image prompts.</td></tr>
+  <tr><td><b>Whisper</b></td><td>The speech-recognition model family fine-tuned on the Train Speech page.</td></tr>
+  <tr><td><b>XTTS-v2</b></td><td>The text-to-speech model family (Hindi, Arabic, Chinese and more) used for voices. Non-commercial licence.</td></tr>
+</table>
+<p class="small">Cursed_Ai Training Handbook. Facts marked measured were observed on this PC; anything marked untested has not been run.</p>
+</body>
+</html>

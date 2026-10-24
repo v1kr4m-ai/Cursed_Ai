@@ -27,6 +27,7 @@ import { SeriesNotifier } from "./components/tools/series/SeriesNotifier";
 import { OllamaClaudeView } from "./components/oclaude/OllamaClaudeView";
 import { TrainLoraView } from "./components/train/TrainLoraView";
 import { FineTuneView } from "./components/train/FineTuneView";
+import { SpeechTrainView } from "./components/train/SpeechTrainView";
 import { ThemeQuick } from "./components/tools/ThemeSettings";
 import { effectiveTheme, themeById } from "./lib/themes";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
@@ -440,8 +441,8 @@ export default function App() {
       <div className="flex h-screen overflow-hidden font-sans selection:bg-violet-500/30 selection:text-violet-400 p-4 gap-4">
         <div className="atmosphere"></div>
         <ToastHost activeTab={activeTab} onNavigate={setActiveTab} />
-        {/* Desktop Sidebar */}
         <SeriesNotifier />
+        {/* Desktop Sidebar */}
         <div className="hidden md:block h-full">
           <Sidebar
             activeTab={activeTab}
@@ -507,6 +508,7 @@ export default function App() {
             <div className={activeTab === "ollamaclaude" ? "contents" : "hidden"}><OllamaClaudeView settings={settings} /></div>
             <div className={activeTab === "trainlora" ? "contents" : "hidden"}><TrainLoraView /></div>
             <div className={activeTab === "finetune" ? "contents" : "hidden"}><FineTuneView /></div>
+            <div className={activeTab === "trainspeech" ? "contents" : "hidden"}><SpeechTrainView /></div>
             <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} models={models} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
             {activeTab === "settings" && (
               <SettingsView

@@ -34,6 +34,12 @@ export interface TrainPaths {
   fluxOutputDir: string;
   fluxUnetDir: string;
   scriptsDir: string;
+  speechRoot: string;
+  speechDatasetsDir: string;
+  speechModelsDir: string;
+  speechOutputDir: string;
+  /** Python environment for text-to-speech training (coqui-tts), made by the Train Speech page. */
+  ttsPython: string;
 }
 
 export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
@@ -61,6 +67,11 @@ export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
     fluxOutputDir: path.join(fluxgymRoot, "outputs"),
     fluxUnetDir: path.join(fluxgymRoot, "models", "unet"),
     scriptsDir: path.join(appRoot, "trainTool", "scripts"),
+    speechRoot: path.join(trainRoot, "speech"),
+    speechDatasetsDir: path.join(trainRoot, "speech", "datasets"),
+    speechModelsDir: path.join(trainRoot, "speech", "models"),
+    speechOutputDir: path.join(trainRoot, "speech", "outputs"),
+    ttsPython: py(path.join(trainRoot, "speech", "tts")),
   };
 }
 

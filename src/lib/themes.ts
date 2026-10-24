@@ -175,6 +175,7 @@ export const THEME_MODULES: { id: string; label: string }[] = [
   { id: "series", label: "Series" },
   { id: "trainlora", label: "Train LoRA" },
   { id: "finetune", label: "FineTune LLM" },
+  { id: "trainspeech", label: "Train Speech" },
   { id: "models", label: "Models" },
   { id: "memory", label: "Memory" },
   { id: "engine", label: "Engine" },

@@ -134,6 +134,14 @@ def main():
         print(f"[train.py] exporting merged GGUF (q4_k_m) to {gguf_dir}", flush=True)
         model.save_pretrained_gguf(gguf_dir, tokenizer, quantization_method="q4_k_m")
 
+        # Unsloth writes the files to "<dir>_gguf"; bring them into the folder the app looks in.
+        side_dir = gguf_dir + "_gguf"
+        if os.path.isdir(side_dir):
+            os.makedirs(gguf_dir, exist_ok=True)
+            for name in os.listdir(side_dir):
+                os.replace(os.path.join(side_dir, name), os.path.join(gguf_dir, name))
+            os.rmdir(side_dir)
+
         if args.ollama_name:
             gguf_files = [f for f in os.listdir(gguf_dir) if f.endswith(".gguf")]
             if not gguf_files:
@@ -141,8 +149,9 @@ def main():
             else:
                 gguf_path = os.path.join(gguf_dir, gguf_files[0])
                 modelfile_path = os.path.join(gguf_dir, "Modelfile")
+                # The model was trained on PROMPT_TEMPLATE, so Ollama must wrap every question the same way.
                 with open(modelfile_path, "w", encoding="utf-8") as f:
-                    f.write(f"FROM {gguf_path}\n")
+                    f.write(f'FROM {gguf_path}\nTEMPLATE """### Instruction:\n{{{{ .Prompt }}}}\n\n### Response:\n"""\nPARAMETER stop "### Instruction:"\nPARAMETER num_ctx 4096\n')
                 print(f"[train.py] running: ollama create {args.ollama_name} -f {modelfile_path}", flush=True)
                 subprocess.run(["ollama", "create", args.ollama_name, "-f", modelfile_path], check=False)
 

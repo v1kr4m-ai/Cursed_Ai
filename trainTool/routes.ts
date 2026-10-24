@@ -273,6 +273,10 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     if (!exists(p.llmPython)) return bad(res, 400, `The fine-tuning Python environment was not found at ${p.llmPython}. Set the training folder in the page.`);
     if (!cfg.baseModelDir || !exists(path.join(cfg.baseModelDir, "config.json"))) return bad(res, 400, "Choose a downloaded base model.");
     if (!cfg.datasetFile || !exists(cfg.datasetFile)) return bad(res, 400, "Choose a training dataset (.jsonl).");
+    // The GGUF export merges the adapter into full-precision weights, which a pre-quantized (bnb 4-bit) checkpoint cannot give: fail now, not after the training.
+    if (cfg.exportGguf) {
+      try { if (JSON.parse(fs.readFileSync(path.join(cfg.baseModelDir, "config.json"), "utf8")).quantization_config) return bad(res, 400, "This base model is already 4-bit, so it cannot be exported to GGUF. Download the full-precision version (e.g. unsloth/Phi-3.5-mini-instruct) - training still loads it in 4-bit - or turn the GGUF export off."); } catch { /* unreadable config: let the trainer report it */ }
+    }
     if (!cfg.outputDir) cfg.outputDir = path.join(p.llmOutputDir, `${path.basename(cfg.baseModelDir)}-${new Date().toISOString().slice(0, 10)}`);
     fs.mkdirSync(cfg.outputDir, { recursive: true });
     const state = startProcess("llm", `Fine-tuning ${path.basename(cfg.baseModelDir)} on ${path.basename(cfg.datasetFile)}`, p.llmPython, buildLlmArgs(cfg, `${p.scriptsDir}/train_llm.py`), { cwd: p.llmRoot });
@@ -288,7 +292,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return bad(res, 400, "Use a Hugging Face name like unsloth/Phi-3.5-mini-instruct-bnb-4bit.");
     if (!exists(p.llmPython)) return bad(res, 400, "The fine-tuning Python environment was not found.");
     fs.mkdirSync(p.llmModelsDir, { recursive: true });
-    res.json(startProcess("download", `Downloading ${repo}`, p.llmPython, ["-c", "import sys; from huggingface_hub import snapshot_download as d; d(sys.argv[1], local_dir=sys.argv[2])", repo, path.join(p.llmModelsDir, repo.split("/")[1])]));
+    res.json(startProcess("download", `Downloading ${repo}`, p.llmPython, ["-c", "import sys; from huggingface_hub import snapshot_download as d; d(sys.argv[1], local_dir=sys.argv[2])", repo, path.join(p.llmModelsDir, repo.split("/")[1])], { env: { HF_HUB_DISABLE_XET: "1" } })); // the Xet transfer backend can stall on some connections
   });
 
   /** Make a fine-tuned GGUF available in Ollama. */

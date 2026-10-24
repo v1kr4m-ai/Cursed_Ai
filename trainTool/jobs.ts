@@ -5,7 +5,7 @@
 import type { Response } from "express";
 import { spawn, execFile, type ChildProcess } from "child_process";
 
-export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download";
+export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv";
 
 export interface JobState {
   kind: JobKind;

@@ -11,6 +11,7 @@ import { registerComfyLogs } from "./comfyLogs";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
+import { registerSpeechTool } from "./trainTool/speech";
 import type { TrainConfig } from "./trainTool/paths";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
@@ -1700,6 +1701,7 @@ async function startServer() {
     comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL, geminiKey: () => geminiKey(),
     getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath,
   });
+  registerSpeechTool(app, { appRoot: process.cwd(), getConfig: () => serverConfig.train || {} });
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
