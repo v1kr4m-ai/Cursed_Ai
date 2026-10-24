@@ -235,9 +235,10 @@ export function ProjectDashboard({ project, onGo, onChanged }: { project: Projec
         {/* rings */}
         <Tile id="progress" delay={0.1} className="min-h-[11rem]" heading="Progress" onClick={() => onGo("produce")} title="Open the production board">
           <div className="flex items-center justify-between gap-2">
-            <Ring pct={overall} size={74} stroke={5} sub="scenes" />
-            <Ring pct={pct(refsDone, refs.length)} size={74} stroke={5} sub="refs" />
-            <Ring pct={pct(joined, eps.length)} size={74} stroke={5} sub="joined" />
+            <Ring pct={overall} size={64} stroke={5} sub="scenes" />
+            <Ring pct={pct(refsDone, refs.length)} size={64} stroke={5} sub="refs" />
+            <Ring pct={pct(joined, eps.length)} size={64} stroke={5} sub="joined" />
+            <div title={running ? `ComfyUI is working on: ${running.label}` : "ComfyUI is idle"}><Ring pct={runPct ?? 0} size={64} stroke={5} label={running ? (runPct !== null ? `${Math.round(runPct)}%` : "...") : "idle"} sub="ComfyUI" /></div>
           </div>
         </Tile>
 

@@ -9,6 +9,7 @@ import { Develop } from "./Develop";
 import { Board } from "./Board";
 import { Assemble } from "./Assemble";
 import { ProjectDashboard } from "./ProjectDashboard";
+import { onSeriesEvent } from "./seriesEvents";
 import { nativeFolder } from "../../comfy/types";
 import { notify } from "../../../lib/notify";
 import type { AIModel } from "../../../types";
@@ -323,20 +324,19 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
   // Live job events: the server pushes status changes as renders start, progress and finish.
   React.useEffect(() => {
     if (!projectId) return;
-    const source = new EventSource(`/api/series/projects/${projectId}/events`);
     let timer: any = null;
-    source.onmessage = event => {
-      try {
-        const data = JSON.parse(event.data);
+    const stop = onSeriesEvent(data => {
+      if (data.projectId !== projectId) return;
+      {
         if (["started", "finished", "failed", "updated", "stitched"].includes(data.type)) {
           clearTimeout(timer);
           timer = setTimeout(() => reload(projectId), 150); // several events can land together
         } else if (data.type === "progress") {
           setProject(p => (p ? { ...p, running: p.running ? { ...p.running, progress: [data.value, data.max] } : p.running } : p));
         }
-      } catch { /* heartbeat */ }
-    };
-    return () => { clearTimeout(timer); source.close(); };
+      }
+    });
+    return () => { clearTimeout(timer); stop(); };
   }, [projectId, reload]);
 
   const themeButton = (

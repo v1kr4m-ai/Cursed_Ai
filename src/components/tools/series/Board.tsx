@@ -152,6 +152,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
   onChanged: (p: Project) => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [playing, setPlaying] = React.useState(false);
   const [draft, setDraft] = React.useState(scene);
   React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
 
@@ -179,9 +180,28 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
       className={`rounded-lg border bg-neutral-900/50 overflow-hidden transition-colors ${isRunning ? "border-sky-700/70" : "border-neutral-800 hover:border-neutral-700"}`}>
       <div className="flex items-start gap-3 p-3">
-        <motion.div whileHover={{ scale: 1.06 }} className={`grid h-14 w-10 shrink-0 place-items-center rounded ${scene.clipPath ? "bg-emerald-950/50" : "bg-neutral-800"}`}>
-          <Film size={16} className={scene.clipPath ? "text-emerald-400" : "text-neutral-600"} />
-        </motion.div>
+        {scene.clipPath ? (
+          <motion.button whileHover={{ scale: 1.06 }} onClick={() => setPlaying(true)} title="Play this clip" className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-black">
+            <video src={fileUrl(scene.clipPath) + "#t=0.4"} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+            <span className="absolute inset-0 grid place-items-center bg-black/25 opacity-80 hover:opacity-100"><Play size={14} className="text-white" /></span>
+          </motion.button>
+        ) : (
+          <div className="grid h-14 w-10 shrink-0 place-items-center rounded bg-neutral-800"><Film size={16} className="text-neutral-600" /></div>
+        )}
+        {playing && scene.clipPath && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => setPlaying(false)}>
+            <div className="max-h-full space-y-2" onClick={e => e.stopPropagation()}>
+              <video src={fileUrl(scene.clipPath)} controls autoPlay loop playsInline className="max-h-[80vh] max-w-full rounded-lg bg-black" />
+              <div className="flex items-center justify-between text-xs text-neutral-300">
+                <span>Episode {episode.number}, scene {scene.number}</span>
+                <span className="flex gap-2">
+                  <button onClick={() => { api.generateScene(project.id, scene.id); setPlaying(false); }} className="rounded-md border border-neutral-600 px-2.5 py-1 hover:bg-neutral-800">Render again</button>
+                  <button onClick={() => setPlaying(false)} className="rounded-md border border-neutral-600 px-2.5 py-1 hover:bg-neutral-800">Close</button>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(o => !o)}>
           <div className="flex items-center gap-2">
             <span className="text-xs text-neutral-500">#{scene.number}</span>

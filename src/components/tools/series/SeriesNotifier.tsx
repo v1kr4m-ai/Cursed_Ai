@@ -1,5 +1,6 @@
 import React from "react";
 import { notify } from "../../../lib/notify";
+import { onSeriesEvent } from "./seriesEvents";
 
 /**
  * Tells you when a series render ends, wherever you are in the app: one notice when the queue is done
@@ -7,10 +8,8 @@ import { notify } from "../../../lib/notify";
  */
 export function SeriesNotifier() {
   React.useEffect(() => {
-    const source = new EventSource("/api/series/events");
-    source.onmessage = event => {
-      try {
-        const d = JSON.parse(event.data);
+    return onSeriesEvent(d => {
+      {
         const name = d.title || "Series";
         if (d.type === "failed") {
           notify({ message: `${name}: a render failed - ${String(d.error || "unknown error").slice(0, 200)}`, kind: "error", tab: "series" });
@@ -20,9 +19,8 @@ export function SeriesNotifier() {
         } else if (d.type === "stitched") {
           notify({ message: `${name}: episode joined`, tab: "series" });
         }
-      } catch { /* heartbeat */ }
-    };
-    return () => source.close();
+      }
+    });
   }, []);
   return null;
 }
