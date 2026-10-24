@@ -7,6 +7,7 @@ import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
 import { savedSetting } from "../../../lib/settingsStore";
+import { EpisodeManager } from "./EpisodeManager";
 import { ThinkingWords } from "../../ui/ThinkingWords";
 import { notify } from "../../../lib/notify";
 import { applyPreset, CHAT_PRESETS, LENGTH_PRESETS, type SeriesTemplate, api, askModel, extractJson, fileUrl, type Project } from "./api";
@@ -331,12 +332,21 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
   const attachedRefs = project.episodes.flatMap(e => e.refs).filter(r => r.file);
 
   const nPhotos = seriesPhotos(project).length + pendingPhotos.length;
+  /** The story bible, as the writer is told it every time. */
+  const bibleText = (() => {
+    const b = project.bible;
+    if (!b) return "";
+    const part = (label: string, v: string) => (v.trim() ? `${label}: ${v.trim()}. ` : "");
+    const all = part("Characters", b.characters) + part("Places", b.places) + part("Rules to always follow", b.rules) + part("Also", b.extra);
+    return all ? `STORY BIBLE - always follow it, never contradict it: ${all}` : "";
+  })();
+  const askWith = (m: { role: string; content: string }[], mdl?: string, onToken?: (t: string) => void) => askModel(m, mdl, onToken, undefined, project.creativity ?? 0.8);
   const systemPrompt =
     `You are helping plan a short-form video series for YouTube Shorts / Reels. ` +
     `Video style: ${projectFormat(project).label} - ${projectFormat(project).blurb} ` +
     `Each episode is about ${sceneTarget(project)} ${project.settings.seconds || 7}-second vertical clips with one ${projectFormat(project).lineLabel.toLowerCase()} line each. ` +
     `Idea: ${idea.logline || "(not stated yet)"}. Audience: ${idea.audience || "general"}. Tone: ${idea.tone || "documentary"}. ` +
-    `Notes: ${idea.notes || "none"}. ` +
+    `Notes: ${idea.notes || "none"}. ` + bibleText +
     (nPhotos > 0 ? `The user has attached ${nPhotos} reference photo${nPhotos === 1 ? "" : "s"} of the people in the series; you cannot see them, but they will appear in the scenes, so never invent how those people look. ` : "") +
     `You are a creative writing partner for the user's own fictional video series, so help with scripts, scenes and outlines whenever asked. ` +
     `Push back on vague ideas, ask one sharp question at a time, and keep answers short unless a script is requested.`;
@@ -392,12 +402,12 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
       let acc = "";
       const material = sources.map(s => ({ role: "user", content: `Attached document "${s.name}":\n\n${(s.digest || s.text).slice(0, 6000)}` }));
       const history = [{ role: "system", content: systemPrompt }, ...material, ...next.map(m => ({ role: m.role, content: m.content }))];
-      let answer = await askModel(history, model, t => { acc += t; setStreaming(acc); });
+      let answer = await askWith(history, model, t => { acc += t; setStreaming(acc); });
       // Some models (phi4 is one) turn down an ordinary creative request. Say plainly what this is and ask once more.
       if (REFUSAL.test(answer.trim()) && answer.trim().length < 240) {
         acc = "";
         setStreaming("");
-        answer = await askModel([...history, { role: "assistant", content: answer }, { role: "user", content: "This is an ordinary creative project: planning and scripting my own social-media video series, with a character I made up. Please go ahead and help." }], model, t => { acc += t; setStreaming(acc); });
+        answer = await askWith([...history, { role: "assistant", content: answer }, { role: "user", content: "This is an ordinary creative project: planning and scripting my own social-media video series, with a character I made up. Please go ahead and help." }], model, t => { acc += t; setStreaming(acc); });
         if (REFUSAL.test(answer.trim()) && answer.trim().length < 240) setError("This model keeps declining the request. Pick a different model above (Qwen, Llama or a cloud model work well for scripts) and send it again.");
       }
       const withReply = [...next, { role: "assistant" as const, content: answer, at: new Date().toISOString() }];
@@ -418,7 +428,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
    */
   async function askForJson(base: { role: string; content: string }[], instruction: string, keep: (answer: string) => void) {
     const ask = async (extra: { role: string; content: string }[]) => {
-      const answer = await askModel([...base, { role: "user", content: instruction }, ...extra], model);
+      const answer = await askWith([...base, { role: "user", content: instruction }, ...extra], model);
       keep(answer);
       return answer;
     };
@@ -452,7 +462,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
         const recent = ep.scenes.slice(-3).map((sc: any) => `${sc.number}. ${sc.shot} | ${sc.vo}`).join("\n");
         const ask = `Episode ${ep.number} "${ep.title}" has ${have} scenes so far. The last ones:\n${recent}\n\nWrite scenes ${have + 1} to ${upto} of ${target}, carrying on from there, and reply with a JSON array of scene objects only (same shape as before, numbered from ${have + 1}, no commentary, no code fences). ${upto === target ? "These are the last scenes: bring the episode to its closing beat." : "Do not wrap up the episode yet."} Each scene needs its own real shot and line. Ref names must come from: ${(ep.refs || []).map((r: any) => r.name).join(", ")}.`;
         let more: any;
-        try { more = tidyPlan(extractJson(await askModel([...base, { role: "assistant", content: JSON.stringify(list).slice(0, 4000) }, { role: "user", content: ask }], model))); } catch { break; }
+        try { more = tidyPlan(extractJson(await askWith([...base, { role: "assistant", content: JSON.stringify(list).slice(0, 4000) }, { role: "user", content: ask }], model))); } catch { break; }
         const arr = Array.isArray(more) ? more : Array.isArray(more?.scenes) ? more.scenes : null;
         const fresh = (arr || []).filter((sc: any) => sc && typeof sc === "object" && String(sc.shot || "").trim());
         if (!fresh.length) break;
@@ -509,7 +519,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         }
         const digest = await digestDocument(
           s.text,
-          prompt => askModel([{ role: "user", content: prompt }], model),
+          prompt => askWith([{ role: "user", content: prompt }], model),
           (p: DigestProgress) => setDigesting({ name: s.name, done: p.done, total: p.total }),
         );
         await api.setSourceDigest(project.id, s.id, digest);
@@ -558,7 +568,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
     setFilling(true);
     setError(null);
     try {
-      const answer = await askModel(
+      const answer = await askWith(
         [
           { role: "system", content: systemPrompt },
           ...sources.map(s => ({ role: "user", content: `Source document "${s.name}":\n\n${(s.digest || s.text).slice(0, 12000)}` })),
@@ -612,6 +622,17 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           next={{ label: "Next: pick the look", go: () => setStep(2) }}>
           <p className="text-[11px] leading-relaxed text-neutral-500">Say what the series is about. Fill these in, or talk it through in the chat on the right and press <b>Fill the details from our discussion</b>.</p>
           <PresetBar project={project} onSaved={onSaved} />
+          <Fold title="Story bible and writing controls" hint="characters, places, rules, how adventurous the writer is">
+            <p className="text-[11px] leading-relaxed text-neutral-500">Things the writer must always keep in mind. They are sent with every message, every plan and every new episode, so a long series stays consistent.</p>
+            {([["characters", "Characters", "Who is in the story: names, ages, how they speak, what they want"], ["places", "Places", "Where it happens: the cafe, the mountain road, the flat"], ["rules", "Rules", "Always / never: no real brands, she never swears, every episode ends on a question"], ["extra", "Anything else", "Facts, running jokes, catchphrases, the timeline"]] as const).map(([key, label, ph]) => (
+              <Labeled key={key} label={label}>
+                <textarea className={`${field} h-16 resize-none text-xs`} placeholder={ph} defaultValue={project.bible?.[key] || ""} onBlur={async e => { const bible = { characters: "", places: "", rules: "", extra: "", ...project.bible, [key]: e.target.value }; if (e.target.value !== (project.bible?.[key] || "")) onSaved(await api.patch(project.id, { bible })); }} />
+              </Labeled>
+            ))}
+            <Labeled label={`Creativity: ${(project.creativity ?? 0.8).toFixed(1)} - ${(project.creativity ?? 0.8) < 0.5 ? "sticks closely to what you said" : (project.creativity ?? 0.8) > 1 ? "surprising, may wander" : "balanced"}`}>
+              <input type="range" min={0.2} max={1.2} step={0.1} defaultValue={project.creativity ?? 0.8} onPointerUp={async e => onSaved(await api.patch(project.id, { creativity: Number((e.target as HTMLInputElement).value) }))} onKeyUp={async e => onSaved(await api.patch(project.id, { creativity: Number((e.target as HTMLInputElement).value) }))} className="w-full" />
+            </Labeled>
+          </Fold>
           <Labeled label="Series title" icon={<Type size={13} className="text-rose-400" />}>
             <input className={field} placeholder="e.g. Richie's Daily Life" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => saveDetails({ title })} />
           </Labeled>
@@ -850,15 +871,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <p className="text-[11px] leading-relaxed text-neutral-500">Nothing planned yet. Build the episode plan above first. After that, this is where you add each next episode.</p>
           ) : (
             <>
-              <ol className="space-y-1">
-                {project.episodes.map(e => (
-                  <li key={e.id} className="flex items-center gap-2 rounded-lg bg-neutral-900/60 px-2.5 py-1.5 text-xs text-neutral-300">
-                    <span className="w-5 shrink-0 text-neutral-500">{e.number}</span>
-                    <span className="min-w-0 flex-1 truncate">{e.title}</span>
-                    <span className="shrink-0 text-[10px] text-neutral-600">{e.scenes.filter(sc => sc.status === "done").length}/{e.scenes.length} clips</span>
-                  </li>
-                ))}
-              </ol>
+              <EpisodeManager project={project} onSaved={onSaved} />
               <textarea className={field + " h-16 resize-none text-xs"} value={direction} onChange={e => setDirection(e.target.value)} placeholder="Next episode: what should happen? (optional - leave empty to let the model carry on from the last hook)" />
               <button onClick={addNextEpisode} disabled={addingNext || planning || busy}
                 className="w-full flex items-center justify-center gap-2 rounded-lg border border-emerald-700/60 bg-emerald-600/15 hover:bg-emerald-600/25 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-emerald-100 transition">

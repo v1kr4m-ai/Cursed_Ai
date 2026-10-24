@@ -143,6 +143,10 @@ export interface Project {
   stillPeople?: string[];
   /** How long each episode should run, in seconds. Missing means eight clips. */
   episodeSeconds?: number;
+  /** What the writer must always follow: who is in the story, where it happens, what to do and never do, anything else. */
+  bible?: { characters: string; places: string; rules: string; extra: string };
+  /** How adventurous the writer is, 0.2 (sticks to the brief) to 1.2 (surprising). Missing means 0.8. */
+  creativity?: number;
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {

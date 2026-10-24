@@ -8,6 +8,7 @@ import { kindOf, kindRank } from "../seriesTool/refKinds";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { copyEpisode, renumber } from "../src/components/tools/series/EpisodeManager";
 import { peopleOf, ensureCast, renamePerson, setSkip, adoptPlannedPeople, mentions } from "../src/components/tools/series/people";
 import { fillSlots, refSourceFiles } from "../seriesTool/refSources";
 import { projectFormat, SERIES_FORMATS } from "../seriesTool/formats";
@@ -379,5 +380,25 @@ describe("planner picker choices", () => {
     const file = { id: "qwen3-coder-30b", name: "qwen3-coder-30b", isDownloaded: true, source: "gguf", type: "General", tags: [] };
     const served = { id: "ollama:qwen3-coder:30b", name: "qwen3-coder:30b", isDownloaded: true, source: "ollama", type: "General", tags: [] };
     expect(recommend([file, served] as any).offline!.id).toBe("ollama:qwen3-coder:30b");
+  });
+});
+
+describe("episode manager", () => {
+  const ep = (n: number, title: string): any => ({ id: "e" + n, number: n, title, era: "", hookOut: "", exportPath: "x.mp4", refs: [{ id: "r" + n, name: "style_plate", role: "style", prompt: "look", negative: "", seed: 1, file: "a.png", status: "done", error: null }, { id: "p" + n, name: "photo", role: "character", prompt: "", negative: "", seed: 1, file: "me.png", status: "done", error: null }], scenes: [{ id: "s" + n, number: 1, vo: "hello", shot: "wide", refIds: ["r" + n, "p" + n], status: "done", clipPath: "c.mp4" }] });
+
+  it("renumbers episodes in their new order", () => {
+    expect(renumber([ep(3, "c"), ep(1, "a"), ep(2, "b")]).map(e => e.number)).toEqual([1, 2, 3]);
+  });
+
+  it("copies the script without anything rendered, and keeps attached photos", () => {
+    const c = copyEpisode(ep(1, "Pilot"));
+    expect(c.id).not.toBe("e1");
+    expect(c.title).toBe("Pilot (copy)");
+    expect(c.exportPath).toBeNull();
+    expect(c.scenes[0].status).toBe("pending");
+    expect(c.scenes[0].clipPath).toBeUndefined();
+    expect(c.refs[0].file).toBeNull();
+    expect(c.refs[1].file).toBe("me.png");
+    expect(c.scenes[0].refIds).toEqual(c.refs.map(r => r.id));
   });
 });

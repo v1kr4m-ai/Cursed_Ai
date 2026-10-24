@@ -62,6 +62,8 @@ export interface Project {
   allowTextCards?: boolean;
   stillPeople?: string[];
   episodeSeconds?: number;
+  bible?: { characters: string; places: string; rules: string; extra: string };
+  creativity?: number;
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;
 }
 
@@ -202,6 +204,7 @@ export async function askModel(
   model: string | undefined,
   onToken?: (t: string) => void,
   signal?: AbortSignal,
+  temperature = 0.8,
 ): Promise<string> {
   // The model must see the whole discussion: size its context window to the conversation plus the answer (about 3 characters a token).
   const chars = messages.reduce((n, m) => n + m.content.length, 0);
@@ -210,7 +213,7 @@ export async function askModel(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
-    body: JSON.stringify({ messages, model, options: { temperature: 0.8, maxTokens: 8192, numCtx } }),
+    body: JSON.stringify({ messages, model, options: { temperature, maxTokens: 8192, numCtx } }),
   });
   if (!res.ok || !res.body) throw new Error((await res.text()) || "The model did not answer.");
 
