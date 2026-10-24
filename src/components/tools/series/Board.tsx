@@ -1,5 +1,6 @@
 import React from "react";
-import { peopleOf, placeCast } from "./people";
+import { adoptPlannedPeople, ensureCast, peopleOf, placeCast } from "./people";
+import { syncPhotos } from "./photos";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
@@ -64,6 +65,35 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
     setDraft(next);
     const episodes = project.episodes.map(e => e.id !== episode.id ? e : { ...e, refs: e.refs.map(r => (r.id === ref_.id ? next : r)) });
     onChanged(await api.patch(project.id, { episodes }));
+  };
+
+  const picker = React.useRef<HTMLInputElement>(null);
+  const [swapping, setSwapping] = React.useState(false);
+  const isPerson = kindOf(ref_) === "person";
+  /** Swaps this generated picture for a real one in every scene (and every episode), under the same name. */
+  const finishSwap = async (episodes: Episode[]) => {
+    const patched = await api.patch(project.id, { episodes });
+    const synced = await syncPhotos(patched);
+    onChanged(await api.patch(project.id, { episodes: ensureCast({ ...synced.project, episodes: adoptPlannedPeople(synced.project) }) }));
+  };
+  const useMyImage = async (file: File) => {
+    setSwapping(true);
+    try {
+      const person = isPerson ? (ref_.person || ref_.name) : undefined;
+      const { ref: made } = await api.uploadRef(project.id, episode.id, file, ref_.name, ref_.role === "style" ? "style" : "character", kindOf(ref_), person);
+      const fresh = await api.get(project.id);
+      await finishSwap(fresh.episodes.map(e => (e.id !== episode.id ? e : { ...e, refs: e.refs.filter(r => r.id !== ref_.id), scenes: e.scenes.map(sc => ({ ...sc, refIds: sc.refIds.map(id => (id === ref_.id ? made.id : id)) })) })));
+    } finally { setSwapping(false); if (picker.current) picker.current.value = ""; }
+  };
+  const usePhoto = async (photo: Ref) => {
+    setSwapping(true);
+    try {
+      await finishSwap(project.episodes.map(e => (e.id !== episode.id ? e : {
+        ...e,
+        refs: e.refs.filter(r => r.id !== ref_.id).map(r => (r.id === photo.id && isPerson ? { ...r, person: ref_.person || ref_.name } : r)),
+        scenes: e.scenes.map(sc => ({ ...sc, refIds: sc.refIds.map(id => (id === ref_.id ? photo.id : id)).filter((id, i, a) => a.indexOf(id) === i) })),
+      })));
+    } finally { setSwapping(false); }
   };
 
   const remove = async () => {
@@ -135,6 +165,24 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
                       );
                     })}
                   </div>
+                </div>
+              )}
+              {draft.prompt.trim() && (
+                <div className="space-y-1.5 rounded-lg border border-neutral-800 p-2">
+                  <div className="text-[11px] text-neutral-400">Do not want this picture made by ComfyUI?</div>
+                  <input ref={picker} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && useMyImage(e.target.files[0])} />
+                  <button onClick={() => picker.current?.click()} disabled={swapping} className="rounded-md border border-neutral-600 px-2.5 py-1 text-[11px] text-neutral-200 hover:bg-neutral-800 disabled:opacity-50">{swapping ? "Working..." : "Use my own image instead"}</button>
+                  {episode.refs.some(r => r.id !== ref_.id && r.file && !r.prompt.trim()) && (
+                    <div>
+                      <div className="text-[11px] text-neutral-500">...or use a photo already attached (click one):</div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {episode.refs.filter(r => r.id !== ref_.id && r.file && !r.prompt.trim()).map(r => (
+                          <button key={r.id} title={`Use ${r.name} as "${ref_.name}"`} disabled={swapping} onClick={() => usePhoto(r)} className="h-10 w-10 overflow-hidden rounded border-2 border-neutral-700 transition hover:border-emerald-400 disabled:opacity-50"><img src={fileUrl(r.file!)} alt={r.name} className="h-full w-full object-cover" /></button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[10px] leading-relaxed text-neutral-600">The picture is replaced in every scene and keeps the name "{ref_.name}", so prompts that mention it point at your image. To make a picture that follows your photo instead, pick the photos under "Made from these photos".</p>
                 </div>
               )}
               {ref_.file && <a href={fileUrl(ref_.file)} target="_blank" rel="noreferrer" className="block truncate text-[11px] text-sky-400 hover:underline">{ref_.file}</a>}

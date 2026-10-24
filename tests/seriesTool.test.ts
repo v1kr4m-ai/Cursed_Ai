@@ -245,6 +245,15 @@ describe("several people", () => {
     expect(buildScenePrompt(skipped as unknown as Project, skipped.episodes[0] as any, skipped.episodes[0].scenes[0] as any)).not.toContain("is Bo");
   });
 
+  it("tells the model which picture a single named person is, using the person's name rather than the file label", () => {
+    const w = world();
+    const ep = { ...w.episodes[0], refs: w.episodes[0].refs.filter(r => r.id !== "a2" && r.id !== "b1"), scenes: [{ ...w.episodes[0].scenes[0], refIds: ["s", "a1"] }] };
+    const prompt = buildScenePrompt({ ...w, episodes: [ep] } as unknown as Project, ep as any, ep.scenes[0] as any);
+    expect(prompt).toContain("Ann in the description below is the person in <Picture 2>");
+    expect(prompt).toContain("for Ann");
+    expect(prompt).not.toContain("Ann photo");
+  });
+
   it("renames and skips everywhere, and fills workflow slots without ever passing a blank to a slot that cannot be skipped", () => {
     const p = world();
     expect(renamePerson(p, "Ann", "Anna")[0].scenes[0].cast).toEqual(["Anna", "Bo"]);

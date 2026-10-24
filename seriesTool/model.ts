@@ -185,7 +185,7 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
     // A plain character ref keeps its original wording: appearance, clothing and proportions.
     return !ref.kind && ref.role === "character"
       ? `Use ${picture} as the exact appearance reference for ${ref.name}, preserving appearance, clothing and proportions.`
-      : info.wiring(picture, ref.name);
+      : info.wiring(picture, kindOf(ref) === "person" && ref.person ? ref.person : ref.name);
   }).join(" ");
 
   const format = projectFormat(project);
@@ -198,7 +198,10 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
   const distinct = new Set(people.map(({ r }) => r.person));
   const who = distinct.size > 1
     ? `There are ${distinct.size} different people in this video: ${people.map(({ r, i }) => `<Picture ${i + 1}> is ${r.person}`).join(", ")}. Keep each person looking exactly like their own picture, clearly different from the others.`
-    : "";
+    : distinct.size === 1
+      // The shot is written with the person's name ("Richie walks..."): say which picture that name is.
+      ? `${people[0].r.person} in the description below is the person in ${people.map(({ i }) => `<Picture ${i + 1}>`).join(" / ")}: every mention of ${people[0].r.person} means exactly that face.`
+      : "";
 
   return [wiring, who, "", fields.description, fields.soundscape, fields.music].filter((l, i) => i !== 1 || l).join("\n");
 }
