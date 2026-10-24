@@ -72,6 +72,39 @@ export interface SeriesTemplate {
   patch: Partial<Project>;
 }
 
+/**
+ * What applying a preset to a series that already exists changes: the style, voice, look and tone. The logline, notes,
+ * title, episodes, pictures and the workflows and size already chosen are kept (a preset's own workflows are used only
+ * when the series has none yet).
+ */
+export function applyPreset(project: Project, t: SeriesTemplate): Partial<Project> {
+  const p: any = t.patch;
+  const keep = project.settings;
+  return {
+    format: p.format, voice: p.voice, allowTextCards: p.allowTextCards, styleLock: p.styleLock, voiceLock: p.voiceLock,
+    idea: { ...project.idea, tone: p.idea?.tone || project.idea.tone, audience: p.idea?.audience || project.idea.audience, niche: p.idea?.niche || (project.idea as any).niche } as any,
+    settings: { ...keep, seconds: p.settings?.seconds ?? keep.seconds, videoWorkflow: keep.videoWorkflow || p.settings?.videoWorkflow || "", imageWorkflow: keep.imageWorkflow || p.settings?.imageWorkflow || "" },
+  };
+}
+
+/** Episode lengths: the seconds an episode should run, as quick choices (0 = the old one-minute default of eight clips). */
+export const LENGTH_PRESETS: { label: string; seconds: number; note: string }[] = [
+  { label: "Short", seconds: 30, note: "about 30 seconds" },
+  { label: "Standard", seconds: 0, note: "about a minute (8 clips)" },
+  { label: "Long", seconds: 180, note: "about 3 minutes" },
+  { label: "Epic", seconds: 600, note: "about 10 minutes, written in parts" },
+];
+
+/** Messages for the discussion box, one click each. */
+export const CHAT_PRESETS: { label: string; text: string }[] = [
+  { label: "Suggest a title", text: "Suggest five strong, short titles for this series, each with a one-line reason." },
+  { label: "Give me a hook", text: "Write three opening hooks for episode 1: one line each, strong enough to stop someone scrolling in the first two seconds." },
+  { label: "Outline the season", text: "Outline the whole season episode by episode: a title, what happens and the closing hook that pulls the viewer to the next one." },
+  { label: "Write episode 1", text: "Write episode 1 scene by scene: for each scene the shot (what the camera sees and does) and the line that is spoken." },
+  { label: "Make it punchier", text: "Tighten what we have so far: cut anything slow or repeated, and make every scene earn its seconds." },
+  { label: "What's missing?", text: "What is missing or unclear in this idea? Ask me the one most important question." },
+];
+
 export interface ProjectSummary {
   id: string; title: string; dir: string; updatedAt: string;
   episodes: number; scenes: number; scenesDone: number; exports: number;

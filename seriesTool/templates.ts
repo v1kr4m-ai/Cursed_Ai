@@ -49,6 +49,36 @@ const BUILTIN: Omit<SeriesTemplate, "savedAt">[] = [
     styleLock: DEFAULT_STYLE_LOCK, voiceLock: DEFAULT_VOICE_LOCK,
     settings: { ...DEFAULT_SETTINGS }, tone: "cold documentary", audience: "", niche: "",
   },
+  {
+    id: "builtin-product", name: "Product showcase", builtin: true, note: "An item shown, unboxed and used, with a short spoken line each clip.",
+    format: "product-demo", voice: "auto", allowTextCards: false,
+    styleLock: "bright clean light, crisp macro close-ups, smooth handheld, high quality commercial look", voiceLock: "a friendly, clear, upbeat voice (S1)",
+    settings: { ...DEFAULT_SETTINGS, seconds: 5 }, tone: "upbeat, trustworthy", audience: "", niche: "products",
+  },
+  {
+    id: "builtin-howto", name: "How-to / tutorial", builtin: true, note: "A calm voice explains steps while hands do the work: recipes, crafts, repairs.",
+    format: "tutorial", voice: "auto", allowTextCards: false,
+    styleLock: "overhead and close-up shots, soft even light, clean tidy workspace, high quality", voiceLock: "a calm, clear, friendly teacher's voice (S1)",
+    settings: { ...DEFAULT_SETTINGS, seconds: 6 }, tone: "calm, clear, encouraging", audience: "beginners", niche: "how-to",
+  },
+  {
+    id: "builtin-music-video", name: "Music video", builtin: true, note: "A person sings to the camera over your own backing track.",
+    format: "singing", voice: "auto", allowTextCards: false,
+    styleLock: "cinematic music video look, moody coloured lighting, slow camera moves, shallow depth of field", voiceLock: DEFAULT_VOICE_LOCK,
+    settings: { ...DEFAULT_SETTINGS, seconds: 6 }, tone: "emotional, stylish", audience: "", niche: "music",
+  },
+  {
+    id: "builtin-short-story", name: "Short story (no voice)", builtin: true, note: "Pictures and music only: mood films, teasers and b-roll for your own soundtrack.",
+    format: "cinematic", voice: "off", allowTextCards: false,
+    styleLock: DEFAULT_STYLE_LOCK, voiceLock: DEFAULT_VOICE_LOCK,
+    settings: { ...DEFAULT_SETTINGS, seconds: 7 }, tone: "atmospheric, slow", audience: "", niche: "",
+  },
+  {
+    id: "builtin-travel", name: "Travel montage", builtin: true, note: "Places and moments cut together: trips, cities, food, markets.",
+    format: "travel", voice: "off", allowTextCards: false,
+    styleLock: "golden hour light, vibrant natural colour, handheld travel footage, wide and detail shots", voiceLock: DEFAULT_VOICE_LOCK,
+    settings: { ...DEFAULT_SETTINGS, seconds: 5 }, tone: "warm, adventurous", audience: "", niche: "travel",
+  },
 ];
 
 export const builtinTemplates = (): SeriesTemplate[] => BUILTIN.map(t => ({ ...t, savedAt: "" }));

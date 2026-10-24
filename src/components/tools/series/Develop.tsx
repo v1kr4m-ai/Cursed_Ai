@@ -9,7 +9,7 @@ import { useDictation } from "../../../services/useDictation";
 import { savedSetting } from "../../../lib/settingsStore";
 import { ThinkingWords } from "../../ui/ThinkingWords";
 import { notify } from "../../../lib/notify";
-import { api, askModel, extractJson, fileUrl, type Project } from "./api";
+import { applyPreset, CHAT_PRESETS, LENGTH_PRESETS, type SeriesTemplate, api, askModel, extractJson, fileUrl, type Project } from "./api";
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
 import { isChatModel, loadRecords, noteOutcome, rateModel, recommend, TIER_LABEL, tierRank } from "./modelRating";
@@ -188,6 +188,42 @@ function StepCard({ n, title, summary, done, open, onOpen, optional, next, child
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** One-click starting points: how the series is made (style, voice, look, tone, clip length). Yours sit beside the built-in ones. */
+function PresetBar({ project, onSaved }: { project: Project; onSaved: (p: Project) => void }) {
+  const [list, setList] = React.useState<SeriesTemplate[]>([]);
+  const [busy, setBusy] = React.useState(false);
+  const [note, setNote] = React.useState("");
+  const load = React.useCallback(() => { api.templates().then(r => setList(r.templates)).catch(() => {}); }, []);
+  React.useEffect(load, [load]);
+  const apply = async (t: SeriesTemplate) => {
+    setBusy(true);
+    try { onSaved(await api.patch(project.id, applyPreset(project, t))); setNote(`"${t.name}" applied: video style, voice, look and tone. Your story, episodes and pictures were not touched.`); }
+    catch (e: any) { setNote(e?.message || String(e)); } finally { setBusy(false); }
+  };
+  const saveCurrent = async () => {
+    const name = window.prompt("Name this preset (it keeps the video style, voice, look, tone and clip length of this series):", project.title);
+    if (!name?.trim()) return;
+    setBusy(true);
+    try { await api.saveTemplate(project.id, name.trim()); load(); setNote(`Saved "${name.trim()}" as a preset.`); } catch (e: any) { setNote(e?.message || String(e)); } finally { setBusy(false); }
+  };
+  const remove = async (t: SeriesTemplate) => { if (confirm(`Remove your preset "${t.name}"?`)) { await api.deleteTemplate(t.id); load(); } };
+  if (!list.length) return null;
+  return (
+    <div className="space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-900/40 p-2.5">
+      <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-300"><Sparkles size={12} className="text-amber-300" /> Start from a preset <button onClick={saveCurrent} disabled={busy} className="ml-auto rounded-md border border-neutral-700 px-2 py-0.5 text-[10px] font-normal text-neutral-300 hover:bg-neutral-800">Save this series' setup as a preset</button></div>
+      <div className="flex flex-wrap gap-1.5">
+        {list.map(t => (
+          <span key={t.id} className="group flex items-center rounded-full border border-neutral-700 hover:border-amber-400/60">
+            <button onClick={() => apply(t)} disabled={busy} title={t.note || t.name} className="rounded-full px-2.5 py-1 text-[11px] text-neutral-200 disabled:opacity-50">{t.name}{t.builtin ? "" : " *"}</button>
+            {!t.builtin && <button onClick={() => remove(t)} title="Remove this preset" className="pr-2 text-[10px] text-neutral-600 hover:text-rose-300">x</button>}
+          </span>
+        ))}
+      </div>
+      {note && <p className="text-[10px] leading-relaxed text-neutral-500">{note}</p>}
     </div>
   );
 }
@@ -575,6 +611,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         <StepCard n={1} title="Your story" summary={storySummary} done={!!(idea.logline.trim() || project.episodes.length)} open={step === 1} onOpen={() => setStep(step === 1 ? 0 : 1)}
           next={{ label: "Next: pick the look", go: () => setStep(2) }}>
           <p className="text-[11px] leading-relaxed text-neutral-500">Say what the series is about. Fill these in, or talk it through in the chat on the right and press <b>Fill the details from our discussion</b>.</p>
+          <PresetBar project={project} onSaved={onSaved} />
           <Labeled label="Series title" icon={<Type size={13} className="text-rose-400" />}>
             <input className={field} placeholder="e.g. Richie's Daily Life" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => saveDetails({ title })} />
           </Labeled>
@@ -760,6 +797,13 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             {[[30, "30 seconds"], [120, "2 minutes"], [180, "3 minutes"], [300, "5 minutes"], [600, "10 minutes"]].map(([sec, label]) => <option key={sec} value={sec}>{label} ({Math.max(2, Math.round(Number(sec) / Math.max(1, project.settings.seconds || 7)))} clips)</option>)}
           </select>
         </div>
+        <div className="flex flex-wrap items-center gap-1.5 px-1">
+          <span className="text-[10px] text-neutral-500">Length:</span>
+          {LENGTH_PRESETS.map(l => {
+            const on = (project.episodeSeconds || 0) === l.seconds;
+            return <button key={l.label} onClick={async () => onSaved(await api.patch(project.id, { episodeSeconds: l.seconds || undefined }))} title={l.note} className={"rounded-full border px-2.5 py-0.5 text-[11px] transition " + (on ? "border-emerald-400 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-300 hover:border-neutral-500")}>{l.label}</button>;
+          })}
+        </div>
         {partNote && <div className="px-1 text-[11px] text-sky-300">Writing {partNote}...</div>}
                   <motion.button
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
@@ -919,6 +963,9 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         </div>
 
         <div className="border-t border-neutral-800 p-3">
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {CHAT_PRESETS.map(c => <button key={c.label} onClick={() => setInput(c.text)} disabled={busy} title={c.text} className="rounded-full border border-teal-500/30 bg-teal-900/15 px-2.5 py-0.5 text-[11px] text-teal-100 hover:bg-teal-800/30 disabled:opacity-40">{c.label}</button>)}
+          </div>
           <MicStatus phase={dictation.phase} level={dictation.level} />
           <div className="flex items-end gap-2">
             <div className="relative flex-1">

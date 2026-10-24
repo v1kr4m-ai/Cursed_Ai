@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { builtinTemplates, templateFrom, templatePatch } from "../seriesTool/templates";
 import { DEFAULT_SETTINGS, type Project } from "../seriesTool/model";
+import { applyPreset, LENGTH_PRESETS } from "../src/components/tools/series/api";
+import { SERIES_FORMATS } from "../seriesTool/formats";
 
 const project = (): Project => ({
   id: "p1", title: "My show", dir: "D:/x", createdAt: "", updatedAt: "",
@@ -39,5 +41,26 @@ describe("series templates", () => {
     expect(list.length).toBeGreaterThanOrEqual(3);
     expect(list.every(t => t.builtin && t.id.startsWith("builtin-"))).toBe(true);
     expect(list.find(t => t.id === "builtin-outfit-change")!.voice).toBe("off");
+  });
+
+  it("every built-in preset names a real video style", () => {
+    const ids = new Set(SERIES_FORMATS.map(f => f.id));
+    for (const t of builtinTemplates()) expect(ids.has(t.format), t.id).toBe(true);
+  });
+
+  it("applying a preset to a series keeps its story, notes and workflows", () => {
+    const p = project();
+    const doc = builtinTemplates().find(t => t.id === "builtin-howto")!;
+    const patch: any = applyPreset(p as any, { ...doc, patch: templatePatch(doc) } as any);
+    expect(patch.format).toBe("tutorial");
+    expect(patch.idea.logline).toBe("A story about dragons");
+    expect(patch.idea.notes).toBe("secret notes");
+    expect(patch.settings.videoWorkflow).toBe("C:\w\vid.json");
+    expect(patch.episodes).toBeUndefined();
+    expect(patch.settings.seconds).toBe(6);
+  });
+
+  it("offers a standard length that means the old eight clips", () => {
+    expect(LENGTH_PRESETS.find(l => l.label === "Standard")!.seconds).toBe(0);
   });
 });
