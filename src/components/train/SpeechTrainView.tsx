@@ -11,6 +11,7 @@ interface Dataset { name: string; path: string; clips: number; transcribed: numb
 interface SpeechStatus {
   paths: { root: string; datasets: string; models: string; outputs: string; ttsPython: string };
   ready: { stt: boolean; ffmpeg: boolean; ttsEnv: boolean; xttsModel: boolean };
+  vishleshan: { dir: string; models: string[] };
   langs: Lang[]; whisperModels: { repo: string; note: string }[]; xttsRepo: string;
   sttModels: { name: string; path: string }[]; xttsModel: { name: string; path: string } | null;
   datasets: Dataset[];
@@ -105,8 +106,9 @@ const INFO: Record<string, CardInfo> = {
     ],
   },
   trained: {
-    job: "Lists what you have trained. Use one in the Try it step.",
-    why: "Each run is kept in its own folder, so you can compare versions.",
+    job: "Lists what you have trained. Use one in the Try it step, or send a speech-to-text model to Cursed_Vishleshan.",
+    why: "Each run is kept in its own folder, so you can compare versions. Cursed_Vishleshan runs Whisper in a different (faster-whisper) format, so a model must be converted before it can use it.",
+    settings: [["Use in Cursed_Vishleshan", "Converts the model and puts it in Cursed_Vishleshan's models folder. The first conversion installs a small converter package, which needs internet once."]],
   },
   trySpeech: {
     job: "Records or loads a clip and shows what the chosen Whisper model hears.",
@@ -325,10 +327,12 @@ export function SpeechTrainView() {
             <div key={o.path} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 p-3 text-xs">
               <span className="font-mono text-zinc-300">{o.name}</span>
               {o.run && <span className="text-[11px] text-zinc-500">{o.run.language} - {o.run.method} - {o.run.clips} clips - {o.run.metric.toUpperCase()} {pct(o.run.before)} to {pct(o.run.after)}</span>}
-              <button onClick={() => set({ tryModel: o.path, mode: "stt", step: "try" })} className={btn + " ml-auto !py-1"}>Try it</button>
+              <button onClick={() => start("speechenv", "/api/speech/stt/export-ct2", { modelDir: o.path, name: o.name })} disabled={env.running} title={`Converts it and puts it in ${status.vishleshan.dir}`} className={btn + " ml-auto !py-1"}>{status.vishleshan.models.includes(o.name.replace(/\s+/g, "-")) ? "Convert again" : "Use in Cursed_Vishleshan"}</button>
+              <button onClick={() => set({ tryModel: o.path, mode: "stt", step: "try" })} className={btn + " !py-1"}>Try it</button>
             </div>
           ))}</div>
         )}
+        <p className="text-[11px] leading-relaxed text-zinc-500">"Use in Cursed_Vishleshan" converts the model to the faster-whisper format in <span className="font-mono">{status.vishleshan.dir}</span>. In Cursed_Vishleshan it then appears in the model list as <span className="font-mono">custom:name</span> (restart that app first if it is open).{status.vishleshan.models.length > 0 && ` Already there: ${status.vishleshan.models.join(", ")}.`}</p>
       </Card>
     </>
   );
@@ -419,7 +423,7 @@ export function SpeechTrainView() {
         </div>
       </div>
 
-      <TrainProgress jobs={[{ title: "Speech-to-text training", job: stt }, { title: "Voice training", job: tts }, { title: "Preparing clips", job: prep }, { title: "Setup or download", job: env }]} />
+      <TrainProgress jobs={[{ title: "Speech-to-text training", job: stt }, { title: "Voice training", job: tts }, { title: "Preparing clips", job: prep }, { title: "Setup, download or conversion", job: env }]} />
 
       <div className="flex shrink-0 items-center justify-center border-b border-white/5 px-8 py-2">
         <Tabs<Step> value={f.step} onChange={v => set({ step: v })} tabs={[{ id: "clips", label: "1  Clips", busy: prep.running }, { id: "train", label: "2  Train", busy: trainJob.running || env.running }, { id: "try", label: "3  Try it" }]} />
@@ -440,8 +444,8 @@ export function SpeechTrainView() {
               {trainReason ? <span className="text-[11px] text-amber-400">{trainReason}</span> : <span className="text-[11px] text-zinc-500">Ollama's and ComfyUI's models can use the GPU too; close them if training runs out of memory.</span>}
             </>}
           </div>
-          <div className="mb-2 flex items-center gap-1.5">{([["speechprep", "Clips"], ["stt", "Speech to text"], ["tts", "Voice"], ["speechenv", "Setup and downloads"]] as const).map(([k, l]) => <button key={k} onClick={() => setConsoleKind(k)} className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${consoleKind === k ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-300"}`}>{l}{jobs[k].running ? " ..." : ""}</button>)}</div>
-          <div className="h-48"><JobConsole job={jobs[consoleKind]} title={consoleKind === "stt" ? "Speech-to-text training" : consoleKind === "tts" ? "Voice training" : consoleKind === "speechenv" ? "Setup and downloads" : "Clip preparation"} /></div>
+          <div className="mb-2 flex items-center gap-1.5">{([["speechprep", "Clips"], ["stt", "Speech to text"], ["tts", "Voice"], ["speechenv", "Setup, downloads, conversion"]] as const).map(([k, l]) => <button key={k} onClick={() => setConsoleKind(k)} className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${consoleKind === k ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-300"}`}>{l}{jobs[k].running ? " ..." : ""}</button>)}</div>
+          <div className="h-48"><JobConsole job={jobs[consoleKind]} title={consoleKind === "stt" ? "Speech-to-text training" : consoleKind === "tts" ? "Voice training" : consoleKind === "speechenv" ? "Setup, downloads and conversion" : "Clip preparation"} /></div>
         </div>
       </div>
     </div>

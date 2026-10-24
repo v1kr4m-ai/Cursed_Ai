@@ -185,6 +185,7 @@ def main():
     say(f"[speech] saving the model to {out}")
     model.save_pretrained(out)
     processor.save_pretrained(out)
+    processor.feature_extractor.save_pretrained(out)   # writes preprocessor_config.json, which faster-whisper needs
     with open(os.path.join(args.output_dir, "run.json"), "w", encoding="utf-8") as f:
         json.dump({"base": args.base_model, "language": args.language, "method": args.method, "epochs": args.epochs, "clips": len(train_items), "metric": unit, "before": before, "after": after}, f, indent=2)
     if before is not None and after is not None:

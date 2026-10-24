@@ -33,6 +33,9 @@ function runStep(log: (t: string) => void, signal: AbortSignal, exe: string, arg
   });
 }
 
+/** Where Cursed_Vishleshan looks for your own Whisper models. */
+const vishleshanDir = () => path.join(os.homedir(), "Documents", "Cursed_Vishleshan", "models", "whisper");
+
 const probe = (cmd: string, args: string[]) => new Promise<boolean>(resolve => execFile(cmd, args, { windowsHide: true, timeout: 8000 }, err => resolve(!err)));
 
 export function registerSpeechTool(app: express.Express, opts: SpeechOptions) {
@@ -69,6 +72,7 @@ export function registerSpeechTool(app: express.Express, opts: SpeechOptions) {
     res.json({
       paths: { root: p.speechRoot, datasets: p.speechDatasetsDir, models: p.speechModelsDir, outputs: p.speechOutputDir, ttsPython: p.ttsPython },
       ready: { stt: t.stt, ffmpeg: t.ffmpeg, ttsEnv: exists(p.ttsPython), xttsModel: !!xtts },
+      vishleshan: { dir: vishleshanDir(), models: (() => { try { return fs.readdirSync(vishleshanDir(), { withFileTypes: true }).filter(d => d.isDirectory() && exists(path.join(vishleshanDir(), d.name, "model.bin"))).map(d => d.name); } catch { return []; } })() },
       langs: LANGS, whisperModels: WHISPER_MODELS, xttsRepo: XTTS_REPO,
       sttModels, xttsModel: xtts || null,
       datasets: datasets(),
@@ -244,6 +248,36 @@ export function registerSpeechTool(app: express.Express, opts: SpeechOptions) {
     cfg.outputDir = path.join(p.speechOutputDir, name);
     fs.mkdirSync(cfg.outputDir, { recursive: true });
     res.json(startProcess("stt", `Training ${path.basename(cfg.baseModel)} for ${langOf(req.body?.language).name} (${cfg.method})`, p.llmPython, buildSttArgs(cfg, path.join(p.scriptsDir, "train_whisper.py")), { cwd: p.scriptsDir }));
+  });
+
+  /** Convert a trained Whisper to the faster-whisper format and put it where Cursed_Vishleshan finds it. */
+  app.post("/api/speech/stt/export-ct2", (req, res) => {
+    if (isRunning("speechenv")) return bad(res, 409, "Another setup, download or conversion is running.");
+    const p = P();
+    const modelDir = String(req.body?.modelDir || "");
+    if (!modelDir || !exists(path.join(modelDir, "config.json"))) return bad(res, 400, "Choose a trained model to convert.");
+    if (!exists(p.llmPython)) return bad(res, 400, `The Python environment was not found at ${p.llmPython}.`);
+    const name = safeName(req.body?.name || path.basename(path.dirname(modelDir))).replace(/\s+/g, "-");
+    if (!name) return bad(res, 400, "Give the converted model a name.");
+    const quant = ["float16", "int8", "int8_float16", "float32"].includes(req.body?.quantization) ? String(req.body.quantization) : "float16";
+    const outRoot = String(req.body?.outDir || vishleshanDir());
+    const out = path.join(outRoot, name);
+    if (exists(path.join(out, "model.bin")) && !req.body?.overwrite) return bad(res, 409, `There is already a converted model called ${name} in ${outRoot}. Choose another name.`);
+    res.json(startTask("speechenv", `Converting ${name} for faster-whisper (Cursed_Vishleshan)`, async ctx => {
+      const { log, signal } = ctx;
+      if (!(await probe(p.llmPython, ["-c", "import importlib.util as u, sys; sys.exit(0 if u.find_spec('ctranslate2') else 1)"]))) {
+        log("== Installing the converter (ctranslate2, needs internet once)");
+        if ((await runStep(log, signal, p.llmPython, ["-m", "pip", "install", "ctranslate2", "--no-deps"])) !== 0) throw new Error("Could not install ctranslate2. Connect to the internet and try again.");
+      }
+      ctx.progress(20, "converting");
+      fs.mkdirSync(outRoot, { recursive: true });
+      const code = await runStep(log, signal, p.llmPython, [path.join(p.scriptsDir, "convert_ct2.py"), "--model", modelDir, "--out", out, "--quantization", quant]);
+      if (signal.aborted) return null;
+      if (code !== 0) throw new Error("The conversion failed. See the lines above.");
+      ctx.progress(100, "done");
+      log(`Done. In Cursed_Vishleshan choose the model custom:${name} (restart it first if it is open).`);
+      return { out, name };
+    }));
   });
 
   app.post("/api/speech/tts/start", (req, res) => {

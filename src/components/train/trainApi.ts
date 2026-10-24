@@ -56,7 +56,7 @@ const JOB_INFO: Record<JobKind, { name: string; tab: string }> = {
   stt: { name: "Speech-to-text training", tab: "trainspeech" },
   tts: { name: "Text-to-speech training", tab: "trainspeech" },
   speechprep: { name: "Clip preparation", tab: "trainspeech" },
-  speechenv: { name: "Speech setup or download", tab: "trainspeech" },
+  speechenv: { name: "Speech setup, download or conversion", tab: "trainspeech" },
 };
 const took = (ms: number) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
 /** The line that best explains a failure: the last error-looking line of the log. */
