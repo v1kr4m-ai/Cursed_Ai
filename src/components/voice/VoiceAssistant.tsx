@@ -75,7 +75,8 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
     } catch { /* ignore */ }
     return null;
   });
-  const dragRef = useRef<{ sx: number; sy: number; px: number; py: number; moved: boolean; mode: "fab" | "panel" } | null>(null);
+  const dragRef = useRef<{ sx: number; sy: number; px: number; py: number; moved: boolean; mode: "fab" | "panel"; held?: boolean } | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const onResize = () => setViewport(readViewport());
     window.addEventListener("resize", onResize);
@@ -394,22 +395,34 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
 
   const beginDrag = (e: React.PointerEvent, mode: "fab" | "panel") => {
     if ((e.target as HTMLElement).closest("button") && mode === "panel") return; // header buttons stay clickable
-    dragRef.current = { sx: e.clientX, sy: e.clientY, px: fab.x, py: fab.y, moved: false, mode };
+    const d = { sx: e.clientX, sy: e.clientY, px: fab.x, py: fab.y, moved: false, mode, held: false };
+    dragRef.current = d;
+    // Holding the icon still opens the panel and starts listening straight away.
+    if (mode === "fab") {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      holdTimer.current = setTimeout(() => {
+        if (dragRef.current !== d || d.moved) return;
+        d.held = true;
+        setOpen(true);
+        if (!activeRef.current) void toggleConversation();
+      }, 550);
+    }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const moveDrag = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
     const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
-    if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { d.moved = true; if (holdTimer.current) clearTimeout(holdTimer.current); }
     if (d.moved) setPosFrac({ fx: clamp((d.px + dx - M) / rangeX, 0, 1), fy: clamp((d.py + dy - M) / rangeY, 0, 1) });
   };
   const endDrag = (e: React.PointerEvent) => {
     const d = dragRef.current;
     dragRef.current = null;
+    if (holdTimer.current) clearTimeout(holdTimer.current);
     if (!d) return;
     if (d.moved && posFrac) { try { localStorage.setItem("cursed.pirate.pos", JSON.stringify(posFrac)); } catch { /* storage blocked */ } }
-    if (d.mode === "fab" && !d.moved) setOpen(true);
+    if (d.mode === "fab" && !d.moved && !d.held) setOpen(true);
   };
 
   // Like a MacBook window: the panel flows out of the icon and is sucked back into it. Its transform origin is the icon's centre.
@@ -431,7 +444,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
             onPointerDown={(e) => beginDrag(e, "fab")}
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
-            title="Cursed_Pirate"
+            title="Cursed_Pirate - click to open, hold to start talking"
             style={{ left: fab.x, top: fab.y }}
             className="fixed z-40 h-11 w-11 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
           >
