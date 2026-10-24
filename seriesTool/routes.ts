@@ -49,9 +49,18 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
 
   const emit = (projectId: string, event: Json) => {
     const payload = `data: ${JSON.stringify(event)}\n\n`;
+  /** Watchers of every series at once (the app's notifier), told which series and title each event is about. */
+  const everyone = new Set<express.Response>();
+  /** Clips and pictures finished or failed since this project's queue last went quiet, for one "all done" notice. */
+  const batch = new Map<string, { done: number; failed: number }>();
+
     for (const res of listeners.get(projectId) || []) res.write(payload);
   };
 
+    if (everyone.size) {
+      const wide = `data: ${JSON.stringify({ ...event, projectId, title: store.get(projectId)?.title || "" })}\n\n`;
+      for (const res of everyone) res.write(wide);
+    }
   const bad = (res: express.Response, code: number, message: string) => res.status(code).json({ error: message });
 
   const findScene = (p: Project, sceneId: string) => {
@@ -171,12 +180,24 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       })),
       root: store.root,
     });
+        const b = batch.get(projectId) || { done: 0, failed: 0 };
+        batch.set(projectId, { ...b, done: b.done + 1 });
   });
 
   app.post("/api/series/projects", (req, res) => {
     const title = String(req.body?.title || "").trim();
+        if (!full.abort.signal.aborted) {
+          const b = batch.get(projectId) || { done: 0, failed: 0 };
+          batch.set(projectId, { ...b, failed: b.failed + 1 });
+        }
     if (!title) return bad(res, 400, "Give the project a title.");
     res.json(store.create(title));
+        // Nothing left waiting: say how the run went, once.
+        if (!(queued.get(projectId) || []).length && !running.has(projectId)) {
+          const b = batch.get(projectId);
+          batch.delete(projectId);
+          if (b && (b.done || b.failed)) emit(projectId, { type: "idle", done: b.done, failed: b.failed });
+        }
   });
 
   app.get("/api/series/projects/:id", (req, res) => {
@@ -233,6 +254,15 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       const content = await extractUpload(name, req.body);
       const text = content.kind === "text"
         ? content.text
+  /** Live job events for every series, for notifications. */
+  app.get("/api/series/events", (req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.write(": open\n\n");
+    everyone.add(res);
+    const beat = setInterval(() => res.write(": beat\n\n"), 25_000);
+    req.on("close", () => { clearInterval(beat); everyone.delete(res); });
+  });
+
         : content.cells.map(c => String(c ?? "")).filter(Boolean).join("\n");
       if (!text.trim()) return bad(res, 422, "No text could be read out of that file.");
       const source: Source = { id: newId(), name, text: text.trim(), addedAt: new Date().toISOString() };

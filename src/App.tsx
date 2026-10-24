@@ -23,6 +23,7 @@ import { ConsoleView } from "./components/tools/ConsoleView";
 import { ImageGeneratorView } from "./components/tools/ImageGenerator";
 import { VideoGeneratorView } from "./components/tools/VideoGenerator";
 import { SeriesStudioView } from "./components/tools/series/SeriesStudio";
+import { SeriesNotifier } from "./components/tools/series/SeriesNotifier";
 import { OllamaClaudeView } from "./components/oclaude/OllamaClaudeView";
 import { TrainLoraView } from "./components/train/TrainLoraView";
 import { FineTuneView } from "./components/train/FineTuneView";
@@ -440,6 +441,7 @@ export default function App() {
         <div className="atmosphere"></div>
         <ToastHost activeTab={activeTab} onNavigate={setActiveTab} />
         {/* Desktop Sidebar */}
+        <SeriesNotifier />
         <div className="hidden md:block h-full">
           <Sidebar
             activeTab={activeTab}

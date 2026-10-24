@@ -444,6 +444,7 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
             onPointerDown={(e) => beginDrag(e, "fab")}
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
+            onContextMenu={e => e.preventDefault()}
             title="Cursed_Pirate - click to open, hold to start talking"
             style={{ left: fab.x, top: fab.y }}
             className="fixed z-40 h-11 w-11 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-2xl shadow-violet-900/50 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"

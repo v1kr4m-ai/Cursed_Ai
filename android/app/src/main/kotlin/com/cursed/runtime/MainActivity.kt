@@ -1,6 +1,15 @@
 package com.cursed.runtime
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -50,6 +59,26 @@ class MainActivity : AppCompatActivity() {
     private var showingWeb = false
     private var pcMode = false
 
+    /** The voice assistant asks the page for the microphone; the phone asks you once, then the page may listen. */
+    private var micRequest: PermissionRequest? = null
+    private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        micRequest?.let { if (ok) it.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else it.deny() }
+        micRequest = null
+    }
+    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    /** Lets the studio page raise a real Android notification (a finished render, an error) while the app is in the background. */
+    inner class Bridge {
+        @JavascriptInterface
+        fun notify(title: String, body: String) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("cursed_jobs", "Renders and jobs", NotificationManager.IMPORTANCE_DEFAULT))
+            val open = PendingIntent.getActivity(this@MainActivity, 0, Intent(this@MainActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val n = Notification.Builder(this@MainActivity, "cursed_jobs").setSmallIcon(R.mipmap.ic_launcher).setContentTitle(title).setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(open).setAutoCancel(true).build()
+            if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) nm.notify((System.currentTimeMillis() % 100000).toInt(), n)
+        }
+    }
+
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
         val uris: Array<Uri>? = when {
@@ -65,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         webView = buildWebView()
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#0E0E10")) }
         setContentView(root)
 
@@ -90,7 +120,14 @@ class MainActivity : AppCompatActivity() {
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
+        addJavascriptInterface(Bridge(), "CursedAndroid")
         webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                val r = request ?: return
+                if (!r.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) { r.deny(); return }
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) r.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                else { micRequest = r; askMic.launch(Manifest.permission.RECORD_AUDIO) }
+            }
             // Attaching photos in Series (or anywhere else a page asks for a file).
             override fun onShowFileChooser(view: WebView?, callback: ValueCallback<Array<Uri>>?, params: FileChooserParams?): Boolean {
                 fileCallback?.onReceiveValue(null)
