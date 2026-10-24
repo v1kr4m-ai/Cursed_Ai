@@ -7,7 +7,12 @@ import type { Episode, Project, Ref, Scene } from "./api";
 import { kindOf } from "../../../../seriesTool/refKinds";
 
 const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-const mentions = (text: string, name: string) => text.toLowerCase().split(/[^a-z0-9']+/).includes(name.trim().toLowerCase());
+/** Whole-word match of a name (one word or several, such as "Aunt May") in a shot or line. */
+export const mentions = (text: string, name: string) => {
+  const words = (t: string) => t.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean);
+  const hay = ` ${words(text).join(" ")} `, needle = words(name).join(" ");
+  return !!needle && hay.includes(` ${needle} `);
+};
 const isPhoto = (r: Ref) => !!r.file && !r.prompt.trim();
 const newId = () => Math.random().toString(36).slice(2, 10);
 

@@ -8,7 +8,7 @@ import { kindOf, kindRank } from "../seriesTool/refKinds";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { peopleOf, ensureCast, renamePerson, setSkip, adoptPlannedPeople } from "../src/components/tools/series/people";
+import { peopleOf, ensureCast, renamePerson, setSkip, adoptPlannedPeople, mentions } from "../src/components/tools/series/people";
 import { fillSlots, refSourceFiles } from "../seriesTool/refSources";
 import { projectFormat, SERIES_FORMATS } from "../seriesTool/formats";
 import { isChatModel, paramsFromName, rateModel, recommend } from "../src/components/tools/series/modelRating";
@@ -243,6 +243,13 @@ describe("several people", () => {
     expect(prompt).toContain("is Ann");
     const skipped = { ...project, episodes: [{ ...eps[0], refs: eps[0].refs.map(r => (r.person === "Bo" ? { ...r, skip: true } : r)) }] } as Project;
     expect(buildScenePrompt(skipped as unknown as Project, skipped.episodes[0] as any, skipped.episodes[0].scenes[0] as any)).not.toContain("is Bo");
+  });
+
+  it("finds a person's name in a shot as a whole word, one word or several", () => {
+    expect(mentions("Richie walks into the cafe.", "Richie")).toBe(true);
+    expect(mentions("Aunt May waves.", "aunt may")).toBe(true);
+    expect(mentions("A richest man.", "Rich")).toBe(false);
+    expect(mentions("Anything", "")).toBe(false);
   });
 
   it("tells the model which picture a single named person is, using the person's name rather than the file label", () => {
