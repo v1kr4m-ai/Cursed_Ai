@@ -170,11 +170,14 @@ export async function askModel(
   onToken?: (t: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {
+  // The model must see the whole discussion: size its context window to the conversation plus the answer (about 3 characters a token).
+  const chars = messages.reduce((n, m) => n + m.content.length, 0);
+  const numCtx = Math.min(32768, Math.max(4096, Math.ceil((Math.ceil(chars / 3) + 8192) / 1024) * 1024));
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
-    body: JSON.stringify({ messages, model, options: { temperature: 0.8, maxTokens: 8192 } }),
+    body: JSON.stringify({ messages, model, options: { temperature: 0.8, maxTokens: 8192, numCtx } }),
   });
   if (!res.ok || !res.body) throw new Error((await res.text()) || "The model did not answer.");
 

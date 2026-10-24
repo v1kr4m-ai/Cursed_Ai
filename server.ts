@@ -497,7 +497,7 @@ async function startServer() {
       resp = provider === "ollama"
         ? await fetch(`${OLLAMA_URL}/api/chat`, {
             method: "POST", signal, headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, top_k: options?.topK, min_p: options?.minP, repeat_penalty: options?.repeatPenalty, seed: options?.seed, num_predict: options?.maxTokens, num_ctx: 4096 } }),
+            body: JSON.stringify({ model, messages: history, stream: true, options: { temperature: options?.temperature, top_p: options?.topP, top_k: options?.topK, min_p: options?.minP, repeat_penalty: options?.repeatPenalty, seed: options?.seed, num_predict: options?.maxTokens, num_ctx: Math.min(Math.max(Number(options?.numCtx) || 4096, 2048), 32768) } }),
           })
         : await fetch(`${LMSTUDIO_URL}/v1/chat/completions`, {
             method: "POST", signal, headers: { "Content-Type": "application/json" },
