@@ -1,7 +1,7 @@
 import React from "react";
 import { WorkflowPicker, WorkflowCheck } from "./WorkflowPicker";
 import { motion, AnimatePresence } from "motion/react";
-import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles, Archive, Pencil, GitMerge } from "lucide-react";
+import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles, Archive, ArchiveRestore, Download, Pencil, GitMerge } from "lucide-react";
 import { api, fileUrl, type Project, type ProjectSummary, type SeriesTemplate } from "./api";
 import "./series-theme.css";
 import { Ring, Tile, TileBoard, PageTitle, type TileDef } from "./DashKit";
@@ -44,6 +44,7 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
   const [title, setTitle] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [showArchived, setShowArchived] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
     try {
@@ -57,6 +58,8 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
     finally { setLoading(false); }
   }, []);
   React.useEffect(() => { refresh(); }, [refresh]);
+  const archivedCount = projects.filter(p => full[p.id]?.archived).length;
+  const shown = projects.filter(p => !!full[p.id]?.archived === showArchived);
 
   const [templates, setTemplates] = React.useState<SeriesTemplate[]>([]);
   const [templateId, setTemplateId] = React.useState("");
@@ -95,6 +98,11 @@ Cancel: story, plan and pictures only (small; clips can be rendered again).`);
       refresh(); onOpen(r.id);
     } catch (e: any) { setError(e?.message || String(e)); }
   }
+  /** Archived series leave the list (nothing is deleted) and come back from "Archived". */
+  async function archive(p: ProjectSummary, on: boolean) {
+    try { await api.patch(p.id, { archived: on }); notify({ message: on ? `"${p.title}" archived - find it under Archived` : `"${p.title}" is back in your series`, tab: "series" }); refresh(); }
+    catch (e: any) { setError(e?.message || String(e)); }
+  }
   async function remove(id: string, name: string) {
     if (!confirm(`Delete "${name}" and everything rendered in it? This cannot be undone.`)) return;
     await api.remove(id);
@@ -104,7 +112,7 @@ Cancel: story, plan and pictures only (small; clips can be rendered again).`);
   const homeDefs: TileDef[] = [
     { id: "summary", title: "All series", x: 0, y: 0, w: 8, h: 17 },
     { id: "new", title: "Start a new series", x: 8, y: 0, w: 16, h: 17 },
-    ...projects.map((p, i): TileDef => ({ id: "p:" + p.id, title: p.title, x: (i % 3) * 8, y: 17 + Math.floor(i / 3) * 21, w: 8, h: 21 })),
+    ...shown.map((p, i): TileDef => ({ id: "p:" + p.id, title: p.title, x: (i % 3) * 8, y: 17 + Math.floor(i / 3) * 21, w: 8, h: 21 })),
   ];
   const total = projects.reduce((a, p) => ({ eps: a.eps + p.episodes, scenes: a.scenes + p.scenes, done: a.done + p.scenesDone, joined: a.joined + p.exports }), { eps: 0, scenes: 0, done: 0, joined: 0 });
   const overall = total.scenes ? Math.round((total.done / total.scenes) * 100) : 0;
@@ -143,7 +151,7 @@ Cancel: story, plan and pictures only (small; clips can be rendered again).`);
         </Tile>
 
 
-        {projects.map((p, i) => {
+        {shown.map((p, i) => {
           const d = full[p.id];
           const pct = p.scenes ? Math.round((p.scenesDone / p.scenes) * 100) : 0;
           const stills = d ? d.episodes.flatMap(e => e.refs).filter(r => r.file).slice(0, 3) : [];
@@ -178,7 +186,8 @@ Cancel: story, plan and pictures only (small; clips can be rendered again).`);
                   </div>
                 )}
                 <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); remove(p.id, p.title); }} className="absolute right-4 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Delete series"><Trash2 size={14} /></span>
-                <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); backUp(p); }} className="absolute right-10 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Back up this series to a zip"><Archive size={14} /></span>
+                <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); backUp(p); }} className="absolute right-10 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title="Export: back up this series to a zip"><Download size={14} /></span>
+                <span role="button" tabIndex={0} data-split onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); archive(p, !full[p.id]?.archived); }} className="absolute right-16 bottom-4 z-10 cursor-pointer opacity-0 group-hover:opacity-70 hover:!opacity-100 transition" title={full[p.id]?.archived ? "Bring this series back to the list" : "Archive: hide this series from the list (nothing is deleted)"}>{full[p.id]?.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}</span>
               </Tile>
             </React.Fragment>
           );
@@ -192,6 +201,13 @@ Cancel: story, plan and pictures only (small; clips can be rendered again).`);
           </Tile>
         )}
 
+      {(archivedCount > 0 || showArchived) && (
+        <div className="mt-4 text-center">
+          <button onClick={() => setShowArchived(a => !a)} className="inline-flex items-center gap-1.5 rounded-full sd-frost border px-3 py-1.5 text-xs opacity-75 hover:opacity-100">
+            {showArchived ? <><ArrowLeft size={12} /> Back to your series</> : <><Archive size={12} /> Archived ({archivedCount})</>}
+          </button>
+        </div>
+      )}
       {root && <p className="mt-6 text-center text-[11px] opacity-45">Series are folders under {root}</p>}
     </div>
   );

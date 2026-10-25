@@ -226,6 +226,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     listeners.get(id)!.add(res);
     const beat = setInterval(() => res.write(": beat\n\n"), 25_000);
     req.on("close", () => { clearInterval(beat); listeners.get(id)?.delete(res); });
+        archived: !!p.archived,
   });
 
   // ------------------------------------------------------------------ assets

@@ -64,6 +64,7 @@ export interface Project {
   episodeSeconds?: number;
   bible?: { characters: string; places: string; rules: string; extra: string };
   creativity?: number;
+  archived?: boolean;
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;
 }
 

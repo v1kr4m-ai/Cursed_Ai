@@ -12,7 +12,7 @@ export function SeriesSummaryCard({ onOpen }: { onOpen: () => void }) {
     return () => { live = false; };
   }, []);
   if (!projects.length) return null;
-  const shown = [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 2);
+  const shown = projects.filter(p => !(p as any).archived).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 2);
   return (
     <button onClick={onOpen} title="Open Series Studio" className="mt-8 w-full max-w-xl text-left rounded-2xl border border-white/5 hover:border-white/20 hover:bg-white/5 p-4 transition-all group">
       <div className="flex items-center gap-2 mb-3">

@@ -147,6 +147,8 @@ export interface Project {
   bible?: { characters: string; places: string; rules: string; extra: string };
   /** How adventurous the writer is, 0.2 (sticks to the brief) to 1.2 (surprising). Missing means 0.8. */
   creativity?: number;
+  /** Put away: hidden from the list of series (nothing is deleted) until it is brought back. */
+  archived?: boolean;
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
