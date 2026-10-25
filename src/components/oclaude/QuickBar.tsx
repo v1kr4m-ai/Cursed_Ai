@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 
 export interface ReadyPrompt { label: string; text: string; group: string }
 
@@ -25,7 +25,24 @@ export const READY_PROMPTS: ReadyPrompt[] = [
   { group: "Safety", label: "Dependency check", text: "List the dependencies, note any that look outdated or unused, and say what could be removed." },
 ];
 
+/** Commands this app answers itself; the rest go to Claude Code. */
+export const APP_COMMANDS: { name: string; args?: string; note: string }[] = [
+  { name: "help", note: "list these commands" },
+  { name: "resume", args: "[number or title]", note: "go back to an earlier session" },
+  { name: "rename", args: "<name>", note: "rename this session" },
+  { name: "model", args: "[name]", note: "show or change the model" },
+  { name: "permissions", args: "[plan|edit|full]", note: "show or change what Claude may do" },
+  { name: "status", note: "model, folder, permission and session" },
+  { name: "clear", note: "start a new session in the same folder" },
+  { name: "fork", note: "branch the conversation from here" },
+  { name: "folder", note: "choose the working folder" },
+  { name: "add-dir", note: "let Claude work in one more folder" },
+  { name: "export", note: "save the session as Markdown" },
+  { name: "delete", note: "delete this session" },
+];
+
 type Tab = "prompts" | "commands" | "skills" | "mcp";
+const FOLD_KEY = "cursed.oclaude.quickFolded";
 const MINE_KEY = "cursed.oclaude.myprompts";
 const loadMine = (): ReadyPrompt[] => { try { const v = JSON.parse(localStorage.getItem(MINE_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
 
@@ -46,6 +63,8 @@ export function QuickBar({ cwd, known, mcp, draft, onInsert }: Props) {
   const [mcpList, setMcpList] = React.useState<{ name: string; target: string; status: string }[] | null>(null);
   const [loadingMcp, setLoadingMcp] = React.useState(false);
   const [mine, setMine] = React.useState<ReadyPrompt[]>(loadMine);
+  const [folded, setFolded] = React.useState(() => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } });
+  const fold = (v: boolean) => { setFolded(v); try { v ? localStorage.setItem(FOLD_KEY, "1") : localStorage.removeItem(FOLD_KEY); } catch { /* storage blocked */ } };
 
   React.useEffect(() => { fetch("/api/oclaude/commands?cwd=" + encodeURIComponent(cwd)).then(r => r.json()).then(setScanned).catch(() => {}); }, [cwd]);
   const refreshMcp = async () => {
@@ -62,7 +81,8 @@ export function QuickBar({ cwd, known, mcp, draft, onInsert }: Props) {
   };
 
   const names = [...new Set([...known, ...scanned.commands, ...scanned.skills])];
-  const builtin = ["compact", "init", "review", "security-review", "cost", "context", "memory", "help"].filter(c => !names.includes(c));
+  const builtin = ["compact", "init", "review", "security-review", "cost", "context", "memory", "pr-comments", "agents", "hooks", "doctor"].filter(c => !names.includes(c) && !APP_COMMANDS.some(a => a.name === c));
+  const appCmds = APP_COMMANDS.filter(c => match(c.name + c.note));
   const match = (s: string) => !q.trim() || s.toLowerCase().includes(q.trim().toLowerCase());
   const slash = [...names.filter(n => !scanned.skills.includes(n) || !known.length), ...builtin].filter(match);
   const skillNames = [...new Set([...scanned.skills, ...known.filter(n => n.includes(":"))])].filter(match);
@@ -72,15 +92,16 @@ export function QuickBar({ cwd, known, mcp, draft, onInsert }: Props) {
   return (
     <div className="mb-2 rounded-2xl border border-white/5 bg-white/[0.02] p-2.5">
       <div className="mb-2 flex items-center gap-1.5">
+        <button onClick={() => fold(!folded)} title={folded ? "Show" : "Fold away"} className="rounded-md p-1 text-zinc-500 hover:text-white"><ChevronDown size={13} className={`transition-transform ${folded ? "-rotate-90" : ""}`} /></button>
         {([["prompts", "Ready prompts"], ["commands", "Commands"], ["skills", "Skills"], ["mcp", "MCP"]] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${tab === id ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}>{label}</button>
+          <button key={id} onClick={() => { setTab(id); fold(false); }} className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${tab === id ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-500 hover:bg-white/10"}`}>{label}</button>
         ))}
         <div className="relative ml-auto">
           <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" className="h-7 w-32 rounded-lg border border-white/5 bg-white/5 pl-7 pr-2 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none" />
         </div>
       </div>
-      <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+      {!folded && <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
         {tab === "prompts" && (
           <>
             {prompts.map((p, i) => (
@@ -92,7 +113,12 @@ export function QuickBar({ cwd, known, mcp, draft, onInsert }: Props) {
             <button onClick={addMine} disabled={!draft.trim()} title="Save what is in the message box as a ready prompt" className={`${chip} flex items-center gap-1 disabled:opacity-40`}><Plus size={11} />Save the message box</button>
           </>
         )}
-        {tab === "commands" && (slash.length ? slash.map(c => <button key={c} onClick={() => onInsert("/" + c + " ")} className={chip}>/{c}</button>) : <span className="text-[11px] text-zinc-600">No commands found. Run once and Claude Code will list its own here.</span>)}
+        {tab === "commands" && (
+          <>
+            {appCmds.map(c => <button key={"app-" + c.name} onClick={() => onInsert("/" + c.name + " ", true)} title={`${c.note}${c.args ? ` - /${c.name} ${c.args}` : ""} (handled by this app)`} className={chip + " border-violet-500/25 text-violet-200/90"}>/{c.name}</button>)}
+            {slash.map(c => <button key={c} onClick={() => onInsert("/" + c + " ")} title="Sent to Claude Code" className={chip}>/{c}</button>)}
+          </>
+        )}
         {tab === "skills" && (skillNames.length ? skillNames.map(c => <button key={c} onClick={() => onInsert("/" + c + " ")} className={chip}>{c}</button>) : <span className="text-[11px] text-zinc-600">No skills found in your .claude folders.</span>)}
         {tab === "mcp" && (
           <>
@@ -102,7 +128,7 @@ export function QuickBar({ cwd, known, mcp, draft, onInsert }: Props) {
             <button onClick={refreshMcp} disabled={loadingMcp} className={`${chip} flex items-center gap-1`}><RefreshCw size={11} className={loadingMcp ? "animate-spin" : ""} />{loadingMcp ? "Checking..." : "Refresh"}</button>
           </>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

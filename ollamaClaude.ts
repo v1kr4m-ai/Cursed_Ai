@@ -237,6 +237,24 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  /** A file dropped on the message box: saved in <folder>/attachments/ so Claude can open it, and named back as a path relative to the folder. */
+  app.post("/api/oclaude/drop", express.raw({ type: "*/*", limit: "200mb" }), (req, res) => {
+    const cwd = String(req.query.cwd || "");
+    const name = path.basename(String(req.query.name || "")).replace(/[^A-Za-z0-9 ._()-]+/g, "_").slice(0, 120);
+    if (!cwd || !fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) return res.status(400).json({ error: "Choose the session's folder first." });
+    if (!name || name.startsWith(".")) return res.status(400).json({ error: "That file has no usable name." });
+    if (!Buffer.isBuffer(req.body)) return res.status(400).json({ error: "Nothing was received." });
+    try {
+      const dir = path.join(cwd, "attachments");
+      fs.mkdirSync(dir, { recursive: true });
+      const ext = path.extname(name), stem = path.basename(name, ext);
+      let file = path.join(dir, name);
+      for (let n = 2; fs.existsSync(file); n++) file = path.join(dir, `${stem} (${n})${ext}`);
+      fs.writeFileSync(file, req.body);
+      res.json({ ok: true, path: path.relative(cwd, file).replace(/\\/g, "/") });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   registerOllamaRestart(app, { ollamaUrl: opts.ollamaUrl });
 
   app.post("/api/oclaude/stop", (req, res) => {

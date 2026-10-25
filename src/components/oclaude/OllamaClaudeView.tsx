@@ -10,7 +10,7 @@ import { notify, notifyError } from "../../lib/notify";
 import { CodeBlock } from "../chat/ChatWindow";
 import { changedFiles } from "./events";
 import { ToolCard } from "./ToolCard";
-import { Chip, QuickBar } from "./QuickBar";
+import { APP_COMMANDS, Chip, QuickBar } from "./QuickBar";
 import { applyEvent, emptyLive, loadSessions, newSession, noticeItem, saveSessions, titleFrom, toMarkdown, userItem, type Live, type Session } from "./events";
 
 interface ModelInfo { name: string; compatible: boolean; reason: string; tools: boolean; thinking: boolean; vision: boolean; cloud: boolean; contextLength: number | null; sizeBytes: number | null; params: string }
@@ -126,9 +126,62 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     setPrefs({ permission: id });
   };
 
+  /** Says something in the transcript without running Claude. */
+  const note = (text: string, tone: "info" | "warn" | "error" = "info") => update(session.id, s => ({ ...s, items: [...s.items, noticeItem(tone, text)] }));
+
+  /**
+   * Commands the app answers itself (Claude Code runs here without its interactive screen, so these would do nothing
+   * there). Anything else that starts with "/" goes to Claude Code as before (/compact, /init, /review, your own commands).
+   */
+  function appCommand(text: string): boolean {
+    const m = /^\/([a-z-]+)(?:\s+([\s\S]*))?$/i.exec(text.trim());
+    if (!m) return false;
+    const cmd = m[1].toLowerCase(), arg = (m[2] || "").trim();
+    const find = (list: Session[], q: string) => (/^\d+$/.test(q) ? list[Number(q) - 1] : list.find(s => s.title.toLowerCase().includes(q.toLowerCase())));
+    switch (cmd) {
+      case "help":
+        note(APP_COMMANDS.map(c => `/${c.name}${c.args ? " " + c.args : ""} - ${c.note}`).join("\n") + "\n\nOther commands (/compact, /init, /review, /cost, your own) go to Claude Code.");
+        return true;
+      case "clear": case "new": startNew(); return true;
+      case "resume": {
+        if (!arg) { setSessionsOpen(true); note(sessions.map((s, i) => `${i + 1}. ${s.title} - ${ago(s.updatedAt)}`).join("\n") + "\n\nType /resume <number or part of the title>."); return true; }
+        const s = find(sessions, arg);
+        if (!s) { note(`No session matches "${arg}".`, "warn"); return true; }
+        setPrefs({ activeId: s.id }); notify({ message: `Back in "${s.title}"`, tab: "ollamaclaude" }); return true;
+      }
+      case "rename":
+        if (!arg) { note("Type the new name after /rename.", "warn"); return true; }
+        update(session.id, s => ({ ...s, title: arg.slice(0, 80) })); notify({ message: `Renamed to "${arg.slice(0, 80)}"`, tab: "ollamaclaude" }); return true;
+      case "model": {
+        if (!arg) { note(`Model: ${model || "none"}\nAvailable: ${compatible.map(c => c.name).join(", ") || "none that support tool calls"}\n\nType /model <name>.`); return true; }
+        const pick = compatible.find(c => c.name === arg) || compatible.find(c => c.name.toLowerCase().includes(arg.toLowerCase()));
+        if (!pick) { note(`No model that supports tool calls matches "${arg}".`, "warn"); return true; }
+        setPrefs({ model: pick.name }); notify({ message: `Model: ${pick.name}`, tab: "ollamaclaude" }); return true;
+      }
+      case "permissions": case "mode": {
+        const p = PERMISSIONS.find(x => x.label.toLowerCase() === arg.toLowerCase() || x.id.toLowerCase() === arg.toLowerCase());
+        if (!p) { note(`Permission: ${PERMISSIONS.find(x => x.id === prefs.permission)?.label}. Choose with /permissions plan, edit or full.`); return true; }
+        choosePermission(p.id); return true;
+      }
+      case "folder": case "cd": chooseFolder(); return true;
+      case "add-dir": addFolder(); return true;
+      case "export": exportMd(); return true;
+      case "fork": update(session.id, s => ({ ...s, fork: true })); note("The next message starts a new branch of this conversation (the original stays as it was)."); return true;
+      case "status":
+        note(`Model: ${model || "none"}${loadedCtx ? ` (${fmtCtx(loadedCtx)})` : ""}\nFolder: ${session.cwd}${prefs.addDirs.length ? `\nAlso: ${prefs.addDirs.join(", ")}` : ""}\nPermission: ${PERMISSIONS.find(x => x.id === prefs.permission)?.label}\nSession: ${session.title} (${session.items.length} entries)`);
+        return true;
+      case "delete": {
+        if (!confirm(`Delete the session "${session.title}"? Its transcript is removed from this app (files Claude changed stay changed).`)) return true;
+        removeSession(session.id); return true;
+      }
+      default: return false;
+    }
+  }
+
   async function send(textOverride?: string, extraAllowed: string[] = []) {
     const text = (textOverride ?? input).trim();
     if (!text || running || !session) return;
+    if (!textOverride && appCommand(text)) { setInput(""); return; }
     if (!status?.claude.found) { notifyError("Claude Code is not installed - see the setup card.", "ollamaclaude"); return; }
     if (!model) { notifyError("No installed model supports tool calls, so none can drive Claude Code.", "ollamaclaude"); return; }
     const id = session.id;
@@ -182,6 +235,23 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
   };
 
   const allowAndRetry = (tools: string[]) => send("You now have permission to use " + tools.join(", ") + ". Please carry on with what you were doing.", tools);
+  // Files dropped on the message box are saved in the session folder (attachments/) and mentioned with @, so Claude reads them.
+  const [dragging, setDragging] = React.useState(false);
+  const dropFiles = async (files: FileList | null) => {
+    setDragging(false);
+    const list = Array.from(files || []);
+    if (!list.length || !session) return;
+    const refs: string[] = [];
+    for (const f of list) {
+      try {
+        const r = await fetch(`/api/oclaude/drop?cwd=${encodeURIComponent(session.cwd)}&name=${encodeURIComponent(f.name)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: f });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Could not save the file.");
+        refs.push("@" + (/\s/.test(d.path) ? `"${d.path}"` : d.path));
+      } catch (e: any) { notifyError(`${f.name}: ${e?.message || e}`, "ollamaclaude"); }
+    }
+    if (refs.length) { setInput(v => (v && !v.endsWith(" ") ? v + " " : v) + refs.join(" ") + " "); inputRef.current?.focus(); notify({ message: `${refs.length} file${refs.length > 1 ? "s" : ""} added to attachments/ in the session folder`, tab: "ollamaclaude" }); }
+  };
   const insert = (text: string, replace?: boolean) => { setInput(v => (replace ? text : v + text)); inputRef.current?.focus(); };
   const exportMd = () => {
     if (!session) return;
@@ -463,7 +533,9 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
             );
           })()}
           {prefs.showQuick && <QuickBar cwd={session.cwd} known={session.init?.slashCommands || []} mcp={session.init?.mcpServers || []} draft={input} onInsert={insert} />}
-          <div className="flex items-end gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5 shadow-xl shadow-black/40 transition-all duration-300 ease-out focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
+          <div onDragOver={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }} onDrop={e => { e.preventDefault(); dropFiles(e.dataTransfer.files); }}
+            className={cn("relative flex items-end gap-1.5 rounded-2xl border bg-white/5 p-1.5 shadow-xl shadow-black/40 transition-all duration-300 ease-out focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]", dragging ? "border-dashed border-violet-400" : "border-white/10")}>
+            {dragging && <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-violet-600/15 text-xs font-medium text-violet-100">Drop to add the file to the session folder and mention it</div>}
             <div className="mb-0.5 ml-0.5 flex shrink-0 gap-0.5">
               {picker}
               <button onClick={() => setPrefs({ showQuick: !prefs.showQuick })} title={prefs.showQuick ? "Hide the prompts and commands" : "Show the prompts and commands"} className={cn("flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-white/5", prefs.showQuick ? "text-violet-400" : "text-zinc-500 hover:text-white")}><Brain size={17} className="hidden" /><span className="font-mono text-base font-bold">/</span></button>
