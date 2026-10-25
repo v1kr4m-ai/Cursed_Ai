@@ -11,6 +11,7 @@ import { CodeBlock } from "../chat/ChatWindow";
 import { changedFiles } from "./events";
 import { ToolCard } from "./ToolCard";
 import { APP_COMMANDS, Chip, QuickBar } from "./QuickBar";
+import { StatusRings } from "./StatusRings";
 import { applyEvent, emptyLive, loadSessions, newSession, noticeItem, saveSessions, titleFrom, toMarkdown, userItem, type Live, type Session } from "./events";
 
 interface ModelInfo { name: string; compatible: boolean; reason: string; tools: boolean; thinking: boolean; vision: boolean; cloud: boolean; contextLength: number | null; sizeBytes: number | null; params: string }
@@ -555,6 +556,11 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
               <button onClick={() => send()} disabled={!canSend} title="Send" className={cn("mb-0.5 mr-0.5 flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200", canSend ? "bg-violet-600 text-white shadow-lg shadow-violet-900/30 hover:scale-105 hover:bg-violet-500 active:scale-95" : "cursor-not-allowed bg-white/5 text-zinc-600")}><Send size={16} className={canSend ? "translate-x-px" : ""} /></button>
             )}
           </div>
+          <StatusRings s={{
+            ctxTokens: session.ctxTokens || 0, ctxMax: loadedCtx || modelInfo?.contextLength || null, model, permission: PERMISSIONS.find(p => p.id === prefs.permission)?.label || "",
+            folder: session.cwd, filesChanged: changedFiles(session.items).length, tools: session.items.filter(i => i.kind === "tool").length,
+            turns: lastResult?.kind === "result" ? lastResult.turns : 0, running, elapsed, lastMs: lastResult?.kind === "result" ? lastResult.ms : 0,
+          }} />
           <p className="mt-2 px-1 text-[10px] text-zinc-600">{PERMISSIONS.find(p => p.id === prefs.permission)?.note} {modelInfo?.cloud ? "This model runs in Ollama's cloud, so it needs internet." : ""}</p>
         </div>
       </div>

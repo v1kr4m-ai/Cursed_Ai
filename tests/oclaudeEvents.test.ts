@@ -60,4 +60,9 @@ describe("Ollama_Claude events", () => {
       { path: "t.txt", before: "one", big: false, undone: false },
     ]);
   });
+  it("keeps how full the context is from each answer, for the status line", () => {
+    const a = applyEvent([], emptyLive, { type: "assistant", message: { content: [{ type: "text", text: "hi" }], usage: { input_tokens: 1200, cache_read_input_tokens: 15000, cache_creation_input_tokens: 300, output_tokens: 40 } } });
+    expect(a.patch.ctxTokens).toBe(16500);
+    expect(applyEvent([], emptyLive, { type: "assistant", message: { content: [] } }).patch.ctxTokens).toBeUndefined();
+  });
 });

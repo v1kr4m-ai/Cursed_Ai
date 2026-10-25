@@ -44,6 +44,10 @@ export interface Session {
   /** Start the next run as a copy of the Claude session instead of continuing it. */
   fork?: boolean;
   items: Item[];
+  /** Tokens the conversation filled in the model's context at the last answer (prompt + cached), for the status line. */
+  ctxTokens?: number;
+  /** Tokens the model wrote in this session. */
+  outTokens?: number;
   /** Tools the user allowed after a denial, kept for this session. */
   allowed: string[];
   init?: InitInfo;
@@ -93,7 +97,10 @@ export function applyEvent(items: Item[], live: Live, ev: any): Applied {
         else if (b.type === "thinking" && b.thinking?.trim()) add.push({ kind: "thinking", id: uid(), text: b.thinking });
         else if (b.type === "tool_use") add.push({ kind: "tool", id: uid(), toolId: b.id, name: b.name, input: b.input, status: "running" });
       }
-      return { items: [...items, ...add], live: emptyLive, patch: {} };
+      // How full the context is: everything the model was given for this answer.
+      const u = ev.message?.usage;
+      const patch: Partial<Session> = u ? { ctxTokens: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) } : {};
+      return { items: [...items, ...add], live: emptyLive, patch };
     }
     case "user": {
       const blocks: any[] = Array.isArray(ev.message?.content) ? ev.message.content : [];
