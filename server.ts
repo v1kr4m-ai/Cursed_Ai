@@ -7,6 +7,7 @@ import { registerExport } from "./seriesTool/exportEpisodes";
 import { registerFinish } from "./seriesTool/finish";
 import { registerTemplates } from "./seriesTool/templates";
 import { registerBackup } from "./seriesTool/backup";
+import { registerMerge } from "./seriesTool/merge";
 import { registerComfyLogs } from "./comfyLogs";
 import { directLaunch, tailLines } from "./comfyLaunch";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
@@ -1710,6 +1711,7 @@ async function startServer() {
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerBackup(app, { projectsRoot: path.join(process.cwd(), "series") });
+  registerMerge(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL, startupLog: () => tailLines(COMFY_LOG, 300, 15 * 60_000) });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),

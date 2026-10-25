@@ -1,6 +1,7 @@
 import React from "react";
 import { adoptPlannedPeople, ensureCast, peopleOf, placeCast } from "./people";
 import { syncPhotos } from "./photos";
+import { markSeen, useSeen } from "./seen";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
@@ -201,6 +202,9 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
 }) {
   const [open, setOpen] = React.useState(false);
   const [playing, setPlaying] = React.useState(false);
+  const { isNew } = useSeen(project.id);
+  const fresh = isNew(scene.clipPath);
+  const play = () => { setPlaying(true); markSeen(project.id, scene.clipPath); };
   const [draft, setDraft] = React.useState(scene);
   React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
 
@@ -229,7 +233,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
       className={`rounded-lg border bg-neutral-900/50 overflow-hidden transition-colors ${isRunning ? "border-sky-700/70" : "border-neutral-800 hover:border-neutral-700"}`}>
       <div className="flex items-start gap-3 p-3">
         {scene.clipPath ? (
-          <motion.button whileHover={{ scale: 1.06 }} onClick={() => setPlaying(true)} title="Play this clip" className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-black">
+          <motion.button whileHover={{ scale: 1.06 }} onClick={play} title={fresh ? "New - play this clip" : "Play this clip"} className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-black">
             <video src={fileUrl(scene.clipPath) + "#t=0.4"} muted playsInline preload="metadata" className="h-full w-full object-cover" />
             <span className="absolute inset-0 grid place-items-center bg-black/25 opacity-80 hover:opacity-100"><Play size={14} className="text-white" /></span>
           </motion.button>
@@ -253,6 +257,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
         <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(o => !o)}>
           <div className="flex items-center gap-2">
             <span className="text-xs text-neutral-500">#{scene.number}</span>
+            {fresh && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}
             <Badge status={isRunning ? "running" : scene.status} progress={running?.progress} />
             {scene.durationS && <span className="text-[11px] text-neutral-500">{scene.durationS.toFixed(2)}s</span>}
           </div>
@@ -373,6 +378,8 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
   const [onlyTodo, setOnlyTodo] = React.useState(false);
   const allScenes = project.episodes.flatMap(e => e.scenes), allRefs = project.episodes.flatMap(e => e.refs);
   const scenesLeft = allScenes.filter(sc => sc.status !== "done").length, refsLeft = allRefs.filter(r => r.status !== "done" && !r.skip && (r.prompt || "").trim()).length;
+  const { isNew } = useSeen(project.id);
+  const newClips = allScenes.filter(sc => isNew(sc.clipPath)).length;
   const failed = allScenes.filter(sc => sc.status === "failed").length + allRefs.filter(r => r.status === "failed").length;
   React.useEffect(() => { if (focusEpisodeId) setOpenEpisode(focusEpisodeId); }, [focusEpisodeId]);
   const running = project.running || null;
@@ -416,7 +423,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-3 py-2.5">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-neutral-100">{scenesLeft === 0 && refsLeft === 0 ? "Everything is rendered" : `${scenesLeft} clip${scenesLeft === 1 ? "" : "s"} and ${refsLeft} picture${refsLeft === 1 ? "" : "s"} left to make`}</div>
-          <div className="text-[11px] text-neutral-500">{allScenes.length - scenesLeft} of {allScenes.length} clips done{failed ? ` - ${failed} failed (open the episode and press render again)` : ""}. {scenesLeft === 0 && refsLeft === 0 ? "Next: join the episodes in Assemble." : "Pictures are made first, then the clips."}</div>
+          <div className="text-[11px] text-neutral-500">{allScenes.length - scenesLeft} of {allScenes.length} clips done{newClips ? ` - ${newClips} new, not watched yet` : ""}{failed ? ` - ${failed} failed (open the episode and press render again)` : ""}. {scenesLeft === 0 && refsLeft === 0 ? "Next: join the episodes in Assemble." : "Pictures are made first, then the clips."}</div>
         </div>
         <label className="flex items-center gap-1.5 text-[11px] text-neutral-400"><input type="checkbox" checked={onlyTodo} onChange={e => setOnlyTodo(e.target.checked)} /> only what needs work</label>
         <button onClick={() => setOpenEpisode(openEpisode ? null : project.episodes[0].id)} className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-[11px] text-neutral-300 hover:bg-neutral-800">{openEpisode ? "Fold all" : "Open first"}</button>
@@ -444,7 +451,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                   <ChevronRight size={16} className="text-neutral-500" />
                 </motion.span>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-neutral-100">{ep.number}. {ep.title}</div>
+                  <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate" onDoubleClick={e => { e.stopPropagation(); const t = window.prompt("Rename episode " + ep.number, ep.title); if (t?.trim() && t.trim() !== ep.title) api.patch(project.id, { episodes: project.episodes.map(x => (x.id === ep.id ? { ...x, title: t.trim() } : x)) }).then(onChanged); }} title="Double-click to rename">{ep.number}. {ep.title}</span>{ep.scenes.some(sc => isNew(sc.clipPath)) && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
                   <div className="truncate text-[11px] text-neutral-500">{ep.era}</div>
                 </div>
               </button>

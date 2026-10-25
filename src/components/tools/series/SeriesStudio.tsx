@@ -1,7 +1,7 @@
 import React from "react";
 import { WorkflowPicker, WorkflowCheck } from "./WorkflowPicker";
 import { motion, AnimatePresence } from "motion/react";
-import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles, Archive } from "lucide-react";
+import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles, Archive, Pencil, GitMerge } from "lucide-react";
 import { api, fileUrl, type Project, type ProjectSummary, type SeriesTemplate } from "./api";
 import "./series-theme.css";
 import { Ring, Tile, TileBoard, PageTitle, type TileDef } from "./DashKit";
@@ -10,6 +10,7 @@ import { Board } from "./Board";
 import { Assemble } from "./Assemble";
 import { ProjectDashboard } from "./ProjectDashboard";
 import { onSeriesEvent } from "./seriesEvents";
+import { baselineSeen } from "./seen";
 import { nativeFolder } from "../../comfy/types";
 import { notify } from "../../../lib/notify";
 import type { AIModel } from "../../../types";
@@ -320,6 +321,22 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
   }, []);
 
   React.useEffect(() => { if (projectId) reload(projectId); }, [projectId, reload]);
+  React.useEffect(() => { if (project) baselineSeen(project); }, [project?.id]);
+
+  const [renaming, setRenaming] = React.useState(false);
+  const [joining, setJoining] = React.useState(false);
+  const [others, setOthers] = React.useState<ProjectSummary[]>([]);
+  const rename = async (title: string) => {
+    setRenaming(false);
+    const t = title.trim();
+    if (!project || !t || t === project.title) return;
+    try { setProject(await api.patch(project.id, { title: t })); } catch (e: any) { setError(e?.message || String(e)); }
+  };
+  const openJoin = async () => { try { setOthers((await api.list()).projects.filter(p => p.id !== projectId)); setJoining(j => !j); } catch (e: any) { setError(e?.message || String(e)); } };
+  const joinWith = async (other: ProjectSummary) => {
+    if (!project || !confirm(`Add every episode of "${other.title}" to the end of "${project.title}"?\n\nTheir pictures and clips are copied into this series. "${other.title}" stays as it is.`)) return;
+    try { const r = await api.merge(project.id, other.id); setProject(await api.get(project.id)); setJoining(false); notify({ message: `Joined "${other.title}": ${r.episodes} episodes added`, tab: "series" }); } catch (e: any) { setError(e?.message || String(e)); }
+  };
 
   // Live job events: the server pushes status changes as renders start, progress and finish.
   React.useEffect(() => {
@@ -367,7 +384,24 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                   <button onClick={() => open(null)} className="flex items-center gap-1.5 rounded-full sd-frost border px-3 py-1.5 text-xs hover:opacity-80">
                     <ArrowLeft size={14} /> All series
                   </button>
-                  <h2 className="text-base font-medium tracking-tight truncate">{project?.title || "Loading..."}</h2>
+                  {renaming && project ? (
+                    <input autoFocus defaultValue={project.title} onBlur={e => rename(e.target.value)} onKeyDown={e => { if (e.key === "Enter") rename((e.target as HTMLInputElement).value); if (e.key === "Escape") setRenaming(false); }} className="min-w-0 rounded-lg border border-current/30 bg-transparent px-2 py-1 text-base font-medium tracking-tight focus:outline-none" />
+                  ) : (
+                    <h2 className="group flex min-w-0 items-center gap-1.5 text-base font-medium tracking-tight">
+                      <span className="truncate" onDoubleClick={() => project && setRenaming(true)} title="Double-click to rename">{project?.title || "Loading..."}</span>
+                      {project && <button onClick={() => setRenaming(true)} title="Rename this series" className="opacity-40 transition hover:opacity-100"><Pencil size={13} /></button>}
+                    </h2>
+                  )}
+                  <div className="relative">
+                    <button onClick={openJoin} title="Add another series' episodes to this one" className="flex items-center gap-1 rounded-full sd-frost border px-2.5 py-1 text-[11px] opacity-70 hover:opacity-100"><GitMerge size={12} /> Join a series</button>
+                    {joining && (
+                      <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border bg-zinc-900 p-1.5 text-white shadow-2xl">
+                        <p className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-wider opacity-50">Add the episodes of...</p>
+                        {others.length === 0 && <p className="px-2 py-2 text-xs opacity-60">There is no other series.</p>}
+                        {others.map(o => <button key={o.id} onClick={() => joinWith(o)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white/10"><span className="truncate">{o.title}</span><span className="shrink-0 text-[10px] opacity-50">{o.episodes} ep</span></button>)}
+                      </div>
+                    )}
+                  </div>
                   <nav className="ml-auto flex items-center gap-1 rounded-full sd-frost border p-1">
                     {STAGES.map(s => {
                       const Icon = s.icon;
@@ -380,7 +414,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                           )}
                           <span className={`relative flex items-center gap-1.5 transition-opacity ${active ? "text-white" : "opacity-65 hover:opacity-100"}`}>
                             <Icon size={13} />
-                            {s.id !== "settings" && s.label}
+                            {s.id === "dashboard" && project ? <span className="max-w-[10rem] truncate">{project.title}</span> : s.id !== "settings" && s.label}
                           </span>
                         </button>
                       );

@@ -1,6 +1,6 @@
 import React from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Copy, Trash2 } from "lucide-react";
-import { api, type Episode, type Project, type Scene } from "./api";
+import { api, type Episode, type Project, type Ref, type Scene } from "./api";
 
 const field = "w-full bg-neutral-900/60 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors";
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -8,6 +8,39 @@ const words = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
 
 /** Gives the episodes 1, 2, 3... in the order they are in (file names for new clips follow the number). */
 export const renumber = (episodes: Episode[]): Episode[] => episodes.map((e, i) => (e.number === i + 1 ? e : { ...e, number: i + 1 }));
+
+/**
+ * Moves a scene to a place in the same or another episode (index 0 = first). A scene that changes episode takes its
+ * pictures with it: a picture the other episode already has under the same name is reused, any other is copied across.
+ * Scenes in both episodes are numbered again, and the clip a scene has already rendered goes with it.
+ */
+export function moveScene(episodes: Episode[], fromId: string, sceneId: string, toId: string, index: number): Episode[] {
+  const from = episodes.find(e => e.id === fromId), to = episodes.find(e => e.id === toId);
+  const scene = from?.scenes.find(sc => sc.id === sceneId);
+  if (!from || !to || !scene) return episodes;
+  const place = (list: Scene[], at: number) => { const next = [...list]; next.splice(Math.max(0, Math.min(at, next.length)), 0, scene); return next; };
+  const number = (list: Scene[]) => list.map((sc, i) => (sc.number === i + 1 ? sc : { ...sc, number: i + 1 }));
+  if (from.id === to.id) {
+    const without = [...from.scenes].sort((a, b) => a.number - b.number).filter(sc => sc.id !== sceneId);
+    return episodes.map(e => (e.id === from.id ? { ...e, scenes: number(place(without, index)) } : e));
+  }
+  const addRefs: Ref[] = [];
+  const mapped = scene.refIds.map(id => {
+    const r = from.refs.find(x => x.id === id);
+    if (!r) return id;
+    const same = [...to.refs, ...addRefs].find(x => x.name === r.name && (x.person || "") === (r.person || "") && !!x.prompt.trim() === !!r.prompt.trim());
+    if (same) return same.id;
+    const copy: Ref = { ...r, id: newId(), fromRefIds: undefined };
+    addRefs.push(copy);
+    return copy.id;
+  });
+  const moving: Scene = { ...scene, refIds: mapped };
+  return episodes.map(e => {
+    if (e.id === from.id) return { ...e, scenes: number([...e.scenes].sort((a, b) => a.number - b.number).filter(sc => sc.id !== sceneId)) };
+    if (e.id === to.id) { const list = [...e.scenes].sort((a, b) => a.number - b.number); const next = [...list]; next.splice(Math.max(0, Math.min(index, next.length)), 0, moving); return { ...e, refs: [...e.refs, ...addRefs], scenes: number(next) }; }
+    return e;
+  });
+}
 
 /** A copy of an episode's story (title, hook, scenes, picture prompts) with nothing rendered, so it can be reworked without touching the original's clips. */
 export function copyEpisode(e: Episode): Episode {
@@ -30,6 +63,7 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
     if (!confirm(`Delete episode ${e.number} "${e.title}"${done ? ` and its ${done} rendered clip${done === 1 ? "" : "s"} from the list` : ""}? The files on disk are not deleted.`)) return;
     store(renumber(eps.filter(x => x.id !== e.id)));
   };
+  const shuffle = (e: Episode, s: Scene, toId: string, index: number) => store(moveScene(eps, e.id, s.id, toId, index));
   const copy = (i: number) => { const next = [...eps]; next.splice(i + 1, 0, copyEpisode(eps[i])); store(renumber(next)); };
 
   const seconds = project.settings.seconds || 7;
@@ -68,9 +102,19 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
                   <input key={e.id + e.hookOut} defaultValue={e.hookOut} onBlur={ev => ev.target.value !== e.hookOut && edit(e.id, { hookOut: ev.target.value })} className={field} /></label>
                 <div className="space-y-1.5">
                   <div className="text-[10px] text-neutral-500">Script - the shot (what the camera sees) and the line, scene by scene. A clip already rendered is not redone by editing; render it again in Produce.</div>
-                  {[...e.scenes].sort((a, b) => a.number - b.number).map(s => (
+                  {[...e.scenes].sort((a, b) => a.number - b.number).map((s, si, all) => (
                     <div key={s.id} className="rounded-md border border-neutral-800 p-2">
-                      <div className="mb-1 flex items-center gap-2 text-[10px] text-neutral-500"><span>Scene {s.number}</span>{s.status === "done" && <span className="text-emerald-400">rendered</span>}<span className="ml-auto">{words(s.vo)} words</span></div>
+                      <div className="mb-1 flex items-center gap-1.5 text-[10px] text-neutral-500"><span>Scene {s.number}</span>{s.status === "done" && <span className="text-emerald-400">rendered</span>}<span>{words(s.vo)} words</span>
+                        <span className="ml-auto flex items-center gap-0.5">
+                          <button onClick={() => shuffle(e, s, e.id, si - 1)} disabled={si === 0} title="Move this scene earlier" className="rounded p-0.5 hover:text-white disabled:opacity-25"><ArrowUp size={11} /></button>
+                          <button onClick={() => shuffle(e, s, e.id, si + 1)} disabled={si === all.length - 1} title="Move this scene later" className="rounded p-0.5 hover:text-white disabled:opacity-25"><ArrowDown size={11} /></button>
+                          {eps.length > 1 && (
+                            <select value="" onChange={ev => ev.target.value && shuffle(e, s, ev.target.value, 9999)} title="Move this scene (and its clip) to the end of another episode" className="ml-1 max-w-[7rem] rounded border border-neutral-700 bg-transparent px-1 py-0.5 text-[10px] text-neutral-400 [&_*]:bg-white [&_*]:text-black">
+                              <option value="">Move to...</option>
+                              {eps.filter(x => x.id !== e.id).map(x => <option key={x.id} value={x.id}>Episode {x.number}</option>)}
+                            </select>
+                          )}
+                        </span></div>
                       <textarea key={s.id + s.shot} defaultValue={s.shot} rows={2} onBlur={ev => ev.target.value !== s.shot && editScene(e.id, s.id, { shot: ev.target.value })} placeholder="Shot" className={field + " resize-none"} />
                       <textarea key={s.id + s.vo} defaultValue={s.vo} rows={2} onBlur={ev => ev.target.value !== s.vo && editScene(e.id, s.id, { vo: ev.target.value })} placeholder="Line" className={field + " mt-1 resize-none"} />
                     </div>

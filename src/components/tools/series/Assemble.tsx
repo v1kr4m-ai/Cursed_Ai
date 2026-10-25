@@ -5,6 +5,7 @@ import { SubtitlesPanel } from "./Subtitles";
 import { AudioPanel } from "./AudioPanel";
 import { OutputStage, KINDS, finalOutput, listOutputs, chooseExportFolder } from "./Outputs";
 import { HoverVideo } from "./DashKit";
+import { markSeen, useSeen } from "./seen";
 import { notify, notifyError } from "../../../lib/notify";
 import { postJson } from "../../comfy/types";
 
@@ -30,6 +31,8 @@ function EpisodeRow({ project, episode, onChanged, open, onToggle }: { project: 
   const ready = ordered.length > 0 && done.length === ordered.length;
   const total = done.reduce((n, s) => n + (s.durationS || 0), 0);
   const fin = finalOutput(episode);
+  const { isNew } = useSeen(project.id);
+  const fresh = isNew(fin?.path) || isNew(episode.exportPath);
   const made = listOutputs(episode).map(o => o.kind);
 
   async function run(e: React.MouseEvent) {
@@ -49,11 +52,11 @@ function EpisodeRow({ project, episode, onChanged, open, onToggle }: { project: 
 
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-900/30">
-      <div role="button" tabIndex={0} onClick={onToggle} onKeyDown={e => (e.key === "Enter" || e.key === " ") && onToggle()} className="flex cursor-pointer items-center gap-3 p-3">
+      <div role="button" tabIndex={0} onClick={() => { if (!open) markSeen(project.id, fin?.path, episode.exportPath, ...(episode.outputs || []).map(o => o.path)); onToggle(); }} onKeyDown={e => (e.key === "Enter" || e.key === " ") && onToggle()} className="flex cursor-pointer items-center gap-3 p-3">
         <ChevronDown size={16} className={"shrink-0 opacity-60 transition-transform " + (open ? "" : "-rotate-90")} />
         {fin ? <HoverVideo src={fileUrl(fin.path)} className="h-12 w-8 shrink-0 rounded bg-black object-cover" /> : <div className="h-12 w-8 shrink-0 rounded bg-current/10" />}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-neutral-100">{episode.number}. {episode.title}</div>
+          <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate">{episode.number}. {episode.title}</span>{fresh && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
           <div className="text-[11px] text-neutral-500">{done.length}/{ordered.length} scenes rendered{total ? ` - ${total.toFixed(1)}s total` : ""}</div>
           <div className="mt-1 flex flex-wrap gap-1"><Chip on={ready}>Rendered</Chip><Chip on={!!episode.exportPath}>Joined</Chip><Chip on={made.includes("subtitled") || made.includes("final")}>Subtitled</Chip><Chip on={made.includes("audio") || made.includes("final")}>Audio</Chip>{fin && <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold " + KINDS[fin.kind].chip}>Final: {KINDS[fin.kind].label}</span>}</div>
         </div>

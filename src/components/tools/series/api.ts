@@ -128,6 +128,7 @@ export const api = {
   create: (title: string) => call<Project>("/api/series/projects", { method: "POST", body: JSON.stringify({ title }) }),
   get: (id: string) => call<Project>(`/api/series/projects/${id}`),
   patch: (id: string, changes: Partial<Project>) => call<Project>(`/api/series/projects/${id}`, { method: "PATCH", body: JSON.stringify(changes) }),
+  merge: (id: string, from: string) => call<{ ok: true; episodes: number }>(`/api/series/projects/${id}/merge`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from }) }),
   backup: (id: string, dest: string, includeClips: boolean) => call<{ ok: true; file: string; bytes: number; withClips: boolean }>(`/api/series/projects/${id}/backup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dest, includeClips }) }),
   pickBackup: () => call<{ path: string | null }>(`/api/series/pick-backup`, { method: "POST" }),
   importBackup: (zip: string) => call<{ ok: true; id: string; title: string; episodes: number }>(`/api/series/projects/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zip }) }),

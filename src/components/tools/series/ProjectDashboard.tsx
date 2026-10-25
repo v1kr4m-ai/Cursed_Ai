@@ -179,7 +179,7 @@ export function ProjectDashboard({ project, onGo, onChanged }: { project: Projec
 
   return (
     <div className="h-full overflow-y-auto pr-1 pb-24">
-      <PageTitle>Dashboard</PageTitle>
+      <PageTitle>{project.title}</PageTitle>
       <TileBoard id="dashboard" defs={TILE_DEFS}>
         {/* hero */}
         <Tile id="hero" tone="dark" delay={0.02} className="min-h-[22rem] flex flex-col" onClick={() => onGo(next.stage)} title={next.label}
