@@ -68,6 +68,8 @@ export interface Episode {
   era: string;
   /** The closing line that pulls the viewer into the next episode. */
   hookOut: string;
+  /** The group it belongs to: "Week 1", "Season 2", "Richie's storyline". Optional. */
+  group?: string;
   refs: Ref[];
   scenes: Scene[];
   exportPath: string | null;
@@ -149,6 +151,8 @@ export interface Project {
   creativity?: number;
   /** Put away: hidden from the list of series (nothing is deleted) until it is brought back. */
   archived?: boolean;
+  /** Automatic grouping: every `size` episodes make the next "<unit> n", each called "<item> k" inside it. */
+  grouping?: { unit: string; item: string; size: number };
 }
 
 export const DEFAULT_SETTINGS: ProjectSettings = {

@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Copy, Trash2 } from "lucide-react";
 import { api, type Episode, type Project, type Ref, type Scene } from "./api";
+import { applyGrouping, GROUPING_PRESETS, itemLabel, type Grouping } from "./groups";
 
 const field = "w-full bg-neutral-900/60 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors";
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -66,6 +67,11 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
   const shuffle = (e: Episode, s: Scene, toId: string, index: number) => store(moveScene(eps, e.id, s.id, toId, index));
   const copy = (i: number) => { const next = [...eps]; next.splice(i + 1, 0, copyEpisode(eps[i])); store(renumber(next)); };
 
+  const [grouping, setGrouping] = React.useState(false);
+  const [g, setG] = React.useState<Grouping>(project.grouping || GROUPING_PRESETS[0].g);
+  const groupAll = async (next: Grouping) => onSaved(await api.patch(project.id, { grouping: next, episodes: applyGrouping(eps, next) }));
+  const ungroup = async () => onSaved(await api.patch(project.id, { grouping: undefined, episodes: eps.map(e => ({ ...e, group: undefined })) }));
+  const groupNames = [...new Set(eps.map(e => (e.group || "").trim()).filter(Boolean))];
   const seconds = project.settings.seconds || 7;
   const totalScenes = eps.reduce((n, e) => n + e.scenes.length, 0);
 
@@ -73,18 +79,38 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-[10px] text-neutral-500">
         <span>{eps.length} episode{eps.length === 1 ? "" : "s"} - {totalScenes} scenes - about {Math.round((totalScenes * seconds) / 60 * 10) / 10} min in all</span>
-        <span>click an episode to edit its script</span>
+        <button onClick={() => setGrouping(x => !x)} className="rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-400 hover:text-white">{grouping ? "Done grouping" : "Group episodes"}</button>
       </div>
+      {grouping && (
+        <div className="space-y-2 rounded-lg border border-neutral-700 bg-neutral-900/60 p-2.5 text-[11px] text-neutral-300">
+          <div className="text-neutral-400">Put the episodes into groups, such as Week 1 (Day 1-7), Season 2, or one storyline per character.</div>
+          <div className="flex flex-wrap gap-1.5">
+            {GROUPING_PRESETS.map(p => <button key={p.label} onClick={() => { setG(p.g); groupAll(p.g); }} className="rounded-full border border-neutral-700 px-2.5 py-0.5 hover:border-amber-400/60">{p.label}</button>)}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            Every <input type="number" min={1} value={g.size} onChange={e => setG({ ...g, size: Number(e.target.value) || 1 })} className={field + " w-14"} /> episodes make a
+            <input value={g.unit} onChange={e => setG({ ...g, unit: e.target.value })} placeholder="Week" className={field + " w-20"} />, each called a
+            <input value={g.item} onChange={e => setG({ ...g, item: e.target.value })} placeholder="Day" className={field + " w-20"} />
+            <button onClick={() => groupAll(g)} className="rounded-md bg-amber-600/30 px-2.5 py-1 text-amber-100 hover:bg-amber-600/50">Apply</button>
+            {eps.some(e => e.group) && <button onClick={ungroup} className="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800">Remove groups</button>}
+          </div>
+          <div className="text-neutral-500">For storylines, leave this and type a group name on each episode instead (open an episode, "Group"). New episodes join the last group, or the automatic grouping when one is set.</div>
+        </div>
+      )}
       {eps.map((e, i) => {
+        const head = (e.group || "") !== (eps[i - 1]?.group || "") && !!e.group;
+        const sub = itemLabel(project, e);
         const isOpen = open === e.id;
         const done = e.scenes.filter(s => s.status === "done").length;
         return (
-          <div key={e.id} className={"rounded-lg border " + (isOpen ? "border-neutral-600 bg-neutral-900/60" : "border-neutral-800 bg-neutral-900/40")}>
+          <React.Fragment key={e.id}>
+          {head && <div className="px-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-amber-300/80">{e.group}</div>}
+          <div className={"rounded-lg border " + (isOpen ? "border-neutral-600 bg-neutral-900/60" : "border-neutral-800 bg-neutral-900/40")}>
             <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-neutral-300">
               <button onClick={() => setOpen(isOpen ? null : e.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                 <ChevronRight size={13} className={"shrink-0 text-neutral-500 transition-transform " + (isOpen ? "rotate-90" : "")} />
                 <span className="w-5 shrink-0 text-neutral-500">{e.number}</span>
-                <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                <span className="min-w-0 flex-1 truncate">{sub && <span className="mr-1.5 text-amber-200/70">{sub}</span>}{e.title}</span>
                 <span className="shrink-0 text-[10px] text-neutral-600">{done}/{e.scenes.length} clips</span>
               </button>
               <button onClick={() => move(i, -1)} disabled={i === 0} title="Move up" className="rounded p-1 text-neutral-500 hover:text-white disabled:opacity-25"><ArrowUp size={12} /></button>
@@ -96,6 +122,9 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
               <div className="space-y-2 border-t border-neutral-800 p-2.5">
                 <label className="block space-y-0.5"><span className="text-[10px] text-neutral-500">Title</span>
                   <input key={e.id + e.title} defaultValue={e.title} onBlur={ev => ev.target.value.trim() && ev.target.value !== e.title && edit(e.id, { title: ev.target.value.trim() })} className={field} /></label>
+                <label className="block space-y-0.5"><span className="text-[10px] text-neutral-500">Group (Week 1, Season 2, a character's storyline... or empty)</span>
+                  <input key={e.id + (e.group || "")} defaultValue={e.group || ""} list={"groups-" + project.id} onBlur={ev => ev.target.value.trim() !== (e.group || "") && edit(e.id, { group: ev.target.value.trim() || undefined })} className={field} />
+                  <datalist id={"groups-" + project.id}>{groupNames.map(n => <option key={n} value={n} />)}</datalist></label>
                 <label className="block space-y-0.5"><span className="text-[10px] text-neutral-500">What this episode covers</span>
                   <input key={e.id + e.era} defaultValue={e.era} onBlur={ev => ev.target.value !== e.era && edit(e.id, { era: ev.target.value })} className={field} /></label>
                 <label className="block space-y-0.5"><span className="text-[10px] text-neutral-500">Closing hook (what pulls the viewer to the next episode)</span>
@@ -123,6 +152,7 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
               </div>
             )}
           </div>
+          </React.Fragment>
         );
       })}
     </div>

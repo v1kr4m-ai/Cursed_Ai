@@ -611,3 +611,4 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
           person: String(r.person || prior?.person || "").trim().slice(0, 60) || undefined,
           skip: typeof r.skip === "boolean" ? r.skip : prior?.skip,
             cast: Array.isArray(s.cast) ? s.cast.map((n: unknown) => String(n).trim()).filter(Boolean) : prior?.cast,
+        group: String(raw.group || old?.group || "").trim() || undefined,

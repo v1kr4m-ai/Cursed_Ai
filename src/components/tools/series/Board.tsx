@@ -2,6 +2,7 @@ import React from "react";
 import { adoptPlannedPeople, ensureCast, peopleOf, placeCast } from "./people";
 import { syncPhotos } from "./photos";
 import { markSeen, useSeen } from "./seen";
+import { itemLabel } from "./groups";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
@@ -437,12 +438,16 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
         </button>
       )}
       {project.episodes.map((ep, i) => {
+        const head = !!ep.group && ep.group !== (project.episodes[i - 1]?.group || "");
+        const sub = itemLabel(project, ep);
         const open = openEpisode === ep.id;
         const scenesDone = ep.scenes.filter(s => s.status === "done").length;
         const refsDone = ep.refs.filter(r => r.status === "done").length;
         const pct = ep.scenes.length ? (scenesDone / ep.scenes.length) * 100 : 0;
         return (
-          <motion.div key={ep.id} layout
+          <React.Fragment key={ep.id}>
+          {head && <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-amber-300/80">{ep.group}</div>}
+          <motion.div layout
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.2) }}
             className="rounded-xl border border-neutral-800 bg-neutral-900/30 overflow-hidden">
             <div className="flex items-center gap-3 p-3">
@@ -451,7 +456,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                   <ChevronRight size={16} className="text-neutral-500" />
                 </motion.span>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate" onDoubleClick={e => { e.stopPropagation(); const t = window.prompt("Rename episode " + ep.number, ep.title); if (t?.trim() && t.trim() !== ep.title) api.patch(project.id, { episodes: project.episodes.map(x => (x.id === ep.id ? { ...x, title: t.trim() } : x)) }).then(onChanged); }} title="Double-click to rename">{ep.number}. {ep.title}</span>{ep.scenes.some(sc => isNew(sc.clipPath)) && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
+                  <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate" onDoubleClick={e => { e.stopPropagation(); const t = window.prompt("Rename episode " + ep.number, ep.title); if (t?.trim() && t.trim() !== ep.title) api.patch(project.id, { episodes: project.episodes.map(x => (x.id === ep.id ? { ...x, title: t.trim() } : x)) }).then(onChanged); }} title="Double-click to rename">{ep.number}. {sub && <span className="text-amber-200/70">{sub} - </span>}{ep.title}</span>{ep.scenes.some(sc => isNew(sc.clipPath)) && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
                   <div className="truncate text-[11px] text-neutral-500">{ep.era}</div>
                 </div>
               </button>
@@ -494,6 +499,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
               )}
             </AnimatePresence>
           </motion.div>
+          </React.Fragment>
         );
       })}
     </div>

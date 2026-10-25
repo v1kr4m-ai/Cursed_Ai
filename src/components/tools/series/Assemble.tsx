@@ -6,6 +6,7 @@ import { AudioPanel } from "./AudioPanel";
 import { OutputStage, KINDS, finalOutput, listOutputs, chooseExportFolder } from "./Outputs";
 import { HoverVideo } from "./DashKit";
 import { markSeen, useSeen } from "./seen";
+import { itemLabel } from "./groups";
 import { notify, notifyError } from "../../../lib/notify";
 import { postJson } from "../../comfy/types";
 
@@ -56,7 +57,7 @@ function EpisodeRow({ project, episode, onChanged, open, onToggle }: { project: 
         <ChevronDown size={16} className={"shrink-0 opacity-60 transition-transform " + (open ? "" : "-rotate-90")} />
         {fin ? <HoverVideo src={fileUrl(fin.path)} className="h-12 w-8 shrink-0 rounded bg-black object-cover" /> : <div className="h-12 w-8 shrink-0 rounded bg-current/10" />}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate">{episode.number}. {episode.title}</span>{fresh && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
+          <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate">{episode.number}. {itemLabel(project, episode) && <span className="text-amber-200/70">{itemLabel(project, episode)} - </span>}{episode.title}</span>{fresh && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
           <div className="text-[11px] text-neutral-500">{done.length}/{ordered.length} scenes rendered{total ? ` - ${total.toFixed(1)}s total` : ""}</div>
           <div className="mt-1 flex flex-wrap gap-1"><Chip on={ready}>Rendered</Chip><Chip on={!!episode.exportPath}>Joined</Chip><Chip on={made.includes("subtitled") || made.includes("final")}>Subtitled</Chip><Chip on={made.includes("audio") || made.includes("final")}>Audio</Chip>{fin && <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold " + KINDS[fin.kind].chip}>Final: {KINDS[fin.kind].label}</span>}</div>
         </div>
@@ -234,7 +235,12 @@ export function Assemble({ project, onChanged }: { project: Project; onChanged: 
         <span>-</span>
         <button onClick={() => setOpen([])} className="hover:text-neutral-300">Close all</button>
       </div>
-      {project.episodes.map(ep => <EpisodeRow key={ep.id} project={project} episode={ep} onChanged={onChanged} open={openIds.includes(ep.id)} onToggle={() => setOpen(openIds.includes(ep.id) ? openIds.filter(x => x !== ep.id) : [...openIds, ep.id])} />)}
+      {project.episodes.map((ep, i) => (
+        <React.Fragment key={ep.id}>
+          {!!ep.group && ep.group !== (project.episodes[i - 1]?.group || "") && <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-amber-300/80">{ep.group}</div>}
+          <EpisodeRow project={project} episode={ep} onChanged={onChanged} open={openIds.includes(ep.id)} onToggle={() => setOpen(openIds.includes(ep.id) ? openIds.filter(x => x !== ep.id) : [...openIds, ep.id])} />
+        </React.Fragment>
+      ))}
       <ExportAll project={project} />
     </div>
   );

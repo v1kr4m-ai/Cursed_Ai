@@ -8,6 +8,7 @@ import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
 import { savedSetting } from "../../../lib/settingsStore";
 import { EpisodeManager } from "./EpisodeManager";
+import { applyGrouping } from "./groups";
 import { ThinkingWords } from "../../ui/ThinkingWords";
 import { notify } from "../../../lib/notify";
 import { applyPreset, CHAT_PRESETS, LENGTH_PRESETS, type SeriesTemplate, api, askModel, extractJson, fileUrl, type Project } from "./api";
@@ -102,7 +103,7 @@ ${rulesFor(fmt, people, scenes, photos)}`;
 /** The plan the page already holds, written back in the shape the planner uses, so one more episode can be added without losing renders. */
 function planJson(project: Project) {
   return project.episodes.map(e => ({
-    number: e.number, title: e.title, era: e.era, hookOut: e.hookOut,
+    number: e.number, title: e.title, era: e.era, hookOut: e.hookOut, group: e.group,
     refs: e.refs.map(r => ({ name: r.name, role: r.role, kind: r.kind, person: r.person, skip: r.skip, prompt: r.prompt, negative: r.negative, seed: r.seed })),
     scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, shot: sc.shot, textCard: sc.textCard, cast: sc.cast, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
   }));
@@ -365,6 +366,15 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
       for (const f of docs) await api.uploadSource(project.id, f);
       if (docs.length) { current = await api.get(project.id); onSaved(current); }
       if (images.length) {
+        // What each picture shows goes into the chat as text, so the model you are talking to understands it even if it cannot see.
+        let thread = messages;
+        for (const f of images) {
+          let seen: string | null = null;
+          try { seen = await readPicture(f); } catch { seen = null; }
+          thread = [...thread, { role: "user" as const, content: seen ? `[Attached picture "${f.name}": ${seen}]` : `[Attached picture "${f.name}" - no picture-reading model is installed, so it could not be described. Install one such as llava or qwen2.5vl to have pictures read.]`, at: new Date().toISOString() }];
+        }
+        setMessages(thread);
+        await saveIdea(idea, thread);
         if (current.episodes.length) {
           for (const f of images) await api.uploadRef(current.id, current.episodes[0].id, f, f.name.replace(/\.[^.]+$/, ""), "character", "person");
           const r = await syncPhotos(await api.get(current.id));
@@ -375,6 +385,21 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
     } catch (e: any) { setError(e?.message || String(e)); }
     finally { setAttaching(false); if (attachInput.current) attachInput.current.value = ""; }
   }
+  /**
+   * A picture dropped into the discussion is read by a model that can see (the one you are talking to if it can,
+   * otherwise the first picture-reading model installed), and what it sees goes into the chat as text, so any model
+   * can follow it. Returns null when no model here can read pictures.
+   */
+  async function readPicture(file: File): Promise<string | null> {
+    const current = models?.find(m => m.id === model);
+    const reader = current?.tags?.includes("Vision") ? current
+      : models?.find(m => m.isDownloaded && m.tags?.includes("Vision") && (m.source === "ollama" || m.source === "lmstudio"));
+    if (!reader) return null;
+    const dataUrl = await new Promise<string>((ok, bad) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.onerror = () => bad(fr.error); fr.readAsDataURL(file); });
+    const text = await askModel([{ role: "user", content: "Describe this picture for a video writer: who or what is in it (face, hair, age, clothes), the setting, light, colours and mood, and any visible text. Plain prose, under 150 words.", images: [dataUrl] }], reader.id, undefined, undefined, 0.3);
+    return text.trim() ? `${text.trim()} (read by ${reader.name})` : null;
+  }
+
   /** The whole discussion as a text file. */
   function saveChat() {
     const text = `# ${project.title} - discussion\n\n` + messages.map(m => `**${m.role === "user" ? "You" : "Model"}** (${m.at ? new Date(m.at).toLocaleString() : ""})\n\n${m.content}\n`).join("\n");
@@ -490,7 +515,9 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
       if (!next || typeof next !== "object" || !Array.isArray(next.scenes)) throw new Error("The model did not write an episode with scenes.");
       next.number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
       await extendScenes(base, [next]);
-      const planned = await api.savePlan(project.id, [...planJson(project), next], true);
+      if (!next.group && project.episodes.length) next.group = project.episodes[project.episodes.length - 1].group;
+      let planned = await api.savePlan(project.id, [...planJson(project), next], true);
+      if (project.grouping) planned = await api.patch(project.id, { episodes: applyGrouping(planned.episodes, project.grouping) });
       await finishPlan(planned, []);
       setDirection("");
       notify({ message: `Episode ${next.number} added - open Produce to render it`, tab: "series" });
@@ -955,7 +982,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                 <div className={m.role === "user"
                   ? "rounded-2xl rounded-tr-sm border border-violet-500/30 bg-violet-600/25 px-3 py-2 text-sm text-violet-50"
                   : "rounded-2xl rounded-tl-sm border border-teal-500/25 border-l-2 border-l-teal-400/60 bg-teal-900/20 px-3 py-2 text-sm text-neutral-200 whitespace-pre-wrap"}>
-                  {m.content}
+                  {m.content.startsWith("[Attached picture") ? <span className="flex items-start gap-1.5 text-[11px] italic text-violet-200/80"><ImagePlus size={12} className="mt-0.5 shrink-0" />{m.content.slice(1, -1)}</span> : m.content}
                 </div>
                 {m.role === "user" && <User size={14} className="mt-2 shrink-0 text-neutral-500" />}
               </motion.div>

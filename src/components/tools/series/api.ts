@@ -37,7 +37,7 @@ export type OutputKind = "joined" | "subtitled" | "audio" | "final";
 export interface Output { kind: OutputKind; path: string; at: string }
 
 export interface Episode {
-  id: string; number: number; title: string; era: string; hookOut: string;
+  id: string; number: number; title: string; era: string; hookOut: string; group?: string;
   refs: Ref[]; scenes: Scene[]; exportPath: string | null; subtitles?: Subtitles; exportedAt?: string; audio?: AudioMix; outputs?: Output[]; finalKind?: string;
 }
 
@@ -65,6 +65,7 @@ export interface Project {
   bible?: { characters: string; places: string; rules: string; extra: string };
   creativity?: number;
   archived?: boolean;
+  grouping?: { unit: string; item: string; size: number };
   running?: { targetId: string; label: string; progress: [number, number] | null } | null;
 }
 
@@ -202,7 +203,7 @@ export const fileUrl = (p: string) => `/api/series/file?path=${encodeURIComponen
 
 /** Ask the chat endpoint for one complete answer (no UI streaming needed beyond a token callback). */
 export async function askModel(
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: string; images?: string[] }[],
   model: string | undefined,
   onToken?: (t: string) => void,
   signal?: AbortSignal,
