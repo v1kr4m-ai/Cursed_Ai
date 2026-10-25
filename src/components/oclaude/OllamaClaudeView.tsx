@@ -2,14 +2,15 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion } from "motion/react";
-import { AlertTriangle, Archive, Bot, Brain, Check, CheckCircle2, ChevronDown, Cloud, Copy, Cpu, Download, FolderOpen, GitFork, Loader2, MoreVertical, Plus, RefreshCw, Send, Settings2, ShieldCheck, Square, Trash2, Undo2, X } from "lucide-react";
+import { AlertTriangle, Archive, Bot, Brain, Check, CheckCircle2, ChevronDown, Cloud, Copy, Cpu, Download, FolderOpen, GitBranch, GitFork, Mic, PanelLeft, PanelRight, Paperclip, Search, Loader2, MoreVertical, Plus, RefreshCw, Send, Settings2, ShieldCheck, Square, Trash2, Undo2, X } from "lucide-react";
 import { AppSettings, MessageRole } from "../../types";
 import { cn } from "@/lib/utils";
 import { nativeFolder } from "../comfy/types";
 import { notify, notifyError } from "../../lib/notify";
 import { CodeBlock } from "../chat/ChatWindow";
 import { changedFiles } from "./events";
-import { ToolCard } from "./ToolCard";
+import { ToolGroup } from "./ToolCard";
+import { useDictation } from "../../services/useDictation";
 import { APP_COMMANDS, Chip, QuickBar } from "./QuickBar";
 import { StatusRings } from "./StatusRings";
 import { applyEvent, emptyLive, loadSessions, newSession, noticeItem, saveSessions, titleFrom, toMarkdown, userItem, type Live, type Session } from "./events";
@@ -30,8 +31,8 @@ const PERMISSIONS = [
 ] as const;
 
 const PREF_KEY = "cursed.oclaude.prefs";
-interface Prefs { model: string; permission: string; userSettings: boolean; maxTurns: number; appendSystemPrompt: string; addDirs: string[]; showQuick: boolean; activeId: string }
-const defaultPrefs: Prefs = { model: "", permission: "acceptEdits", userSettings: false, maxTurns: 0, appendSystemPrompt: "", addDirs: [], showQuick: true, activeId: "" };
+interface Prefs { model: string; permission: string; userSettings: boolean; maxTurns: number; appendSystemPrompt: string; addDirs: string[]; showQuick: boolean; activeId: string; leftPane: boolean; rightPane: boolean }
+const defaultPrefs: Prefs = { model: "", permission: "acceptEdits", userSettings: false, maxTurns: 0, appendSystemPrompt: "", addDirs: [], showQuick: true, activeId: "", leftPane: true, rightPane: true };
 const loadPrefs = (): Prefs => { try { return { ...defaultPrefs, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") }; } catch { return defaultPrefs; } };
 
 const fmtSize = (n: number | null) => (n ? (n > 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${Math.round(n / 1024 ** 2)} MB`) : "");
@@ -238,6 +239,14 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
   const allowAndRetry = (tools: string[]) => send("You now have permission to use " + tools.join(", ") + ". Please carry on with what you were doing.", tools);
   // Files dropped on the message box are saved in the session folder (attachments/) and mentioned with @, so Claude reads them.
   const [dragging, setDragging] = React.useState(false);
+  const [sessionQuery, setSessionQuery] = React.useState("");
+  const [git, setGit] = React.useState<{ repo: boolean; branch?: string; files?: number; added?: number; removed?: number; untracked?: number } | null>(null);
+  React.useEffect(() => {
+    if (!session?.cwd || running) return;
+    fetch("/api/oclaude/git?cwd=" + encodeURIComponent(session.cwd)).then(r => r.json()).then(setGit).catch(() => setGit(null));
+  }, [session?.cwd, running]);
+  const dictation = useDictation(input, setInput);
+  const filePicker = React.useRef<HTMLInputElement>(null);
   const dropFiles = async (files: FileList | null) => {
     setDragging(false);
     const list = Array.from(files || []);
@@ -329,30 +338,60 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     return <div className="glass flex h-full flex-1 items-center justify-center rounded-[2.5rem] text-sm text-zinc-500"><Loader2 size={16} className="mr-2 animate-spin" />{status === null ? "Looking for Claude Code and Ollama..." : "Starting..."}</div>;
   }
 
+  // Sessions grouped by the folder they work in, newest first, filtered by the search box.
+  const sessionGroups = (() => {
+    const q = sessionQuery.trim().toLowerCase();
+    const list = [...sessions].filter(s => !q || s.title.toLowerCase().includes(q) || s.cwd.toLowerCase().includes(q)).sort((a, b) => b.updatedAt - a.updatedAt);
+    const out: { folder: string; cwd: string; list: Session[] }[] = [];
+    for (const s of list) {
+      const folder = s.cwd.split(/[\\/]/).filter(Boolean).pop() || s.cwd || "No folder";
+      let g = out.find(x => x.cwd === s.cwd);
+      if (!g) { g = { folder, cwd: s.cwd, list: [] }; out.push(g); }
+      g.list.push(s);
+    }
+    return out;
+  })();
+  const ctxMax = loadedCtx || modelInfo?.contextLength || null;
+  const ctxPct = ctxMax && session.ctxTokens ? Math.min(100, (session.ctxTokens / ctxMax) * 100) : null;
+  const files = changedFiles(session.items);
+  const card = "rounded-2xl border border-white/5 bg-white/[0.03] p-3.5";
+
   return (
-    <div className="glass relative flex h-full flex-1 flex-col overflow-hidden rounded-[2.5rem]">
-      {/* header */}
-      <div className="z-10 flex h-20 shrink-0 items-center justify-between gap-4 border-b border-white/5 bg-transparent px-8 backdrop-blur-md">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="model-tag">Ollama_Claude</div>
-            {status.claude.version && <div className="vulkan-tag" title={status.claude.path || ""}>{status.claude.version.split(" ")[0]}</div>}
+    <div className="glass relative flex h-full flex-1 overflow-hidden rounded-[2.5rem]">
+      {prefs.leftPane && (
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-white/5 bg-black/10 md:flex">
+          <div className="space-y-1 p-3">
+            <button onClick={() => startNew()} className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-zinc-200 hover:bg-white/5"><Plus size={16} />New session</button>
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input value={sessionQuery} onChange={e => setSessionQuery(e.target.value)} placeholder="Search" className="w-full rounded-xl bg-transparent py-2 pl-8 pr-2 text-sm text-zinc-200 placeholder:text-zinc-500 hover:bg-white/5 focus:bg-white/5 focus:outline-none" />
+            </div>
           </div>
-          <button onClick={chooseFolder} title={"Working folder - Claude reads and writes here\n" + session.cwd} className="flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-white/10">
-            <FolderOpen size={14} className="shrink-0 text-violet-400" /><span className="max-w-[16rem] truncate font-mono">{session.cwd}</span>
-          </button>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {sessionGroups.map(g => (
+              <div key={g.cwd} className="mb-3">
+                <p className="truncate px-2.5 pb-1 text-[11px] font-medium text-zinc-500" title={g.cwd}>{g.folder}</p>
+                {g.list.map(s => (
+                  <div key={s.id} className={cn("group flex items-center rounded-lg", s.id === session.id ? "bg-white/10" : "hover:bg-white/5")}>
+                    <button onClick={() => setPrefs({ activeId: s.id })} title={`${s.title}\n${s.model || "no model"} - ${ago(s.updatedAt)}`} className={cn("min-w-0 flex-1 truncate px-2.5 py-1.5 text-left text-[13px]", s.id === session.id ? "text-white" : "text-zinc-300")}>{s.title}</button>
+                    <button onClick={() => { if (confirm(`Delete the session "${s.title}"?`)) removeSession(s.id); }} title="Delete" className="mr-1 hidden rounded p-1 text-zinc-500 hover:text-rose-400 group-hover:block"><Trash2 size={12} /></button>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {!sessionGroups.length && <p className="px-2.5 text-xs text-zinc-600">No sessions match.</p>}
+          </div>
+        </aside>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+      {/* header */}
+      <div className="z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-white/5 bg-transparent px-5 backdrop-blur-md">
+        <div className="flex min-w-0 items-center gap-3">
+          <button onClick={() => setPrefs({ leftPane: !prefs.leftPane })} title={prefs.leftPane ? "Hide the sessions" : "Show the sessions"} className="hidden rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white md:block"><PanelLeft size={17} /></button>
+          <span className="truncate text-sm font-medium text-zinc-200" title="Double-click to rename" onDoubleClick={() => { const t = window.prompt("Rename this session", session.title); if (t?.trim()) update(session.id, s => ({ ...s, title: t.trim().slice(0, 80) })); }}>{session.title}</span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <div className="hidden items-center rounded-xl border border-white/10 bg-white/5 p-0.5 md:flex" role="group" aria-label="What Claude may do">
-            {PERMISSIONS.map(p => (
-              <button key={p.id} onClick={() => choosePermission(p.id)} title={p.note} className={cn("rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors", prefs.permission === p.id ? (p.id === "bypassPermissions" ? "bg-rose-600 text-white" : "bg-violet-600 text-white") : "text-zinc-500 hover:text-zinc-200")}>{p.label}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2" title={status.ollama.running ? `Ollama ${status.ollama.version} is running` : "Ollama is not running"}>
-            <div className={cn("h-2 w-2 rounded-full", status.ollama.running ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" : "bg-rose-500")} />
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">{status.ollama.running ? "Ollama online" : "Ollama off"}</span>
-          </div>
-          <div className="mx-1 h-6 w-[1px] bg-white/5" />
+          <button onClick={() => setPrefs({ rightPane: !prefs.rightPane })} title={prefs.rightPane ? "Hide the details" : "Show the details"} className="hidden p-2 text-zinc-500 transition-colors hover:text-white lg:block"><PanelRight size={18} /></button>
           <button onClick={() => setSetupOpen(v => !v)} title="Session settings" className={cn("p-2 transition-colors", setupOpen ? "text-violet-400" : "text-zinc-500 hover:text-white")}><Settings2 size={18} /></button>
           <div className="relative">
             <button onClick={() => setSessionsOpen(v => !v)} title="Sessions" className="p-2 text-zinc-500 transition-colors hover:text-white"><Archive size={18} /></button>
@@ -416,8 +455,8 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
       )}
 
       {/* messages */}
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
-        <div className="mx-auto flex max-w-4xl flex-col pb-12">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="mx-auto flex max-w-3xl flex-col pb-12">
           {!items.length && !running && (
             <div className="flex flex-col items-center py-6 text-center">
               <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-violet-500/10"><Bot size={40} className="text-violet-400" /></div>
@@ -438,16 +477,24 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
               {problems.length > 0 && (
                 <div className="mt-6 w-full max-w-xl space-y-2">{problems.map(p => <div key={p} className="flex items-start gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-left text-xs text-amber-300"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{p}</div>)}</div>
               )}
-              <p className="mt-8 max-w-md text-[11px] leading-relaxed text-zinc-600">Pick the folder to work in (top left), choose what Claude may do (Plan / Edit / Full), then ask. The ready prompts below the box are a good start.</p>
+              <p className="mt-8 max-w-md text-[11px] leading-relaxed text-zinc-600">Pick the folder to work in (Environment, on the right), choose what Claude may do (under the message box: Plan, Edit or Full), then ask. The ready prompts above the box are a good start.</p>
             </div>
           )}
 
           {items.map((it, idx) => {
+            // A run of tool calls shows as one line ("Ran 3 commands"), drawn where the run starts.
+            if (it.kind === "tool") {
+              if (items[idx - 1]?.kind === "tool") return null;
+              const run: any[] = [];
+              for (let j = idx; j < items.length && items[j].kind === "tool"; j++) run.push(items[j]);
+              return <ToolGroup key={it.id} tools={run} />;
+            }
             switch (it.kind) {
-              case "user": return <motion.div key={it.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="chat-bubble user-bubble whitespace-pre-wrap">{it.text}</motion.div>;
+              case "user": return <motion.div key={it.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-5 mt-2 ml-auto max-w-[80%] whitespace-pre-wrap rounded-2xl bg-white/[0.07] px-4 py-3 text-sm leading-relaxed text-zinc-100">{it.text}</motion.div>;
               case "text": return (
-                <motion.div key={it.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="chat-bubble ai-bubble">
+                <motion.div key={it.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="group/t mb-3 text-[15px] leading-relaxed text-zinc-200">
                   <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>{it.text}</ReactMarkdown></div>
+                  <button onClick={() => navigator.clipboard?.writeText(it.text).then(() => notify({ message: "Copied", tab: "ollamaclaude" })).catch(() => {})} title="Copy" className="mt-1 rounded p-1 text-zinc-600 opacity-0 transition hover:text-zinc-300 group-hover/t:opacity-100"><Copy size={13} /></button>
                 </motion.div>
               );
               case "thinking": return (
@@ -456,7 +503,6 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
                   <p className="mt-2 whitespace-pre-wrap italic leading-relaxed">{it.text}</p>
                 </details>
               );
-              case "tool": return <ToolCard key={it.id} tool={it} />;
               case "notice": return <div key={it.id} className={cn("mx-auto my-2 max-w-[80%] rounded-full px-4 py-1.5 text-center text-[11px]", it.tone === "error" ? "bg-rose-500/10 text-rose-300" : it.tone === "warn" ? "bg-amber-500/10 text-amber-300" : "bg-white/5 text-zinc-500")}>{it.text}</div>;
               case "result": return (
                 <div key={it.id} className="mb-4 mt-1">
@@ -481,7 +527,7 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
           {running && (live.thinking || live.text) && (
             <>
               {live.thinking && !live.text && <div className="mb-3 max-w-[80%] rounded-2xl border border-white/5 px-4 py-2 text-xs italic text-zinc-500"><Brain size={13} className="mr-2 inline text-violet-400" />{live.thinking.slice(-280)}</div>}
-              {live.text && <div className="chat-bubble ai-bubble"><div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>{live.text + " ▋"}</ReactMarkdown></div></div>}
+              {live.text && <div className="mb-3 text-[15px] leading-relaxed text-zinc-200"><div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>{live.text + " ▋"}</ReactMarkdown></div></div>}
             </>
           )}
           {running && !live.text && !live.thinking && (
@@ -494,8 +540,8 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
       </div>
 
       {/* composer */}
-      <div className="shrink-0 border-t border-white/5 bg-transparent p-6">
-        <div className="mx-auto max-w-4xl">
+      <div className="shrink-0 bg-transparent px-6 pb-4 pt-2">
+        <div className="mx-auto max-w-3xl">
           {smallCtx && (
             <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-300">
               <AlertTriangle size={14} className="shrink-0" />
@@ -505,65 +551,86 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
               <button onClick={() => copyCmd("setx OLLAMA_CONTEXT_LENGTH 32768")} className="flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-2.5 py-1 font-mono text-[11px] hover:bg-amber-500/30">{copied ? <Check size={11} /> : <Copy size={11} />}setx OLLAMA_CONTEXT_LENGTH 32768</button>
             </div>
           )}
-          {(() => {
-            const files = changedFiles(session.items);
-            if (!files.length) return null;
-            const open = files.filter(f => !f.undone && !f.big).map(f => f.path);
-            const name = (p: string) => p.split(/[\/]/).pop();
-            return (
-              <div className="mb-2 rounded-2xl border border-white/10 bg-white/5 text-xs text-zinc-300">
-                <div className="flex items-center gap-2 px-3 py-2">
-                  <button onClick={() => setFilesOpen(o => !o)} className="flex flex-1 items-center gap-2 text-left">
-                    <ChevronDown size={13} className={cn("transition-transform", !filesOpen && "-rotate-90")} />
-                    <span>Files changed <span className="text-zinc-500">({files.length})</span></span>
-                  </button>
-                  {open.length > 0 && <button onClick={() => undoFiles(open)} disabled={running} className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-40"><Undo2 size={12} />Undo all</button>}
-                </div>
-                {filesOpen && (
-                  <div className="space-y-0.5 border-t border-white/5 px-3 py-2">
-                    {files.map(f => (
-                      <div key={f.path} className="flex items-center gap-2">
-                        <span className={cn("min-w-0 flex-1 truncate font-mono", f.undone && "text-zinc-600 line-through")} title={f.path}>{name(f.path)}</span>
-                        <span className="text-[10px] text-zinc-500">{f.undone ? "put back" : f.before === null && !f.big ? "new" : f.big ? "too large to undo" : "edited"}</span>
-                        {!f.undone && !f.big && <button onClick={() => undoFiles([f.path])} disabled={running} title={f.before === null ? "Delete this new file" : "Restore the previous content"} className="rounded-md px-1.5 py-0.5 text-violet-300 hover:bg-white/10 disabled:opacity-40">Undo</button>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
           {prefs.showQuick && <QuickBar cwd={session.cwd} known={session.init?.slashCommands || []} mcp={session.init?.mcpServers || []} draft={input} onInsert={insert} />}
           <div onDragOver={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }} onDrop={e => { e.preventDefault(); dropFiles(e.dataTransfer.files); }}
-            className={cn("relative flex items-end gap-1.5 rounded-2xl border bg-white/5 p-1.5 shadow-xl shadow-black/40 transition-all duration-300 ease-out focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]", dragging ? "border-dashed border-violet-400" : "border-white/10")}>
+            className={cn("relative rounded-2xl border bg-white/[0.04] shadow-xl shadow-black/30 transition-all focus-within:border-white/20 focus-within:bg-white/[0.06]", dragging ? "border-dashed border-violet-400" : "border-white/10")}>
             {dragging && <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-violet-600/15 text-xs font-medium text-violet-100">Drop to add the file to the session folder and mention it</div>}
-            <div className="mb-0.5 ml-0.5 flex shrink-0 gap-0.5">
-              {picker}
-              <button onClick={() => setPrefs({ showQuick: !prefs.showQuick })} title={prefs.showQuick ? "Hide the prompts and commands" : "Show the prompts and commands"} className={cn("flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-white/5", prefs.showQuick ? "text-violet-400" : "text-zinc-500 hover:text-white")}><Brain size={17} className="hidden" /><span className="font-mono text-base font-bold">/</span></button>
+            <textarea
+              ref={inputRef} value={input} onChange={e => setInput(e.target.value)} rows={1}
+              onKeyDown={e => { if (e.key === "Enter" && (settings.enterToSend ? !e.shiftKey : (e.ctrlKey || e.metaKey))) { e.preventDefault(); send(); } }}
+              placeholder={running ? "Claude is working..." : dictation.listening ? "Listening..." : "Type / for commands"}
+              className="block max-h-48 min-h-[48px] w-full resize-none bg-transparent px-4 pt-3.5 text-[15px] text-white placeholder:text-zinc-500 focus:outline-none"
+              style={{ height: Math.min(192, 30 + input.split("\n").length * 22) }}
+            />
+            <div className="flex items-center gap-1 px-2 pb-2">
+              <input ref={filePicker} type="file" multiple className="hidden" onChange={e => { dropFiles(e.target.files); e.target.value = ""; }} />
+              <button onClick={() => filePicker.current?.click()} title="Add files (they are saved in the session folder and mentioned)" className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/5 hover:text-white"><Plus size={18} /></button>
+              <button onClick={() => setPrefs({ showQuick: !prefs.showQuick })} title={prefs.showQuick ? "Hide the prompts and commands" : "Show the prompts and commands"} className={cn("flex h-8 w-8 items-center justify-center rounded-lg font-mono text-sm font-bold hover:bg-white/5", prefs.showQuick ? "text-violet-400" : "text-zinc-500 hover:text-white")}>/</button>
+              <div className="ml-auto flex items-center gap-1">
+                {dictation.supported && <button onClick={dictation.toggle} title="Speak your message" className={cn("flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/5", dictation.listening ? "text-rose-400" : "text-zinc-400 hover:text-white")}>{dictation.transcribing ? <Loader2 size={16} className="animate-spin" /> : <Mic size={17} />}</button>}
+                {running ? (
+                  <button onClick={stop} title="Stop" className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600/80 text-white hover:bg-red-500"><Square size={14} className="fill-current" /></button>
+                ) : (
+                  <button onClick={() => send()} disabled={!canSend} title="Send" className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all", canSend ? "bg-violet-600 text-white hover:bg-violet-500" : "cursor-not-allowed text-zinc-600")}><Send size={15} /></button>
+                )}
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <textarea
-                ref={inputRef} value={input} onChange={e => setInput(e.target.value)} rows={1}
-                onKeyDown={e => { if (e.key === "Enter" && (settings.enterToSend ? !e.shiftKey : (e.ctrlKey || e.metaKey))) { e.preventDefault(); send(); } }}
-                placeholder={running ? "Claude is working..." : lastResult ? "Ask a follow-up, or give the next task..." : `Ask Claude Code to work in ${session.cwd.split(/[\\/]/).pop()}...`}
-                className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-3 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none"
-                style={{ height: Math.min(160, 24 + input.split("\n").length * 22) }}
-              />
-            </div>
-            {running ? (
-              <button onClick={stop} title="Stop" className="mb-0.5 mr-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-red-600/80 text-white transition-all hover:bg-red-500"><Square size={15} className="fill-current" /></button>
-            ) : (
-              <button onClick={() => send()} disabled={!canSend} title="Send" className={cn("mb-0.5 mr-0.5 flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200", canSend ? "bg-violet-600 text-white shadow-lg shadow-violet-900/30 hover:scale-105 hover:bg-violet-500 active:scale-95" : "cursor-not-allowed bg-white/5 text-zinc-600")}><Send size={16} className={canSend ? "translate-x-px" : ""} /></button>
-            )}
           </div>
-          <StatusRings s={{
-            ctxTokens: session.ctxTokens || 0, ctxMax: loadedCtx || modelInfo?.contextLength || null, model, permission: PERMISSIONS.find(p => p.id === prefs.permission)?.label || "",
-            folder: session.cwd, filesChanged: changedFiles(session.items).length, tools: session.items.filter(i => i.kind === "tool").length,
-            turns: lastResult?.kind === "result" ? lastResult.turns : 0, running, elapsed, lastMs: lastResult?.kind === "result" ? lastResult.ms : 0,
-          }} />
-          <p className="mt-2 px-1 text-[10px] text-zinc-600">{PERMISSIONS.find(p => p.id === prefs.permission)?.note} {modelInfo?.cloud ? "This model runs in Ollama's cloud, so it needs internet." : ""}</p>
+          <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-zinc-400">
+            <select value={prefs.permission} onChange={e => choosePermission(e.target.value)} title={PERMISSIONS.find(p => p.id === prefs.permission)?.note} className="rounded-lg bg-transparent px-1 py-1 hover:bg-white/5 focus:outline-none [&_*]:bg-zinc-900">
+              {PERMISSIONS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+            <div className="flex items-center gap-2">
+              {picker}
+              <span title={ctxMax ? `Context: ${(session.ctxTokens || 0).toLocaleString()} of ${ctxMax.toLocaleString()} tokens` : "Context: not known yet"} className="relative h-5 w-5">
+                <svg viewBox="0 0 20 20" className="h-5 w-5 -rotate-90"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeOpacity={0.2} strokeWidth={2.5} /><circle cx="10" cy="10" r="8" fill="none" stroke={ctxPct !== null && ctxPct > 85 ? "#fb7185" : ctxPct !== null && ctxPct > 60 ? "#fbbf24" : "#a78bfa"} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={50.27} strokeDashoffset={50.27 * (1 - (ctxPct ?? 0) / 100)} /></svg>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
+      </div>
+      {prefs.rightPane && (
+        <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/5 p-3 lg:flex">
+          <div className={card}>
+            <p className="mb-2 text-[13px] font-medium text-zinc-200">Environment</p>
+            <div className="space-y-2 text-[13px] text-zinc-300">
+              <p className="flex items-center gap-2"><Bot size={14} className="shrink-0 text-zinc-500" />Claude Code {status.claude.version.split(" ")[0]}</p>
+              <button onClick={chooseFolder} title={session.cwd} className="flex w-full items-center gap-2 text-left hover:text-white"><FolderOpen size={14} className="shrink-0 text-zinc-500" /><span className="truncate">{session.cwd.split(/[\\/]/).filter(Boolean).pop()}</span><span className="truncate text-[11px] text-zinc-600">{session.cwd}</span></button>
+              {git?.repo && <p className="flex items-center gap-2"><GitBranch size={14} className="shrink-0 text-zinc-500" />{git.branch}</p>}
+              {prefs.addDirs.map(d => <p key={d} className="flex items-center gap-2 text-zinc-400"><FolderOpen size={14} className="shrink-0 text-zinc-600" /><span className="truncate" title={d}>{d.split(/[\\/]/).pop()}</span></p>)}
+              <p className="flex items-center gap-2"><span className={cn("ml-1 h-2 w-2 shrink-0 rounded-full", status.ollama.running ? "bg-emerald-500" : "bg-rose-500")} /><span className="ml-1">{status.ollama.running ? `Ollama ${status.ollama.version}` : "Ollama is off"}</span></p>
+            </div>
+          </div>
+          <div className={card}>
+            <div className="flex items-center justify-between text-[13px]"><span className="font-medium text-zinc-200">Context</span><span className="text-zinc-400">{ctxPct !== null ? `${Math.round(ctxPct)}%` : session.ctxTokens ? `${Math.round(session.ctxTokens / 100) / 10}k` : "-"}</span></div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className={cn("h-full rounded-full transition-all", ctxPct !== null && ctxPct > 85 ? "bg-rose-400" : ctxPct !== null && ctxPct > 60 ? "bg-amber-400" : "bg-violet-400")} style={{ width: `${ctxPct ?? 0}%` }} /></div>
+            <p className="mt-1.5 text-[11px] text-zinc-500">{(session.ctxTokens || 0).toLocaleString()} tokens{ctxMax ? ` of ${ctxMax.toLocaleString()}` : ""}. Type /compact when it fills up.</p>
+          </div>
+          <div className={card}>
+            <p className="mb-1 text-[13px] font-medium text-zinc-200">This session</p>
+            <StatusRings s={{ ctxTokens: session.ctxTokens || 0, ctxMax, model, permission: PERMISSIONS.find(p => p.id === prefs.permission)?.label || "", folder: session.cwd, filesChanged: files.length, tools: session.items.filter(i => i.kind === "tool").length, turns: lastResult?.kind === "result" ? lastResult.turns : 0, running, elapsed, lastMs: lastResult?.kind === "result" ? lastResult.ms : 0 }} />
+          </div>
+          <div className={card}>
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="font-medium text-zinc-200">Changes</span>
+              {git?.repo && <span className="text-[12px]"><span className="text-emerald-400">+{(git.added || 0).toLocaleString()}</span> <span className="text-rose-400">-{(git.removed || 0).toLocaleString()}</span>{git.untracked ? <span className="text-zinc-500"> +{git.untracked} new</span> : null}</span>}
+            </div>
+            {files.length === 0 ? <p className="mt-1.5 text-[11px] text-zinc-500">Claude has not changed any file in this session.</p> : (
+              <div className="mt-2 space-y-1 text-xs">
+                {files.map(f => (
+                  <div key={f.path} className="flex items-center gap-2">
+                    <span className={cn("min-w-0 flex-1 truncate font-mono text-[11px]", f.undone ? "text-zinc-600 line-through" : "text-zinc-300")} title={f.path}>{f.path.split(/[\\/]/).pop()}</span>
+                    <span className="text-[10px] text-zinc-500">{f.undone ? "put back" : f.before === null && !f.big ? "new" : f.big ? "large" : "edited"}</span>
+                    {!f.undone && !f.big && <button onClick={() => undoFiles([f.path])} disabled={running} className="rounded px-1.5 py-0.5 text-[10px] text-violet-300 hover:bg-white/10 disabled:opacity-40">Undo</button>}
+                  </div>
+                ))}
+                {files.some(f => !f.undone && !f.big) && <button onClick={() => undoFiles(files.filter(f => !f.undone && !f.big).map(f => f.path))} disabled={running} className="mt-1 flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] hover:bg-white/10 disabled:opacity-40"><Undo2 size={12} />Undo all</button>}
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

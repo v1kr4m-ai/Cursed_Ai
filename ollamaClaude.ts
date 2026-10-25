@@ -255,6 +255,21 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  /** Branch and uncommitted change size of the session folder, for the side panel. Not a repository: { repo: false }. */
+  app.get("/api/oclaude/git", (req, res) => {
+    const cwd = String(req.query.cwd || "");
+    if (!cwd || !fs.existsSync(cwd)) return res.json({ repo: false });
+    const git = (args: string[]) => new Promise<string | null>(ok => execFile("git", ["-C", cwd, ...args], { timeout: 6000, windowsHide: true }, (e, out) => ok(e ? null : String(out))));
+    (async () => {
+      const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"]))?.trim();
+      if (!branch) return res.json({ repo: false });
+      const stat = (await git(["diff", "--shortstat", "HEAD"])) || "";
+      const num = (re: RegExp) => Number(re.exec(stat)?.[1] || 0);
+      const untracked = ((await git(["ls-files", "--others", "--exclude-standard"])) || "").split(/\r?\n/).filter(Boolean).length;
+      res.json({ repo: true, branch, files: num(/(\d+) files? changed/), added: num(/(\d+) insertions?/), removed: num(/(\d+) deletions?/), untracked });
+    })().catch(e => res.json({ repo: false, error: String(e) }));
+  });
+
   registerOllamaRestart(app, { ollamaUrl: opts.ollamaUrl });
 
   app.post("/api/oclaude/stop", (req, res) => {
