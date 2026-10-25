@@ -82,8 +82,8 @@ export function QuickBar({ cwd, known, mcp, draft, onInsert }: Props) {
 
   const names = [...new Set([...known, ...scanned.commands, ...scanned.skills])];
   const builtin = ["compact", "init", "review", "security-review", "cost", "context", "memory", "pr-comments", "agents", "hooks", "doctor"].filter(c => !names.includes(c) && !APP_COMMANDS.some(a => a.name === c));
-  const appCmds = APP_COMMANDS.filter(c => match(c.name + c.note));
   const match = (s: string) => !q.trim() || s.toLowerCase().includes(q.trim().toLowerCase());
+  const appCmds = APP_COMMANDS.filter(c => match(c.name + c.note));
   const slash = [...names.filter(n => !scanned.skills.includes(n) || !known.length), ...builtin].filter(match);
   const skillNames = [...new Set([...scanned.skills, ...known.filter(n => n.includes(":"))])].filter(match);
   const prompts = [...mine, ...READY_PROMPTS].filter(p => match(p.label + p.group));
