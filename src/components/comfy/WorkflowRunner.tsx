@@ -41,21 +41,65 @@ const EXPRESSION_KEYS: Record<string, { label: string; min: number; max: number;
   sample_ratio: { label: "Strength", min: 0, max: 1, step: 0.01, hint: "How strongly the expression is applied", neutral: 1 },
   crop_factor: { label: "Crop around face", min: 1.5, max: 3, step: 0.1, hint: "How much area around the face is used", neutral: 2 },
 };
-const EXPRESSION_PRESETS: Record<string, Record<string, number>> = {
-  Neutral: {},
-  Smile: { smile: 0.8, eyebrow: 1 },
-  "Big smile": { smile: 1.2, aaa: 25, eyebrow: 2, blink: -2 },
-  Laugh: { smile: 1.3, aaa: 60, eyebrow: 4, blink: -6 },
-  Sad: { smile: -0.3, eyebrow: -4, rotate_pitch: 4, pupil_y: -4 },
-  Surprised: { aaa: 70, eyebrow: 12, woo: 4, blink: 3 },
-  Angry: { eyebrow: -9, smile: -0.25, eee: 6 },
-  Wink: { wink: 18, smile: 0.6 },
-  Kiss: { woo: 12, smile: 0.1, blink: -3 },
-  "Eyes closed": { blink: -16, smile: 0.3 },
-  "Look left": { pupil_x: -12, rotate_yaw: -8 },
-  "Look right": { pupil_x: 12, rotate_yaw: 8 },
-  "Head tilt": { rotate_roll: 10, smile: 0.5 },
-};
+/** Face presets in groups; values are offsets from a neutral face (anything not named stays neutral). */
+const EXPRESSION_GROUPS: { name: string; presets: Record<string, Record<string, number>> }[] = [
+  { name: "Happy", presets: {
+    Neutral: {},
+    Smile: { smile: 0.8, eyebrow: 1 },
+    "Soft smile": { smile: 0.45, blink: -1 },
+    "Big smile": { smile: 1.2, aaa: 25, eyebrow: 2, blink: -2 },
+    Laugh: { smile: 1.3, aaa: 60, eyebrow: 4, blink: -6 },
+    "Laugh, eyes shut": { smile: 1.3, aaa: 45, blink: -15, rotate_pitch: -3 },
+    Excited: { smile: 1.1, aaa: 40, eyebrow: 9, blink: 3 },
+    Smirk: { smile: 0.5, eee: 3, rotate_roll: 3, eyebrow: 2 },
+    Shy: { smile: 0.5, pupil_y: -8, rotate_pitch: 6, rotate_roll: 4 },
+    Flirty: { smile: 0.6, wink: 14, rotate_roll: 5, eyebrow: 3 },
+    Proud: { smile: 0.5, rotate_pitch: -8, blink: -2 },
+  } },
+  { name: "Sad and angry", presets: {
+    Sad: { smile: -0.3, eyebrow: -4, rotate_pitch: 4, pupil_y: -4 },
+    "Very sad": { smile: -0.3, eyebrow: -6, blink: -5, rotate_pitch: 8, pupil_y: -8 },
+    Crying: { smile: -0.3, aaa: 15, eyebrow: -6, blink: -10, rotate_pitch: 6 },
+    Pout: { woo: 8, smile: -0.2, eyebrow: -2 },
+    Angry: { eyebrow: -9, smile: -0.25, eee: 6 },
+    Furious: { eyebrow: -10, aaa: 30, eee: 10, smile: -0.3, blink: 2 },
+    Disgusted: { eyebrow: -6, eee: 8, smile: -0.3, rotate_yaw: -5, blink: -3 },
+    Annoyed: { eyebrow: -5, smile: -0.15, pupil_x: 8, blink: -3 },
+    Bored: { blink: -6, smile: -0.1, rotate_roll: -5, eyebrow: -2 },
+  } },
+  { name: "Surprise and fear", presets: {
+    Surprised: { aaa: 70, eyebrow: 12, woo: 4, blink: 3 },
+    Shocked: { aaa: 100, eyebrow: 15, blink: 5, rotate_pitch: -4 },
+    "Gasp": { woo: 12, aaa: 30, eyebrow: 10, blink: 4 },
+    Scared: { aaa: 35, eyebrow: 10, eee: 5, blink: 5, rotate_pitch: 4 },
+    Worried: { eyebrow: 6, smile: -0.2, eee: 3, pupil_y: -3 },
+    Confused: { eyebrow: 5, rotate_roll: 8, smile: -0.1, pupil_x: 5 },
+  } },
+  { name: "Eyes and gaze", presets: {
+    Wink: { wink: 18, smile: 0.6 },
+    "Eyes closed": { blink: -16, smile: 0.3 },
+    Sleepy: { blink: -10, aaa: 10, rotate_roll: 6, eyebrow: -2 },
+    Yawn: { aaa: 110, blink: -12, eyebrow: 4, rotate_pitch: -5 },
+    "Look left": { pupil_x: -12, rotate_yaw: -8 },
+    "Look right": { pupil_x: 12, rotate_yaw: 8 },
+    "Look up": { pupil_y: 10, rotate_pitch: -8, eyebrow: 3 },
+    "Look down": { pupil_y: -10, rotate_pitch: 8 },
+    "Side glance": { pupil_x: 13, smile: 0.3 },
+    Thinking: { pupil_x: -8, pupil_y: 8, rotate_roll: 5, woo: 3 },
+  } },
+  { name: "Head and mouth", presets: {
+    "Head tilt": { rotate_roll: 10, smile: 0.5 },
+    "Chin up": { rotate_pitch: -12 },
+    "Chin down": { rotate_pitch: 12, pupil_y: 6 },
+    "Turn left": { rotate_yaw: -15, pupil_x: -6 },
+    "Turn right": { rotate_yaw: 15, pupil_x: 6 },
+    Kiss: { woo: 12, smile: 0.1, blink: -3 },
+    Talking: { aaa: 30, eee: 2, smile: 0.2 },
+    Singing: { aaa: 55, woo: 6, eyebrow: 5, blink: -4 },
+    Determined: { eyebrow: -5, eee: 4, smile: -0.05, rotate_pitch: 3 },
+  } },
+];
+const EXPRESSION_PRESETS: Record<string, Record<string, number>> = Object.assign({}, ...EXPRESSION_GROUPS.map(g => g.presets));
 const SIZE_PRESETS: Record<Kind, [number, number, string?][]> = {
   image: [[512, 512, "SD 1.5"], [768, 768], [1024, 1024, "SDXL / Flux"], [1152, 896], [896, 1152], [1344, 768, "16:9"], [768, 1344, "9:16"], [1536, 1024, "3:2"]],
   audio: [],
@@ -529,11 +573,17 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                 </Section>
                 {exprNode && (
                   <Section title="Expression" icon={<Smile size={14} />} accent={a.text} badge={`${exprFields.length} controls`} defaultOpen>
-                    <div className="flex flex-wrap gap-1.5">
-                      {Object.entries(EXPRESSION_PRESETS).map(([name, preset]) => (
-                        <button key={name} onClick={() => applyExpression(preset)} className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/10">{name}</button>
-                      ))}
-                    </div>
+                    {EXPRESSION_GROUPS.map(g => (
+                      <div key={g.name}>
+                        <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-zinc-600">{g.name}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(g.presets).map(([name, preset]) => (
+                            <button key={name} onClick={() => applyExpression(preset)} className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/10">{name}</button>
+                          ))}
+                          {g.name === "Happy" && <button onClick={() => { const names = Object.keys(EXPRESSION_PRESETS); applyExpression(EXPRESSION_PRESETS[names[Math.floor(Math.random() * names.length)]]); }} title="A random preset" className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/10"><Dices size={11} className="mr-1 inline" />Random</button>}
+                        </div>
+                      </div>
+                    ))}
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                       {exprFields.map(f => {
                         const k = EXPRESSION_KEYS[f.input];
