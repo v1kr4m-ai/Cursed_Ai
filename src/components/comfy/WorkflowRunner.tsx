@@ -9,6 +9,7 @@ import { takePending } from "../../lib/studioBridge";
 import type { StudioRequest } from "../../services/studioIntent";
 import { PreviousResults } from "./PreviousResults";
 import { ShareMenu } from "./ShareMenu";
+import { MissingNodes } from "./MissingNodes";
 import { Converter } from "./Converter";
 import { QueueList } from "./shared";
 import { SortMenu } from "./SortMenu";
@@ -457,7 +458,8 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               {folder && !loading && workflows.length === 0 && !loadError && <p className="text-[11px] text-zinc-500">No {kind} workflows here.{counts.image || counts.video ? ` This folder has ${counts.image || 0} image / ${counts.video || 0} video workflows.` : ""}</p>}
               {loadError && <p className="text-[11px] text-red-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {loadError}</p>}
               {st && !st.comfyReachable && <p className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> ComfyUI is not reachable - start it before running.</p>}
-              {wf && !wf.isRunnable && <p className="text-[11px] text-red-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>Cannot run: {wf.missing.join("; ")}</span></p>}
+              {wf && !wf.isRunnable && wf.missing.some(m => !/custom node/.test(m)) && <p className="text-[11px] text-red-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>Cannot run: {wf.missing.filter(m => !/custom node/.test(m)).join("; ")}</span></p>}
+              {wf && !!wf.missingNodes?.length && <MissingNodes key={wf.path} types={wf.missingNodes} onDone={() => loadWorkflows(folder, selected)} />}
               {wf?.warnings.map((w, i) => <p key={i} className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>{w}</span></p>)}
               {wf && (wf.needsAssignment.length > 0 || !wf.promptNodeId && wf.needsPrompt || !wf.outputNodeId) && (
                 <div className="grid grid-cols-2 gap-2">

@@ -12,6 +12,7 @@ import { registerComfyLogs } from "./comfyLogs";
 import { directLaunch, tailLines } from "./comfyLaunch";
 import { freeComfyForLLM, handoffEnabled, setHandoff } from "./gpuHandoff";
 import { nodeList, registerWorkflowHub, workflowFolder } from "./workflowHub";
+import { registerComfyNodes } from "./comfyNodes";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
@@ -1724,6 +1725,13 @@ async function startServer() {
   registerBackup(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerMerge(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerComfyLogs(app, { comfyUrl: () => COMFYUI_URL, startupLog: () => tailLines(COMFY_LOG, 300, 15 * 60_000) });
+  registerComfyNodes(app, { comfyUrl: () => COMFYUI_URL, restart: async () => {
+    // Stop (whatever started it), wait until the port is free, then start it again the app's way (no window).
+    await fetch(`http://127.0.0.1:${PORT}/api/comfyui/stop`, { method: "POST" });
+    for (let i = 0; i < 30 && await isComfyRunning(); i++) await new Promise(r => setTimeout(r, 1000));
+    const r = await fetch(`http://127.0.0.1:${PORT}/api/comfyui/start`, { method: "POST" });
+    if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as any).error || "ComfyUI did not start again.");
+  } });
   registerSubtitles(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     transcribe: async samples => {

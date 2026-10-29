@@ -50,6 +50,8 @@ export interface WorkflowInfo {
   refVideoBypassable: boolean[];
   refAudioBypassable: boolean[];
   promptKeys: string[];
+  /** Node types the workflow uses that this ComfyUI does not have (custom nodes to install). */
+  missingNodes: string[];
   needsPrompt: boolean;
   outputKind: OutputKind;
   fields: WorkflowField[];
@@ -65,7 +67,7 @@ const blank = (name: string, p: string): WorkflowInfo => ({
   name, path: p, refImageCount: 0, isRunnable: false, missing: [], promptNodeId: null, outputNodeId: null,
   refImageNodeIds: [], refVideoCount: 0, refVideoNodeIds: [], refAudioCount: 0, refAudioNodeIds: [], refKeys: {},
   refImageLabels: [], refVideoLabels: [], refAudioLabels: [], refImageBypassable: [], refVideoBypassable: [], refAudioBypassable: [],
-  promptKeys: ["text"], needsPrompt: true, outputKind: "image", fields: [], warnings: [], needsAssignment: [],
+  promptKeys: ["text"], missingNodes: [], needsPrompt: true, outputKind: "image", fields: [], warnings: [], needsAssignment: [],
   promptCandidates: [], outputCandidates: [], workflowGroupCount: 0,
 });
 const unusable = (name: string, p: string, reason: string): WorkflowInfo => ({ ...blank(name, p), missing: [reason] });
@@ -210,6 +212,7 @@ export function loadWorkflowInfo(file: string, overrides: Overrides = {}, object
   let blocking = dangling.filter(d => scope.has(d[0]));
   // A dangling link to a node the converter dropped just means that custom node isn't installed - say so.
   const droppedUsed = [...new Set(blocking.filter(d => d[2] in droppedTypes).map(d => droppedTypes[d[2]]))].sort();
+  const missingNodes = new Set<string>(droppedUsed);
   if (droppedUsed.length) missing.push(`custom node(s) not installed in ComfyUI: ${droppedUsed.join(", ")}`);
   blocking = blocking.filter(d => !(d[2] in droppedTypes));
   if (blocking.length) {
@@ -223,6 +226,7 @@ export function loadWorkflowInfo(file: string, overrides: Overrides = {}, object
     const used = new Set([...scope].map(n => graph[n].class_type));
     const unknownUsed = [...used].filter(c => !knownClasses.has(c)).sort();
     const unknownOther = [...new Set(Object.values<any>(graph).map(n => n.class_type))].filter(c => !knownClasses.has(c) && !used.has(c)).sort();
+    unknownUsed.forEach(c => missingNodes.add(c));
     if (unknownUsed.length) missing.push(`custom node(s) not installed in ComfyUI: ${unknownUsed.join(", ")}`);
     if (unknownOther.length) warnings.push(`unused branches need custom nodes that aren't installed: ${unknownOther.join(", ")}`);
   }
@@ -250,6 +254,7 @@ export function loadWorkflowInfo(file: string, overrides: Overrides = {}, object
     refVideoBypassable: ordered.video.map(n => isBypassable(graph, n)),
     refAudioBypassable: ordered.audio.map(n => isBypassable(graph, n)),
     promptKeys,
+    missingNodes: [...missingNodes].sort(),
     needsPrompt: promptInId !== null,
     outputKind: outputId ? outputKindOf(String(graph[outputId].class_type || "")) : "image",
     fields: describeFields(graph, promptInId, negativeId, scope, objectInfo),
