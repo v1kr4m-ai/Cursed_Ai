@@ -18,6 +18,10 @@ interface Props {
   bare?: boolean;
   /** Every prompt found in the file (spreadsheet column / document headings), for running them all. */
   onCandidates?: (texts: string[]) => void;
+  /** What the box asks for, when it is not a picture description (for example a song's style tags). */
+  placeholder?: string;
+  /** The name over the box ("Tags" for a song). */
+  textLabel?: string;
 }
 
 /**
@@ -25,7 +29,7 @@ interface Props {
  * prompt is found for you. Spreadsheets list every prompt (the column is guessed and can be switched); documents with
  * several "Prompt" headings list each one. You can always edit the text by hand.
  */
-export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates, bare, usageKey = 0 }: Props) {
+export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onCandidates, bare, usageKey = 0, placeholder, textLabel }: Props) {
   const a = ACCENT[kind];
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = React.useState("");
@@ -197,7 +201,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
       )}
 
       <div>
-        <div className="flex items-center justify-between mb-1"><label className={label + " !mb-0"}>Prompt text</label><span className="inline-flex items-center gap-1.5">{bare && <button onClick={() => fileRef.current?.click()} disabled={busy} title="Pull the prompt out of a file (txt, md, docx, xlsx, pdf, image)" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors disabled:opacity-40">{busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}</button>}{bare && <button onClick={() => setDriveOpen(true)} disabled={busy} title="Read prompts from Google Drive / Sheets / Docs" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-blue-300 transition-colors disabled:opacity-40"><Cloud size={15} /></button>}{bare && <button onClick={() => setLinkOpen(o => !o)} title="Paste a Google Sheets / Docs / Drive link" className={`p-2.5 rounded-xl transition-colors ${linkOpen ? "bg-white/15 text-white" : "bg-white/5 hover:bg-white/10 text-zinc-300"}`}><Link2 size={15} /></button>}<EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></span></div>
+        <div className="flex items-center justify-between mb-1"><label className={label + " !mb-0"}>{textLabel || "Prompt text"}</label><span className="inline-flex items-center gap-1.5">{bare && <button onClick={() => fileRef.current?.click()} disabled={busy} title="Pull the prompt out of a file (txt, md, docx, xlsx, pdf, image)" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors disabled:opacity-40">{busy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}</button>}{bare && <button onClick={() => setDriveOpen(true)} disabled={busy} title="Read prompts from Google Drive / Sheets / Docs" className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-blue-300 transition-colors disabled:opacity-40"><Cloud size={15} /></button>}{bare && <button onClick={() => setLinkOpen(o => !o)} title="Paste a Google Sheets / Docs / Drive link" className={`p-2.5 rounded-xl transition-colors ${linkOpen ? "bg-white/15 text-white" : "bg-white/5 hover:bg-white/10 text-zinc-300"}`}><Link2 size={15} /></button>}<EnhancePromptButton kind={kind} prompt={prompt} onPrompt={onPrompt} modelId={modelId} tab={kind} /></span></div>
         {linkOpen && (
           <div className="flex gap-2 mb-2">
             <input value={link} onChange={e => setLink(e.target.value)} onKeyDown={e => e.key === "Enter" && readLink()} placeholder="https://docs.google.com/spreadsheets/d/..." className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[12px] text-white focus:outline-none placeholder:text-zinc-700" />
@@ -209,7 +213,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
           value={prompt}
           onChange={(e) => onPrompt(e.target.value)}
           rows={4}
-          placeholder="A robot holding a red skateboard, studio lighting..."
+          placeholder={placeholder || "A robot holding a red skateboard, studio lighting..."}
           className={`w-full bg-white/5 border-none rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 ${a.ring} placeholder:text-zinc-700 resize-y`}
         />
         {!needsPrompt && <p className="text-[11px] text-amber-400 mt-2">This workflow takes no text prompt - the box is ignored.</p>}

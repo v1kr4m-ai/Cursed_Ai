@@ -18,6 +18,8 @@ export interface WorkflowInfo {
   refImageBypassable: boolean[]; refVideoBypassable: boolean[]; refAudioBypassable: boolean[];
   fields: WorkflowField[];
   promptNodeId: string | null;
+  /** The text box(es) on the prompt node the main prompt goes into ("text", or "tags" for a song). */
+  promptKeys?: string[];
   outputNodeId: string | null;
   promptCandidates: NodeChoice[];
   outputCandidates: NodeChoice[];

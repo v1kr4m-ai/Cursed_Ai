@@ -240,7 +240,13 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const setRole = (r: string, x: any) => setFieldValues(s => { const n = { ...s }; for (const f of roleOf(r)) n[f.id] = x; return n; });
   const sizeW = roleOf("width")[0], sizeH = roleOf("height")[0], lengthF = roleOf("length")[0], fpsF = roleOf("fps")[0];
   const roleFields = roleOf("size");
-  const otherFields = wf ? wf.fields.filter(f => !f.role && !f.group) : [];
+  // The prompt node's other text boxes (a song's lyrics next to its style tags) are inputs in their own right:
+  // each gets its own box under the prompt instead of hiding among the settings.
+  const promptTexts = wf ? wf.fields.filter(f => !f.role && !f.group && f.kind === "text" && f.node === wf.promptNodeId) : [];
+  const otherFields = wf ? wf.fields.filter(f => !f.role && !f.group && !promptTexts.includes(f)) : [];
+  const promptKey = wf?.promptKeys?.[0] && wf.promptKeys[0] !== "text" ? wf.promptKeys[0] : "";
+  const promptTitle = promptKey ? promptKey.replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "Prompt";
+  const promptHint = /tags|genre|style/i.test(promptKey) ? "Style tags: genre, mood, instruments, voice, tempo (e.g. upbeat pop, female vocals, acoustic guitar, 120 bpm)" : promptKey ? `${promptTitle}...` : undefined;
   // Every other value of every node, grouped by node, for full control (folded away by default).
   const allFields = wf ? wf.fields.filter(f => !f.role && f.group) : [];
   const [allQuery, setAllQuery] = React.useState("");
@@ -476,9 +482,16 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
             {wf && wf.isRunnable && (
               <>
                 {/* Prompt */}
-                <Section title="Prompt" icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
-                  <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} />
+                <Section title={promptTitle} icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
+                  <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} placeholder={promptHint} textLabel={promptKey ? promptTitle : undefined} />
                 </Section>
+                {promptTexts.map(f => (
+                  <Section key={f.id} title={f.label} icon={<Type size={14} />} accent={a.text} badge={String(val(f) ?? "").trim() ? `${String(val(f)).trim().split(/\n+/).length} lines` : "empty"} defaultOpen>
+                    <textarea value={val(f) ?? ""} onChange={e => setField(f.id, e.target.value)} rows={/lyric/i.test(f.label) ? 10 : 4}
+                      placeholder={/lyric/i.test(f.label) ? "[verse]\nWrite the words here, one line per sung line\n\n[chorus]\n...\n\nLeave empty for an instrumental." : f.label}
+                      className={`${field} resize-y font-mono text-[12px] leading-relaxed`} />
+                  </Section>
+                ))}
 
                 {/* References */}
                 {refCount > 0 && (
