@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { itemsOf, listSessions, projectDirFor, readSession, titleOf } from "../oclaudeHistory";
+import { itemsOf, listFolders, listSessions, projectDirFor, readSession, titleOf } from "../oclaudeHistory";
 
 const line = (o: any) => JSON.stringify(o);
 
@@ -41,5 +41,11 @@ describe("a folder's Claude Code sessions", () => {
     expect(readSession(cwd, "bbb-2", home)).toEqual([{ kind: "user", text: "new one" }]);
     expect(readSession(cwd, "../x", home)).toBeNull();
     expect(listSessions("C:\\nowhere", home)).toEqual([]);
+  });
+  it("lists every folder with sessions by the real path written in its files, leaving out temporary folders", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+    const put = (cwd: string, id: string) => { const d = projectDirFor(cwd, home); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, id + ".jsonl"), line({ type: "user", cwd, message: { content: "hi" } })); };
+    put("C:/work/shop", "a"); put("C:/work/shop", "b"); put("C:/Users/me/AppData/Local/Temp/x", "c");
+    expect(listFolders(home)).toEqual([expect.objectContaining({ cwd: "C:/work/shop", count: 2 })]);
   });
 });

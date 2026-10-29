@@ -254,7 +254,7 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     fetch("/api/oclaude/history?cwd=" + encodeURIComponent(session.cwd)).then(r => r.json()).then(d => setHistory(d.sessions || [])).catch(() => setHistory([]));
   }, [session?.cwd]);
   React.useEffect(() => { loadHistory(); }, [loadHistory]);
-  type FolderEntry = { key: string; title: string; updatedAt: number; app?: Session; claudeId?: string };
+  type FolderEntry = { key: string; title: string; updatedAt: number; app?: Session; claudeId?: string; cwd?: string };
   const folderSessions: FolderEntry[] = (() => {
     if (!session) return [];
     const mine = sessions.filter(x => x.cwd === session.cwd);
@@ -264,17 +264,49 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
       ...history.filter(h => !known.has(h.id)).map(h => ({ key: "cc-" + h.id, title: h.title, updatedAt: h.updatedAt, claudeId: h.id })),
     ].sort((a, b) => b.updatedAt - a.updatedAt);
   })();
+  const [treeFolders, setTreeFolders] = React.useState<{ cwd: string; count: number; updatedAt: number }[]>([]);
+  const [treeSessions, setTreeSessions] = React.useState<Record<string, { id: string; title: string; updatedAt: number }[]>>({});
+  const [openFolders, setOpenFolders] = React.useState<string[]>(() => { try { return JSON.parse(localStorage.getItem("cursed.oclaude.openFolders") || "[]"); } catch { return []; } });
+  React.useEffect(() => { fetch("/api/oclaude/folders").then(r => r.json()).then(d => setTreeFolders(d.folders || [])).catch(() => {}); }, [running]);
+  const loadFolder = (cwd: string) => fetch("/api/oclaude/history?cwd=" + encodeURIComponent(cwd)).then(r => r.json()).then(d => setTreeSessions(m => ({ ...m, [cwd]: d.sessions || [] }))).catch(() => {});
+  const toggleFolder = (cwd: string) => {
+    const next = openFolders.includes(cwd) ? openFolders.filter(x => x !== cwd) : [...openFolders, cwd];
+    setOpenFolders(next);
+    try { localStorage.setItem("cursed.oclaude.openFolders", JSON.stringify(next)); } catch { /* storage blocked */ }
+    if (!openFolders.includes(cwd)) loadFolder(cwd);
+  };
+  React.useEffect(() => { openFolders.forEach(loadFolder); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const same = (a: string, b: string) => a.replace(/[\\/]+$/, "").toLowerCase() === b.replace(/[\\/]+$/, "").toLowerCase();
+  /** Folders in the tree: every folder with sessions here or in Claude Code, newest first; each holds this app's sessions and Claude Code's own. */
+  const tree = (() => {
+    const q = sessionQuery.trim().toLowerCase();
+    const cwds: { cwd: string; updatedAt: number; count: number }[] = [];
+    const add = (cwd: string, t: number, n: number) => { const f = cwds.find(x => same(x.cwd, cwd)); if (f) { f.updatedAt = Math.max(f.updatedAt, t); f.count = Math.max(f.count, n); } else cwds.push({ cwd, updatedAt: t, count: n }); };
+    for (const s of sessions) if (s.cwd) add(s.cwd, s.updatedAt, 0);
+    for (const f of treeFolders) add(f.cwd, f.updatedAt, f.count);
+    return cwds.sort((a, b) => b.updatedAt - a.updatedAt).map(f => {
+      const mine = sessions.filter(s => same(s.cwd, f.cwd));
+      const known = new Set(mine.map(s => s.claudeSessionId).filter(Boolean));
+      const entries: FolderEntry[] = [
+        ...mine.map(s => ({ key: s.id, title: s.title, updatedAt: s.updatedAt, app: s, cwd: f.cwd })),
+        ...(treeSessions[f.cwd] || []).filter(h => !known.has(h.id)).map(h => ({ key: "cc-" + h.id, title: h.title, updatedAt: h.updatedAt, claudeId: h.id, cwd: f.cwd })),
+      ].sort((a, b) => b.updatedAt - a.updatedAt).filter(e => !q || e.title.toLowerCase().includes(q) || f.cwd.toLowerCase().includes(q));
+      const name = f.cwd.split(/[\\/]/).filter(Boolean).pop() || f.cwd;
+      return { ...f, name, entries, total: Math.max(f.count + mine.filter(s => !s.claudeSessionId).length, entries.length) };
+    }).filter(f => !q || f.entries.length || f.cwd.toLowerCase().includes(q));
+  })();
   /** Opens a session from the folder list; one Claude Code made elsewhere is brought in with its conversation and continues where it stopped. */
   const resumeEntry = async (e: FolderEntry) => {
     setSessionsOpen(false);
     if (e.app) { setPrefs({ activeId: e.app.id }); return; }
     try {
-      const r = await fetch(`/api/oclaude/history/${e.claudeId}?cwd=${encodeURIComponent(session.cwd)}`);
+      const cwd = e.cwd || session.cwd;
+      const r = await fetch(`/api/oclaude/history/${e.claudeId}?cwd=${encodeURIComponent(cwd)}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Could not read that session.");
       const rid = () => Math.random().toString(36).slice(2, 10);
       const items = (d.items as any[]).map(it => (it.kind === "user" ? userItem(it.text) : it.kind === "text" ? { kind: "text" as const, id: rid(), text: it.text } : { kind: "tool" as const, id: rid(), toolId: it.toolId, name: it.name, input: it.input, status: "done" as const }));
-      const s2: Session = { ...newSession(session.cwd, model), title: e.title, claudeSessionId: e.claudeId, items, updatedAt: e.updatedAt };
+      const s2: Session = { ...newSession(cwd, model), title: e.title, claudeSessionId: e.claudeId, items, updatedAt: e.updatedAt };
       setSessions(l => { const n = [s2, ...l]; saveSessions(n); return n; });
       setPrefs({ activeId: s2.id });
       notify({ message: `Resumed "${e.title}" - your next message continues it`, tab: "ollamaclaude" });
@@ -372,19 +404,6 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     return <div className="glass flex h-full flex-1 items-center justify-center rounded-[2.5rem] text-sm text-zinc-500"><Loader2 size={16} className="mr-2 animate-spin" />{status === null ? "Looking for Claude Code and Ollama..." : "Starting..."}</div>;
   }
 
-  // Sessions grouped by the folder they work in, newest first, filtered by the search box.
-  const sessionGroups = (() => {
-    const q = sessionQuery.trim().toLowerCase();
-    const list = [...sessions].filter(s => !q || s.title.toLowerCase().includes(q) || s.cwd.toLowerCase().includes(q)).sort((a, b) => b.updatedAt - a.updatedAt);
-    const out: { folder: string; cwd: string; list: Session[] }[] = [];
-    for (const s of list) {
-      const folder = s.cwd.split(/[\\/]/).filter(Boolean).pop() || s.cwd || "No folder";
-      let g = out.find(x => x.cwd === s.cwd);
-      if (!g) { g = { folder, cwd: s.cwd, list: [] }; out.push(g); }
-      g.list.push(s);
-    }
-    return out;
-  })();
   const ctxMax = loadedCtx || modelInfo?.contextLength || null;
   const ctxPct = ctxMax && session.ctxTokens ? Math.min(100, (session.ctxTokens / ctxMax) * 100) : null;
   const files = changedFiles(session.items);
@@ -402,18 +421,32 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-            {sessionGroups.map(g => (
-              <div key={g.cwd} className="mb-3">
-                <p className="truncate px-2.5 pb-1 text-[11px] font-medium text-zinc-500" title={g.cwd}>{g.folder}</p>
-                {g.list.map(s => (
-                  <div key={s.id} className={cn("group flex items-center rounded-lg", s.id === session.id ? "bg-white/10" : "hover:bg-white/5")}>
-                    <button onClick={() => setPrefs({ activeId: s.id })} title={`${s.title}\n${s.model || "no model"} - ${ago(s.updatedAt)}`} className={cn("min-w-0 flex-1 truncate px-2.5 py-1.5 text-left text-[13px]", s.id === session.id ? "text-white" : "text-zinc-300")}>{s.title}</button>
-                    <button onClick={() => { if (confirm(`Delete the session "${s.title}"?`)) removeSession(s.id); }} title="Delete" className="mr-1 hidden rounded p-1 text-zinc-500 hover:text-rose-400 group-hover:block"><Trash2 size={12} /></button>
-                  </div>
-                ))}
-              </div>
-            ))}
-            {!sessionGroups.length && <p className="px-2.5 text-xs text-zinc-600">No sessions match.</p>}
+            {tree.map(f => {
+              const open = openFolders.includes(f.cwd) || !!sessionQuery.trim();
+              return (
+                <div key={f.cwd} className="mb-1">
+                  <button onClick={() => toggleFolder(f.cwd)} title={f.cwd} className={cn("group flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-white/5", same(f.cwd, session.cwd) ? "text-zinc-200" : "text-zinc-400")}>
+                    <ChevronDown size={12} className={cn("shrink-0 transition-transform", !open && "-rotate-90")} />
+                    <FolderOpen size={13} className="shrink-0 text-zinc-500" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
+                    {f.total > 0 && <span className="shrink-0 text-[10px] text-zinc-600">{f.total}</span>}
+                    <span role="button" tabIndex={0} onClick={ev => { ev.stopPropagation(); startNew(f.cwd); }} title={`New session in ${f.name}`} className="hidden shrink-0 rounded p-0.5 text-zinc-500 hover:text-white group-hover:block"><Plus size={12} /></span>
+                  </button>
+                  {open && (
+                    <div className="ml-3 border-l border-white/5 pl-1.5">
+                      {f.entries.map(e => (
+                        <div key={e.key} className={cn("group flex items-center rounded-lg", e.app?.id === session.id ? "bg-white/10" : "hover:bg-white/5")}>
+                          <button onClick={() => resumeEntry(e)} title={`${e.title}\n${ago(e.updatedAt)}${e.claudeId ? " - made in Claude Code, opens here and continues" : ""}`} className={cn("min-w-0 flex-1 truncate px-2 py-1.5 text-left text-[13px]", e.app?.id === session.id ? "text-white" : e.claudeId ? "text-zinc-400" : "text-zinc-300")}>{e.title}</button>
+                          {e.app && <button onClick={() => { if (confirm(`Delete the session "${e.title}"?`)) removeSession(e.app!.id); }} title="Delete" className="mr-1 hidden rounded p-1 text-zinc-500 hover:text-rose-400 group-hover:block"><Trash2 size={12} /></button>}
+                        </div>
+                      ))}
+                      {!f.entries.length && <p className="px-2 py-1 text-[11px] text-zinc-600">{treeSessions[f.cwd] ? "No sessions." : "Loading..."}</p>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {!tree.length && <p className="px-2.5 text-xs text-zinc-600">No sessions match.</p>}
           </div>
         </aside>
       )}

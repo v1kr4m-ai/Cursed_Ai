@@ -65,6 +65,40 @@ export function listSessions(cwd: string, home?: string): { id: string; title: s
   }).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);
 }
 
+/** The real folder a session file was made in (Claude Code writes it on its lines as "cwd"). */
+export function cwdOf(lines: string[]): string | null {
+  for (const line of lines) {
+    try { const j = JSON.parse(line); if (typeof j.cwd === "string" && j.cwd) return j.cwd; } catch { /* a partial line */ }
+  }
+  return null;
+}
+
+/** Every folder Claude Code has sessions in, newest first, with how many. Temporary folders are left out. */
+export function listFolders(home = os.homedir()): { cwd: string; count: number; updatedAt: number }[] {
+  const root = path.join(home, ".claude", "projects");
+  let dirs: string[];
+  try { dirs = fs.readdirSync(root); } catch { return []; }
+  const out: { cwd: string; count: number; updatedAt: number }[] = [];
+  for (const d of dirs) {
+    const dir = path.join(root, d);
+    let files: { f: string; t: number }[];
+    try { files = fs.readdirSync(dir).filter(n => n.endsWith(".jsonl")).map(n => ({ f: path.join(dir, n), t: fs.statSync(path.join(dir, n)).mtimeMs })); } catch { continue; }
+    if (!files.length) continue;
+    files.sort((a, b) => b.t - a.t);
+    let cwd: string | null = null;
+    for (const { f } of files.slice(0, 3)) {
+      const fd = fs.openSync(f, "r");
+      const buf = Buffer.alloc(Math.min(fs.statSync(f).size, 128_000));
+      try { fs.readSync(fd, buf, 0, buf.length, 0); } finally { fs.closeSync(fd); }
+      cwd = cwdOf(buf.toString("utf8").split(/\r?\n/));
+      if (cwd) break;
+    }
+    if (!cwd || /[\\/](temp|tmp)[\\/]/i.test(cwd)) continue;
+    out.push({ cwd, count: files.length, updatedAt: files[0].t });
+  }
+  return out.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
 export function readSession(cwd: string, id: string, home?: string): HistoryItem[] | null {
   if (!/^[A-Za-z0-9-]+$/.test(id)) return null;
   const file = path.join(projectDirFor(cwd, home), id + ".jsonl");

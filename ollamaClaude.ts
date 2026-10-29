@@ -11,7 +11,7 @@ import os from "os";
 import path from "path";
 import { spawn, execFile, type ChildProcess } from "child_process";
 import { registerOllamaRestart } from "./ollamaRestart";
-import { listSessions, readSession } from "./oclaudeHistory";
+import { listFolders, listSessions, readSession } from "./oclaudeHistory";
 
 export interface OllamaClaudeOptions { ollamaUrl: string }
 
@@ -277,6 +277,8 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
     if (!cwd) return res.json({ sessions: [] });
     res.json({ sessions: listSessions(cwd) });
   });
+  /** Every folder with Claude Code sessions, for the folder tree. */
+  app.get("/api/oclaude/folders", (_req, res) => res.json({ folders: listFolders() }));
   app.get("/api/oclaude/history/:id", (req, res) => {
     const items = readSession(String(req.query.cwd || ""), req.params.id);
     if (!items) return res.status(404).json({ error: "That session was not found in this folder." });
