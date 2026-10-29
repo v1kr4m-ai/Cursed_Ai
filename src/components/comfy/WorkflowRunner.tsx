@@ -10,6 +10,7 @@ import type { StudioRequest } from "../../services/studioIntent";
 import { PreviousResults } from "./PreviousResults";
 import { ShareMenu } from "./ShareMenu";
 import { MissingNodes } from "./MissingNodes";
+import { SendToSeries } from "./SendToSeries";
 import { Converter } from "./Converter";
 import { QueueList } from "./shared";
 import { SortMenu } from "./SortMenu";
@@ -909,6 +910,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               <p className="text-[11px] text-zinc-500 truncate flex-1 min-w-[140px]" title={stageItem?.prompt}>{stageItem ? `${stageItem.workflow} · ${stageItem.prompt || "no prompt"}` : stagePath.split(/[\\/]/).pop()}</p>
               {stageItem?.prompt && <button onClick={() => reusePrompt(stageItem)} title="Reuse this prompt" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><CornerUpLeft size={13} /> Prompt</button>}
               {isImage(stagePath) && wf && wf.refImageCount > 0 && <button onClick={() => useAsReference(stagePath)} title="Use as reference image" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><ImageIcon size={13} /> Reference</button>}
+              {isImage(stagePath) && !stagePath.startsWith("data:") && <SendToSeries path={stagePath} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`} />}
               <ShareMenu kind={kind} url={(stagePath.startsWith("data:") || stagePath.startsWith("blob:") || stagePath.startsWith("/api/")) ? stagePath : fileUrl(stagePath)} caption={stageItem?.prompt} onReveal={() => reveal(stagePath)} tab={kind} />
               <button onClick={() => reveal(stagePath)} title="Show in folder" className={iconBtn}><ExternalLink size={14} /></button>
               <button onClick={() => removeResult(stagePath)} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>
