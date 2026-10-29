@@ -52,6 +52,7 @@ export interface Project {
   id: string; title: string; dir: string; createdAt: string; updatedAt: string;
   idea: { logline: string; audience: string; tone: string; notes: string; niche?: string };
   discussion: { role: "user" | "assistant"; content: string; at: string }[];
+  threads?: { id: string; title: string; messages: { role: "user" | "assistant"; content: string; at: string }[]; updatedAt: string }[];
   styleLock: string; voiceLock: string;
   settings: ProjectSettings; episodes: Episode[]; sources?: Source[];
   /** What kind of video this is: narration, vlog, ugc, singing, dancing... (seriesTool/formats.ts). */

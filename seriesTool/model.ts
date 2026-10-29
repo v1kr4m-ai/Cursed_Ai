@@ -127,6 +127,8 @@ export interface Project {
   updatedAt: string;
   idea: { logline: string; audience: string; tone: string; notes: string };
   discussion: Message[];
+  /** More discussions beside the main one (a new week, a character's backstory...), each kept apart. */
+  threads?: { id: string; title: string; messages: Message[]; updatedAt: string }[];
   /** Pasted into every scene prompt verbatim so the look does not drift between clips. */
   styleLock: string;
   /** Narrator identity, restated in every scene prompt for the same reason. */

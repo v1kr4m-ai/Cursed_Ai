@@ -1,6 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus, Check, ChevronDown, ChevronRight, Paperclip, Download } from "lucide-react";
+import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus, Check, ChevronDown, ChevronRight, Paperclip, Download, X } from "lucide-react";
 import { SERIES_FORMATS, projectFormat, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { MicStatus } from "../../voice/MicStatus";
@@ -278,8 +278,44 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const [title, setTitle] = React.useState(project.title);
   const [style, setStyle] = React.useState(project.styleLock || "");
   const [filling, setFilling] = React.useState(false);
+  const LIVE_KEY = "cursed.series.liveFill";
+  const [liveFill, setLiveFill] = React.useState(() => { try { return localStorage.getItem(LIVE_KEY) !== "0"; } catch { return true; } });
+  const [autoFilling, setAutoFilling] = React.useState(false);
+  /** Fields you typed in yourself: the live update leaves them alone. */
+  const touched = React.useRef(new Set<string>());
+  /** Fields the live update just changed, highlighted for a moment. */
+  const [flash, setFlash] = React.useState<string[]>([]);
   const [input, setInput] = React.useState("");
-  const [messages, setMessages] = React.useState(project.discussion);
+  // Discussions: the main one (project.discussion) and any others, each with its own messages, so talking about
+  // next week or a character's backstory never mixes into the running conversation. The open one is remembered.
+  const THREAD_KEY = `cursed.series.thread.${project.id}`;
+  const [thread, setThread] = React.useState<string>(() => { try { const t = localStorage.getItem(THREAD_KEY) || "main"; return t === "main" || (project.threads || []).some(x => x.id === t) ? t : "main"; } catch { return "main"; } });
+  const threadMessages = (id: string) => (id === "main" ? project.discussion : (project.threads || []).find(t => t.id === id)?.messages || []);
+  const [messages, setMessages] = React.useState(() => threadMessages(thread));
+  /** The patch that saves `msgs` into the open discussion. */
+  const threadPatch = (msgs: typeof messages): Partial<Project> => (thread === "main"
+    ? { discussion: msgs }
+    : { threads: (project.threads || []).map(t => (t.id === thread ? { ...t, messages: msgs, updatedAt: new Date().toISOString() } : t)) });
+  const openThread = (id: string) => { setThread(id); setMessages(threadMessages(id)); try { localStorage.setItem(THREAD_KEY, id); } catch { /* storage blocked */ } };
+  const newThread = async () => {
+    const title = window.prompt("Name the new discussion (for example: Week 2, Richie's backstory, a new idea)");
+    if (!title?.trim()) return;
+    const t = { id: Math.random().toString(36).slice(2, 10), title: title.trim().slice(0, 60), messages: [], updatedAt: new Date().toISOString() };
+    onSaved(await api.patch(project.id, { threads: [...(project.threads || []), t] }));
+    setThread(t.id); setMessages([]); try { localStorage.setItem(THREAD_KEY, t.id); } catch { /* storage blocked */ }
+  };
+  const renameThread = async (id: string) => {
+    const cur = (project.threads || []).find(t => t.id === id);
+    const title = window.prompt("Rename this discussion", cur?.title || "");
+    if (!cur || !title?.trim()) return;
+    onSaved(await api.patch(project.id, { threads: (project.threads || []).map(t => (t.id === id ? { ...t, title: title.trim().slice(0, 60) } : t)) }));
+  };
+  const deleteThread = async (id: string) => {
+    const cur = (project.threads || []).find(t => t.id === id);
+    if (!cur || !confirm(`Delete the discussion "${cur.title}" and its ${cur.messages.length} messages?`)) return;
+    onSaved(await api.patch(project.id, { threads: (project.threads || []).filter(t => t.id !== id) }));
+    if (thread === id) openThread("main");
+  };
   const [streaming, setStreaming] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [planning, setPlanning] = React.useState(false);
@@ -413,7 +449,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
     URL.revokeObjectURL(a.href);
   }
 
-  const saveIdea = async (next = idea, discussion = messages) => onSaved(await api.patch(project.id, { idea: next, discussion }));
+  const saveIdea = async (next = idea, discussion = messages) => onSaved(await api.patch(project.id, { idea: next, ...threadPatch(discussion) }));
 
   async function send() {
     const text = input.trim();
@@ -442,6 +478,8 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
       setMessages(withReply);
       setStreaming("");
       await saveIdea(idea, withReply);
+      // The details on the left follow the main discussion as it goes (other discussions are kept to themselves).
+      if (liveFill && thread === "main") void fillFromDiscussion(true, withReply);
     } catch (e: any) {
       setError(e?.message || String(e));
       setMessages(next);
@@ -586,36 +624,47 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
   }
 
   async function saveDetails(next: { title?: string; style?: string; idea?: typeof idea }) {
-    const patch: Record<string, unknown> = { discussion: messages };
+    const patch: Record<string, unknown> = { ...threadPatch(messages) };
     if (next.idea) patch.idea = next.idea;
     if (next.title !== undefined && next.title.trim()) patch.title = next.title.trim();
     if (next.style !== undefined) patch.styleLock = next.style;
     onSaved(await api.patch(project.id, patch as any));
   }
 
-  /** Reads the discussion back and puts title, niche, logline, audience, tone, style and notes into the fields. */
-  async function fillFromDiscussion() {
-    setFilling(true);
+  /**
+   * Reads the discussion back and puts title, niche, logline, audience, tone, style and notes into the fields.
+   * `auto` = the live update after an answer: quiet, and it never overwrites a field you typed in yourself.
+   */
+  async function fillFromDiscussion(auto = false, msgs = messages) {
+    if (auto) setAutoFilling(true); else { setFilling(true); touched.current.clear(); }
     setError(null);
     try {
       const answer = await askWith(
         [
           { role: "system", content: systemPrompt },
           ...sources.map(s => ({ role: "user", content: `Source document "${s.name}":\n\n${(s.digest || s.text).slice(0, 12000)}` })),
-          ...messages.map(m => ({ role: m.role, content: m.content })),
+          ...msgs.map(m => ({ role: m.role, content: m.content })),
           { role: "user", content: FILL_INSTRUCTION },
         ],
         model,
       );
       const d = extractJson(answer);
       if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("The model did not return the details.");
-      const pick = (v: unknown, keep: string) => (typeof v === "string" && v.trim() ? v.trim() : keep);
-      const nextIdea = { ...idea, niche: pick(d.niche, idea.niche || ""), logline: pick(d.logline, idea.logline), audience: pick(d.audience, idea.audience), tone: pick(d.tone, idea.tone), notes: pick(d.notes, idea.notes) };
-      const nextTitle = pick(d.title, title), nextStyle = pick(d.style, style);
+      const changed: string[] = [];
+      const pick = (key: string, v: unknown, keep: string) => {
+        if (auto && touched.current.has(key)) return keep;
+        const next = typeof v === "string" && v.trim() ? v.trim() : keep;
+        if (next !== keep) changed.push(key);
+        return next;
+      };
+      const nextIdea = { ...idea, niche: pick("niche", d.niche, idea.niche || ""), logline: pick("logline", d.logline, idea.logline), audience: pick("audience", d.audience, idea.audience), tone: pick("tone", d.tone, idea.tone), notes: pick("notes", d.notes, idea.notes) };
+      const nextTitle = pick("title", d.title, title), nextStyle = pick("style", d.style, style);
+      if (auto && !changed.length) return;
       setIdea(nextIdea); setTitle(nextTitle); setStyle(nextStyle);
+      setFlash(changed); setTimeout(() => setFlash([]), 2500);
       await saveDetails({ title: nextTitle, style: nextStyle, idea: nextIdea });
-    } catch (e: any) { setError(e?.message || String(e)); }
-    finally { setFilling(false); }
+    } catch (e: any) { if (!auto) setError(e?.message || String(e)); }
+    finally { if (auto) setAutoFilling(false); else setFilling(false); }
   }
 
   /**
@@ -683,14 +732,14 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             </Labeled>
           </Fold>
           <Labeled label="Series title" icon={<Type size={13} className="text-rose-400" />}>
-            <input className={field} placeholder="e.g. Richie's Daily Life" value={title} onChange={e => setTitle(e.target.value)} onBlur={() => saveDetails({ title })} />
+            <input className={field + (flash.includes("title") ? " ring-1 ring-emerald-500/70" : "")} placeholder="e.g. Richie's Daily Life" value={title} onChange={e => { touched.current.add("title"); setTitle(e.target.value); }} onBlur={() => saveDetails({ title })} />
           </Labeled>
           {IDEA_FIELDS.map(({ key, label, icon: Icon, color, placeholder }) => (
             <Labeled key={key} label={label} icon={<Icon size={13} className={color} />}>
-              <input className={field} placeholder={placeholder} value={idea[key]} onChange={e => setIdea({ ...idea, [key]: e.target.value })} onBlur={() => saveIdea()} />
+              <input className={field + (flash.includes(key) ? " ring-1 ring-emerald-500/70" : "")} placeholder={placeholder} value={idea[key]} onChange={e => { touched.current.add(key); setIdea({ ...idea, [key]: e.target.value }); }} onBlur={() => saveIdea()} />
             </Labeled>
           ))}
-                  <button onClick={fillFromDiscussion} disabled={filling || busy || !planReady} title={planReady ? "Reads the conversation and fills in the title, niche, style and the rest" : "Talk it through first"}
+                  <button onClick={() => fillFromDiscussion()} disabled={filling || busy || !planReady} title={planReady ? "Reads the conversation and fills in the title, niche, style and the rest" : "Talk it through first"}
           className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900/60 hover:bg-neutral-800/80 disabled:opacity-40 px-4 py-2.5 text-sm font-medium text-neutral-100 transition">
           {filling ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} className="text-fuchsia-400" />}
           {filling ? "Filling in the details..." : "Fill the details from our discussion"}
@@ -733,7 +782,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
               <div className="text-[10px] uppercase tracking-wider text-neutral-500">{group}</div>
               <div className="flex flex-wrap gap-1.5">
                 {SERIES_FORMATS.filter(f => f.group === group).map(f => (
-                  <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: f.id, discussion: messages }))} title={f.blurb}
+                  <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: f.id, ...threadPatch(messages) }))} title={f.blurb}
                     className={"rounded-full border px-3 py-1 text-xs transition " + (fmt.id === f.id ? "border-sky-500 bg-sky-500/15 text-sky-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
                     {f.label}
                   </button>
@@ -745,7 +794,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <div className="text-[10px] uppercase tracking-wider text-neutral-500">Voice in the clips</div>
             <div className="flex flex-wrap gap-1.5">
               {([["auto", "Style default"], ["off", "No voice (I add music later)"], ["on", "She talks to the camera"]] as const).map(([v, label]) => (
-                <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voice: v, discussion: messages }))}
+                <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voice: v, ...threadPatch(messages) }))}
                   className={"rounded-full border px-3 py-1 text-xs transition " + ((project.voice || "auto") === v ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
                   {label}
                 </button>
@@ -765,13 +814,13 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             </div>
           )}
           <label className="flex items-start gap-2 text-[11px] text-neutral-400">
-            <input type="checkbox" className="mt-0.5" checked={!!project.allowTextCards} onChange={async e => onSaved(await api.patch(project.id, { allowTextCards: e.target.checked, discussion: messages }))} />
+            <input type="checkbox" className="mt-0.5" checked={!!project.allowTextCards} onChange={async e => onSaved(await api.patch(project.id, { allowTextCards: e.target.checked, ...threadPatch(messages) }))} />
             <span>Write on-screen text cards into the video. Leave this off to get clean clips: subtitles and captions are added afterwards in Assemble.</span>
           </label>
         </motion.div>
 
           <Labeled label="The look (colours, light, camera feel)" icon={<Brush size={13} className="text-fuchsia-400" />}>
-            <textarea className={`${field} h-16 resize-none`} placeholder="e.g. warm natural light, handheld phone footage" value={style} onChange={e => setStyle(e.target.value)} onBlur={() => saveDetails({ style })} />
+            <textarea className={`${field} h-16 resize-none`} placeholder="e.g. warm natural light, handheld phone footage" value={style} onChange={e => { touched.current.add("style"); setStyle(e.target.value); }} onBlur={() => saveDetails({ style })} />
           </Labeled>
         </StepCard>
 
@@ -982,6 +1031,19 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <option value="__online_setup">+ Use Claude, ChatGPT, Gemini, OpenRouter... (add a key in Settings)</option>
           </select>
           {model?.startsWith("gemini:") || model?.startsWith("online:") || /[:-]cloud$/i.test(model || "") ? <span className="flex items-center gap-1 text-[10px] text-sky-400"><Cloud size={11} /> online</span> : <span className="text-[10px] text-emerald-400">offline</span>}
+        </div>
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-neutral-800 px-2 py-1.5">
+          {[{ id: "main", title: "Main discussion" }, ...(project.threads || [])].map(t => (
+            <span key={t.id} className={"group flex shrink-0 items-center rounded-lg " + (thread === t.id ? "bg-violet-600/25 text-violet-100" : "text-neutral-400 hover:bg-neutral-800")}>
+              <button onClick={() => openThread(t.id)} onDoubleClick={() => t.id !== "main" && renameThread(t.id)} title={t.id === "main" ? "The series' main conversation" : "Double-click to rename"} className="max-w-[10rem] truncate px-2.5 py-1 text-[11px]">{t.title}</button>
+              {t.id !== "main" && <button onClick={() => deleteThread(t.id)} title="Delete this discussion" className="hidden pr-1.5 text-neutral-500 hover:text-rose-400 group-hover:block"><X size={11} /></button>}
+            </span>
+          ))}
+          <button onClick={newThread} title="Start a separate discussion (a new week, a character, a new idea) that does not mix into the others" className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-neutral-400 hover:bg-neutral-800 hover:text-white"><Plus size={12} />New</button>
+          <label className="ml-auto flex shrink-0 items-center gap-1.5 pl-2 text-[10px] text-neutral-500" title="After each answer in the main discussion, the title, idea, audience, tone, look and notes on the left are updated (fields you typed in yourself are left alone)">
+            {autoFilling ? <Loader2 size={10} className="animate-spin text-emerald-400" /> : null}
+            <input type="checkbox" checked={liveFill} onChange={e => { setLiveFill(e.target.checked); try { localStorage.setItem(LIVE_KEY, e.target.checked ? "1" : "0"); } catch { /* storage blocked */ } }} />live details
+          </label>
         </div>
         <div ref={scroller} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && !streaming && (
