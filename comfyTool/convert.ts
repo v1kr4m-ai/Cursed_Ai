@@ -21,6 +21,8 @@ type Json = Record<string, any>;
 const WIDGET_TYPES = new Set(["INT", "FLOAT", "STRING", "BOOLEAN", "COMBO"]);
 const SKIP_TYPES = new Set(["Note", "MarkdownNote", "Label (rgthree)", "Fast Groups Muter (rgthree)", "Fast Groups Bypasser (rgthree)"]);
 const PASSTHROUGH_TYPES = new Set(["Reroute", "SetNode", "GetNode"]);
+// "Use Everywhere" broadcast nodes: whatever is plugged into them feeds every matching empty input in the graph.
+const EVERYWHERE = /^(Anything Everywhere\d?\??|Prompts Everywhere|Seed Everywhere)$/;
 const MODE_MUTED = 2, MODE_BYPASS = 4;
 // Reference loaders stay in the graph even when bypassed/muted in the editor: people park a spare slot that way,
 // and the app decides per run whether a slot is used.
@@ -185,8 +187,41 @@ function fits(typeTag: any, value: any): boolean {
 
 const isLinkValue = (v: any) => Array.isArray(v) && v.length === 2 && typeof v[0] === "string";
 
+/**
+ * Turns "Use Everywhere" broadcasts into ordinary links: an output plugged into Anything Everywhere goes to every
+ * empty socket of the same type; Prompts Everywhere sends its first input to every empty "positive" and its second
+ * to every empty "negative". The broadcast nodes themselves are then skipped like notes.
+ * ponytail: the nodes' optional title / group / colour restrictions are not honoured; every match is wired.
+ */
+export function resolveEverywhere(nodes: Json[], links: Link[]): void {
+  const byId = new Map<any, Link>(links.map(l => [l[0], l]));
+  const nodeById = new Map<any, Json>(nodes.map(n => [n.id, n]));
+  let next = 0;
+  for (const ue of nodes.filter(n => EVERYWHERE.test(String(n.type)) && n.mode !== MODE_MUTED && n.mode !== MODE_BYPASS)) {
+    // The broadcast node's own input list is not reliable (its slots are made on the fly); the link list is.
+    const feeding = links.filter(l => l[3] === ue.id).sort((x, y) => x[4] - y[4]);
+    feeding.forEach((l, k) => {
+      const src = nodeById.get(l[1]);
+      const type = src?.outputs?.[l[2]]?.type ?? l[5];
+      if (!type || type === "*") return;
+      for (const n of nodes) {
+        if (n === ue || EVERYWHERE.test(String(n.type)) || n.id === l[1] || n.mode === MODE_MUTED || n.mode === MODE_BYPASS) continue;
+        (n.inputs || []).forEach((slot: Json, i: number) => {
+          if (slot.link != null || slot.widget || slot.type !== type) return;
+          if (ue.type === "Prompts Everywhere" && slot.name !== (k === 0 ? "positive" : "negative")) return;
+          const id = `UE${next++}`;
+          const link: Link = [id, l[1], l[2], n.id, i, type];
+          links.push(link); byId.set(id, link);
+          slot.link = id;
+        });
+      }
+    });
+  }
+}
+
 export function convertUiWorkflow(ui: Json, objectInfo: Json): ConvertResult {
   const [nodes, links] = expandSubgraphs(ui);
+  resolveEverywhere(nodes, links);
   const linksById = new Map<any, Link>(links.map(l => [l[0], l]));
   const passthrough = buildPassthroughMap(nodes, linksById);
   const primitives = new Map<any, Json>(nodes.filter(n => n.type === "PrimitiveNode").map(n => [n.id, n]));
@@ -198,6 +233,7 @@ export function convertUiWorkflow(ui: Json, objectInfo: Json): ConvertResult {
     const nodeType: string = node.type;
 
     if (SKIP_TYPES.has(nodeType)) { result.skippedNodes.push([nodeId, nodeType, "UI-only annotation node"]); continue; }
+    if (EVERYWHERE.test(nodeType)) { result.skippedNodes.push([nodeId, nodeType, "broadcast node - turned into links"]); continue; }
     if (PASSTHROUGH_TYPES.has(nodeType)) { result.skippedNodes.push([nodeId, nodeType, "passthrough - resolved through, not a real node"]); continue; }
     if ((node.mode === MODE_MUTED || node.mode === MODE_BYPASS) && !REF_LOADER_TYPES.has(nodeType)) {
       result.skippedNodes.push([nodeId, nodeType, "bypassed/muted in the editor"]); continue;
