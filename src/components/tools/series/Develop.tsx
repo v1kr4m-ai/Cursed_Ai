@@ -270,7 +270,10 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const rating = rateModel(ready.find(m => m.id === model) || { id: model || "", name: model || "", sizeBytes: undefined }, model ? records[model] : undefined);
   const better = React.useMemo(() => recommend(ready, records), [models]);
   const betterThan = (m?: AIModel) => !!m && m.id !== model && tierRank(rateModel(m, records[m.id]).tier) < tierRank(rating.tier);
-  const pickModel = (id: string) => { setTalkModel(id); try { localStorage.setItem(TALK_MODEL_KEY, id); } catch { /* storage blocked */ } };
+  const pickModel = (id: string) => {
+    // Online models appear here once a key is saved in Settings > Integrations > Online models.
+    if (id === "__online_setup") { notify({ message: "Add a key for Claude, ChatGPT, OpenRouter or another provider in Settings > Integrations > Online models; its models then show here under Online.", tab: "settings" }); window.dispatchEvent(new CustomEvent("cursed:goto", { detail: { tab: "settings" } })); return; }
+    setTalkModel(id); try { localStorage.setItem(TALK_MODEL_KEY, id); } catch { /* storage blocked */ } };
   const [idea, setIdea] = React.useState(project.idea);
   const [title, setTitle] = React.useState(project.title);
   const [style, setStyle] = React.useState(project.styleLock || "");
@@ -615,11 +618,30 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
     finally { setFilling(false); }
   }
 
+  /**
+   * A plan pasted by hand is added after the episodes already there (numbered on from the last one), so nothing that
+   * exists is lost. "Replace" swaps the whole plan instead, keeping renders whose episode and scene numbers still match.
+   */
+  const [replacePlan, setReplacePlan] = React.useState(false);
   async function savePastedPlan() {
     setError(null);
     try {
-      onSaved(await api.savePlan(project.id, extractJson(rawPlan)));
+      const got = extractJson(rawPlan);
+      const list: any[] = Array.isArray(got) ? got : Array.isArray(got?.episodes) ? got.episodes : got && typeof got === "object" && Array.isArray(got.scenes) ? [got] : [];
+      if (!list.length) throw new Error("That JSON has no episodes in it.");
+      if (replacePlan) {
+        if (project.episodes.length && !confirm(`Replace all ${project.episodes.length} episodes with the ${list.length} pasted ones? Renders are kept only where the episode and scene numbers still match.`)) return;
+        await finishPlan(await api.savePlan(project.id, list), []);
+      } else {
+        const last = project.episodes.reduce((n, e) => Math.max(n, e.number), 0);
+        const added = tidyPlan(list).map((e: any, i: number) => ({ ...e, number: last + i + 1 }));
+        let planned = await api.savePlan(project.id, [...planJson(project), ...added], true);
+        if (project.grouping) planned = await api.patch(project.id, { episodes: applyGrouping(planned.episodes, project.grouping) });
+        await finishPlan(planned, []);
+        notify({ message: `${added.length} episode${added.length === 1 ? "" : "s"} added after episode ${last}`, tab: "series" });
+      }
       setShowRaw(false);
+      setRawPlan("");
     } catch (e: any) { setError(e?.message || String(e)); }
   }
 
@@ -820,6 +842,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
               <option value="">App's selected model</option>
               {offline.length > 0 && <optgroup label="Offline (on this PC)">{offline.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
               {online.length > 0 && <optgroup label="Online">{online.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
+              <option value="__online_setup">+ Use Claude, ChatGPT, Gemini, OpenRouter... (add a key in Settings)</option>
             </select>
           </div>
                   {(rating.tier === "basic" || rating.tier === "weak") && (
@@ -917,8 +940,9 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                     <AnimatePresence>
           {showRaw && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-2 overflow-hidden">
-              <textarea className={`${field} h-48 font-mono text-xs`} value={rawPlan} onChange={e => setRawPlan(e.target.value)} placeholder="Paste a plan JSON array here if the model's answer needs fixing." />
-              <button onClick={savePastedPlan} className="w-full rounded-lg bg-neutral-700 hover:bg-neutral-600 px-3 py-2 text-xs text-white">Use this plan</button>
+              <textarea className={`${field} h-48 font-mono text-xs`} value={rawPlan} onChange={e => setRawPlan(e.target.value)} placeholder="Paste episodes as JSON (a list, or one episode). They are added after the episodes you already have." />
+              <label className="flex items-center gap-2 text-[11px] text-neutral-400"><input type="checkbox" checked={replacePlan} onChange={e => setReplacePlan(e.target.checked)} />Replace the whole plan instead of adding these episodes after the last one</label>
+              <button onClick={savePastedPlan} className="w-full rounded-lg bg-neutral-700 hover:bg-neutral-600 px-3 py-2 text-xs text-white">{replacePlan ? "Replace the plan with this" : project.episodes.length ? `Add these after episode ${project.episodes.reduce((n, e) => Math.max(n, e.number), 0)}` : "Use this plan"}</button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -955,6 +979,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <option value="">App's selected model</option>
             {offline.length > 0 && <optgroup label="Offline (on this PC)">{offline.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
             {online.length > 0 && <optgroup label="Online">{online.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>}
+            <option value="__online_setup">+ Use Claude, ChatGPT, Gemini, OpenRouter... (add a key in Settings)</option>
           </select>
           {model?.startsWith("gemini:") || model?.startsWith("online:") || /[:-]cloud$/i.test(model || "") ? <span className="flex items-center gap-1 text-[10px] text-sky-400"><Cloud size={11} /> online</span> : <span className="text-[10px] text-emerald-400">offline</span>}
         </div>
