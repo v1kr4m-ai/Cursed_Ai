@@ -23,6 +23,7 @@ import { MODEL_FLAGS } from "../../lib/modelTags";
 import { FlagChip, FitBadge } from "./flags";
 import { fitFor, useSystemInfo } from "../../lib/ramFit";
 import { ModelHub } from "./ModelHub";
+import { WorkflowHub } from "./WorkflowHub";
 
 interface ModelManagerProps {
   models: AIModel[];
@@ -69,7 +70,7 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
   }, [models.length]);
   const [search, setSearch] = useState("");
   const sys = useSystemInfo();
-  const [view, setView] = useState<"installed" | "hf" | "ollama" | "comfy">("installed");
+  const [view, setView] = useState<"installed" | "hf" | "ollama" | "comfy" | "workflows">("installed");
   const [flag, setFlag] = useState<string | null>(null);
 
   const filteredModels = models.filter(m => 
@@ -100,15 +101,17 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-5">
-          {([["installed", "Installed"], ["hf", "Hugging Face"], ["ollama", "Ollama Library"], ["comfy", "ComfyUI"]] as const).map(([id, label]) => (
+          {([["installed", "Installed"], ["hf", "Hugging Face"], ["ollama", "Ollama Library"], ["comfy", "ComfyUI"], ["workflows", "ComfyUI Workflows"]] as const).map(([id, label]) => (
             <button key={id} onClick={() => setView(id)}
               className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors ${view === id ? "bg-violet-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>{label}</button>
           ))}
+          {view !== "workflows" && <>
           <span className="w-px h-6 bg-white/10 mx-2" />
           <button onClick={() => setFlag(null)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${flag === null ? "bg-white text-black" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>All</button>
           {MODEL_FLAGS.map(fl => (
             <button key={fl} onClick={() => setFlag(flag === fl ? null : fl)} className={`rounded-lg transition-all ${flag === fl ? "ring-2 ring-white/60" : "opacity-80 hover:opacity-100"}`}><FlagChip flag={fl} /></button>
           ))}
+          </>}
         </div>
 
         {view === "installed" && hosts && (!hosts.ollama || !hosts.lmstudio) && (
@@ -118,7 +121,10 @@ export function ModelManager({ models, selectedModelId, onSelectModel, onDownloa
           </div>
         )}
 
-        {view !== "installed" && (
+        {view === "workflows" && (
+          <div className="overflow-y-auto pb-20 pr-2"><WorkflowHub /></div>
+        )}
+        {view !== "installed" && view !== "workflows" && (
           <div className="overflow-y-auto pb-20 pr-2">
             <ModelHub key={view} source={view} flag={flag} onInstalled={onRefresh} />
           </div>

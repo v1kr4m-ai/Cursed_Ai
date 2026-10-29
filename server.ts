@@ -11,6 +11,7 @@ import { registerMerge } from "./seriesTool/merge";
 import { registerComfyLogs } from "./comfyLogs";
 import { directLaunch, tailLines } from "./comfyLaunch";
 import { freeComfyForLLM, handoffEnabled, setHandoff } from "./gpuHandoff";
+import { nodeList, registerWorkflowHub, workflowFolder } from "./workflowHub";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
@@ -211,7 +212,7 @@ async function startServer() {
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
   interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
-  interface ServerConfig { phone?: PhoneConfig; online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[]; gpuHandoff?: boolean }
+  interface ServerConfig { phone?: PhoneConfig; online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[]; gpuHandoff?: boolean; civitaiKey?: string }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -1693,6 +1694,7 @@ async function startServer() {
   });
 
   // Workflow runner: run the user's own ComfyUI workflows (Image and Video tabs, "Workflows" mode).
+  registerWorkflowHub(app, { folder: () => workflowFolder(process.env.COMFYUI_PATH || serverConfig.comfyuiPath), objectInfo: () => nodeList(COMFYUI_URL), civitaiKey: () => process.env.CIVITAI_API_KEY || serverConfig.civitaiKey || "", setCivitaiKey: k => { serverConfig.civitaiKey = k || undefined; saveConfig(); } });
   registerComfyTool(app, {
     dataDir: process.cwd(),
     getComfyUrl: () => COMFYUI_URL,
