@@ -2,6 +2,7 @@ import React from "react";
 import { Music, Loader2, Trash2, Upload, Wand2, Crosshair } from "lucide-react";
 import { api, fileUrl, type AudioTrack, type Episode, type Project } from "./api";
 import { notify, notifyError } from "../../../lib/notify";
+import { MusicMaker } from "./MusicMaker";
 
 const field = "bg-transparent border border-neutral-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-neutral-500";
 const COLORS = ["bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-teal-500", "bg-sky-500"];
@@ -103,6 +104,7 @@ export function AudioPanel({ project, episode, onChanged, wantSubtitles }: { pro
         </button>
         <span className="opacity-55">Pick a sound file, or a video - its sound is pulled out.</span>
       </div>
+      <MusicMaker project={project} episode={episode} length={length} startAt={startOf} onChanged={onChanged} />
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,260px)_1fr]">
         <div className="space-y-2">
