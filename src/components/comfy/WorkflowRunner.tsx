@@ -23,6 +23,7 @@ const isImage = (p: string) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(p);
 const MAX_INSTANCES = 20;
 const SIZE_PRESETS: Record<Kind, [number, number, string?][]> = {
   image: [[512, 512, "SD 1.5"], [768, 768], [1024, 1024, "SDXL / Flux"], [1152, 896], [896, 1152], [1344, 768, "16:9"], [768, 1344, "9:16"], [1536, 1024, "3:2"]],
+  audio: [],
   video: [[512, 512], [768, 512, "LTX"], [512, 768], [704, 480], [832, 480, "Wan"], [480, 832], [1024, 576, "16:9"], [1280, 720, "HD"], [720, 1280, "9:16"]],
 };
 interface ToolState { workflowFolder: string; refFolder: string; destination: string; defaultDestination: string; outputFilename: string; lastWorkflow: string; comfyReachable: boolean }
@@ -143,7 +144,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
         seenFinished.current.add(r.runId);
         if (notified.current.has(r.runId)) continue;
         notified.current.add(r.runId);
-        if (r.status === "done") notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${r.workflow}`, tab: kind, thumb: r.result && isImage(r.result) ? fileUrl(r.result) : undefined });
+        if (r.status === "done") notify({ message: `${kind === "image" ? "Image" : kind === "audio" ? "Audio" : "Video"} ready - ${r.workflow}`, tab: kind, thumb: r.result && isImage(r.result) ? fileUrl(r.result) : undefined });
         else if (r.status === "failed") notifyError(`${r.workflow} failed: ${r.error || "unknown error"}`, kind);
       }
     }).catch(() => {});
@@ -239,7 +240,10 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const setRole = (r: string, x: any) => setFieldValues(s => { const n = { ...s }; for (const f of roleOf(r)) n[f.id] = x; return n; });
   const sizeW = roleOf("width")[0], sizeH = roleOf("height")[0], lengthF = roleOf("length")[0], fpsF = roleOf("fps")[0];
   const roleFields = roleOf("size");
-  const otherFields = wf ? wf.fields.filter(f => !f.role) : [];
+  const otherFields = wf ? wf.fields.filter(f => !f.role && !f.group) : [];
+  // Every other value of every node, grouped by node, for full control (folded away by default).
+  const allFields = wf ? wf.fields.filter(f => !f.role && f.group) : [];
+  const [allQuery, setAllQuery] = React.useState("");
   const setSize = (w: number, h: number) => { if (w > 0) setRole("width", w); if (h > 0) setRole("height", h); };
   const sizePresets = SIZE_PRESETS[kind];
   const curW = sizeW ? Number(val(sizeW)) : 0, curH = sizeH ? Number(val(sizeH)) : 0;
@@ -307,7 +311,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
         case "progress": setStatus("Generating"); setProgress([e.value, e.max]); setQueueNote(""); break;
         case "preview": setPreview(`data:image/jpeg;base64,${e.image_b64}`); break;
         case "log": break;
-        case "done": notified.current.add(id); setResult(e.path); setViewPath(e.path); setProgress(null); notify({ message: `${kind === "image" ? "Image" : "Video"} ready - ${wf?.name || "workflow"}`, tab: kind, thumb: isImage(e.path) ? fileUrl(e.path) : undefined }); finish(); break;
+        case "done": notified.current.add(id); setResult(e.path); setViewPath(e.path); setProgress(null); notify({ message: `${kind === "image" ? "Image" : kind === "audio" ? "Audio" : "Video"} ready - ${wf?.name || "workflow"}`, tab: kind, thumb: isImage(e.path) ? fileUrl(e.path) : undefined }); finish(); break;
         case "failed": notified.current.add(id); setRunError(e.message); notifyError(`${wf?.name || "Workflow"} failed: ${e.message}`, kind); finish(); break;
         case "cancelled": setStatus("Cancelled"); setRunError(pausedRef.current === id ? "Paused - resume it under Jobs." : "Cancelled"); finish(); break;
       }
@@ -593,6 +597,42 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                       })}
                     </div>
                     <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer pt-1"><input type="checkbox" checked={randomSeed || count > 1} disabled={count > 1} onChange={e => setRandomSeed(e.target.checked)} /> <Dices size={14} /> New random seed every run{count > 1 ? " (always on for several instances)" : ""}</label>
+                  </Section>
+                )}
+                {allFields.length > 0 && (
+                  <Section title="All settings" icon={<SlidersHorizontal size={14} />} accent={a.text} badge={`${allFields.length}`}>
+                    <input value={allQuery} onChange={e => setAllQuery(e.target.value)} placeholder="Find a setting (seed, sampler, model, seconds...)" className={`${field} !py-1.5 text-xs`} />
+                    {[...new Set(allFields.map(f => f.group!))].map(g => {
+                      const list = allFields.filter(f => f.group === g && (!allQuery.trim() || `${g} ${f.label}`.toLowerCase().includes(allQuery.trim().toLowerCase())));
+                      if (!list.length) return null;
+                      return (
+                        <div key={g} className="space-y-2 rounded-xl border border-white/5 p-2.5">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{g}</p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                            {list.map(f => {
+                              const v = val(f);
+                              const set = (x: any) => setField(f.id, x);
+                              return (
+                                <div key={f.id} className={f.kind === "text" || (f.kind === "select" && String(v).length > 22) ? "col-span-2" : ""}>
+                                  <label className={label + " !mb-1"}>{f.label}</label>
+                                  {f.kind === "select" && f.options ? (
+                                    <select value={String(v)} onChange={e => set(e.target.value)} className={field}>{(f.options.includes(String(v)) ? f.options : [String(v), ...f.options]).map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}</select>
+                                  ) : f.kind === "bool" ? (
+                                    <label className="flex items-center gap-2 text-[13px] text-zinc-300 py-1.5"><input type="checkbox" checked={!!v} onChange={e => set(e.target.checked)} /> {v ? "On" : "Off"}</label>
+                                  ) : f.kind === "int" || f.kind === "float" ? (
+                                    <input type="number" value={v ?? ""} step={f.kind === "int" ? 1 : "any"} onChange={e => set(e.target.value === "" ? "" : Number(e.target.value))} className={field} />
+                                  ) : f.kind === "text" ? (
+                                    <textarea value={v ?? ""} rows={2} onChange={e => set(e.target.value)} className={`${field} resize-y`} />
+                                  ) : (
+                                    <input value={v ?? ""} onChange={e => set(e.target.value)} className={field} />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </Section>
                 )}
                 {otherFields.length === 0 && (

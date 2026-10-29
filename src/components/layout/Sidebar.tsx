@@ -18,6 +18,7 @@ import {
   ArchiveRestore,
   ImagePlus,
   Clapperboard,
+  AudioLines,
   Pencil,
   Trash2,
   Pin,
@@ -102,6 +103,7 @@ export function Sidebar({
     { id: "vision", label: "Vision", icon: Eye },
     { id: "image", label: "Image", icon: ImagePlus },
     { id: "video", label: "Video", icon: Clapperboard },
+    { id: "audio", label: "Audio", icon: AudioLines },
     { id: "series", label: "Series", icon: Clapperboard },
     { id: "trainlora", label: "Train LoRA", icon: Palette },
     { id: "finetune", label: "FineTune LLM", icon: GraduationCap },
@@ -322,7 +324,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "ollamaclaude", "vision", "image", "video", "series", "trainlora", "finetune", "trainspeech", "models", "memory", "engine", "console", "settings"].map((tab) => (
+               {["chat", "ollamaclaude", "vision", "image", "video", "audio", "series", "trainlora", "finetune", "trainspeech", "models", "memory", "engine", "console", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

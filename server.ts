@@ -1125,7 +1125,7 @@ async function startServer() {
   // --- Gallery: generated images/videos are saved to disk (outputs/), so the
   // Image/Video tabs can show history, delete, and reveal in the file manager.
   const OUTPUTS_DIR = path.join(process.cwd(), "outputs");
-  const galleryDir = (kind: string) => path.join(OUTPUTS_DIR, kind === "video" ? "videos" : "images");
+  const galleryDir = (kind: string) => path.join(OUTPUTS_DIR, kind === "video" ? "videos" : kind === "audio" ? "audio" : "images");
   fs.mkdirSync(galleryDir("image"), { recursive: true });
   fs.mkdirSync(galleryDir("video"), { recursive: true });
 
@@ -1143,10 +1143,11 @@ async function startServer() {
   }
 
   app.get("/api/gallery", (req, res) => {
-    const kind = req.query.kind === "video" ? "video" : "image";
+    const kind = req.query.kind === "video" ? "video" : req.query.kind === "audio" ? "audio" : "image";
+    fs.mkdirSync(galleryDir(kind), { recursive: true });
     const dir = galleryDir(kind);
     const items = fs.readdirSync(dir)
-      .filter(f => (kind === "video" ? /\.(mp4|webm)$/i : /\.(png|jpg|jpeg|webp|gif)$/i).test(f))
+      .filter(f => (kind === "video" ? /\.(mp4|webm)$/i : kind === "audio" ? /\.(mp3|wav|flac|ogg|m4a|opus)$/i : /\.(png|jpg|jpeg|webp|gif)$/i).test(f))
       .map(f => ({ file: f, url: `/api/gallery/file/${kind}/${encodeURIComponent(f)}`, createdAt: fs.statSync(path.join(dir, f)).mtimeMs }))
       .sort((a, b) => b.createdAt - a.createdAt);
     res.json({ dir, items });
@@ -1696,7 +1697,7 @@ async function startServer() {
     dataDir: process.cwd(),
     getComfyUrl: () => COMFYUI_URL,
     getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
-    galleryDirs: { image: galleryDir("image"), video: galleryDir("video") },
+    galleryDirs: { image: galleryDir("image"), video: galleryDir("video"), audio: galleryDir("audio") },
   });
 
   // Jobs from before this start can no longer be running: put their scenes and stills back to pending.

@@ -256,6 +256,8 @@ export interface WorkflowField {
   role?: "width" | "height" | "length" | "fps" | "size";
   /** Frame counts must be a multiple of this plus one (LTX 8, Wan / Hunyuan 4). */
   snap?: number;
+  /** Shown under "All settings": every other value a node takes, for whoever wants full control. */
+  group?: string;
 }
 
 const SIZE_KEYS: Record<string, "width" | "height" | "length"> = { width: "width", height: "height", length: "length", num_frames: "length", video_frames: "length", frames_number: "length", frame_count: "length" };
@@ -357,6 +359,31 @@ export function describeFields(graph: Json, promptId: string | null, negativeId:
         if (!options || !options.length) continue; // without the choices a dropdown cannot be built
       }
       add(nid, key, label, kind, options, sizeRole(cls, key));
+    }
+  }
+
+  // Everything else a node in the workflow takes as a plain value (numbers, words, switches, model and sampler
+  // choices), grouped by node: the full set of controls, shown folded away under "All settings".
+  for (const nid of sortedIds(Object.keys(graph))) {
+    if (scope && !scope.has(nid)) continue;
+    const node = graph[nid];
+    const cls = String(node.class_type || "");
+    if (/^(LoadImage|LoadVideo|LoadAudio|VHS_Load)/i.test(cls) || /Note$/i.test(cls)) continue;
+    const spec = ((objectInfo || {})[cls] || {}).input || {};
+    const group = `${(node._meta || {}).title || cls} (${nid})`;
+    for (const [key, value] of Object.entries<any>(node.inputs || {})) {
+      const id = `${nid}.${key}`;
+      if (value === null || value === undefined || isLink(value) || fields.some(x => x.id === id)) continue;
+      if (nid === promptId && textKeys(node).includes(key)) continue;
+      const entry = spec.required?.[key] || spec.optional?.[key];
+      let kind: string, options: string[] | undefined;
+      const combo = entry && (Array.isArray(entry[0]) ? entry[0] : entry[0] === "COMBO" && Array.isArray(entry[1]?.options) ? entry[1].options : null);
+      if (combo && combo.length) { kind = "select"; options = combo.map(String); }
+      else if (typeof value === "boolean") kind = "bool";
+      else if (typeof value === "number") kind = Number.isInteger(value) && entry?.[0] !== "FLOAT" ? "int" : "float";
+      else if (typeof value === "string") kind = value.length > 60 || /text|prompt|lyrics|tags|caption/i.test(key) ? "text" : "string";
+      else continue;
+      fields.push({ id, node: nid, input: key, label: key.replace(/_/g, " "), kind, value, ...(options ? { options } : {}), group });
     }
   }
   return fields;

@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 
-export type Kind = "image" | "video";
+export type Kind = "image" | "video" | "audio";
 export interface Overrides { prompt_in?: string; output?: string }
 
 export interface ToolConfig {
@@ -19,7 +19,7 @@ export interface ToolConfig {
 
 const DEFAULTS: ToolConfig = {
   workflowFolder: "", refFolder: "", promptFileDir: "",
-  destination: { image: "", video: "" }, outputFilename: { image: "", video: "" }, lastWorkflow: { image: "", video: "" },
+  destination: { image: "", video: "", audio: "" }, outputFilename: { image: "", video: "", audio: "" }, lastWorkflow: { image: "", video: "", audio: "" },
   workflowRoles: {},
 };
 

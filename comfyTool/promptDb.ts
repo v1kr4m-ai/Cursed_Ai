@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { DatabaseSync } from "node:sqlite";
 
-export type Kind = "image" | "video";
+export type Kind = "image" | "video" | "audio";
 export interface PromptEntry {
   id: number; kind: Kind; mode: string; workflow: string; prompt: string; negative: string;
   params: Record<string, any>; file: string; driveUrl: string; favorite: boolean; notes: string; tags: string; createdAt: number; updatedAt: number;

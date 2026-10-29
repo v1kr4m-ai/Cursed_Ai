@@ -24,6 +24,7 @@ import { ImageGeneratorView } from "./components/tools/ImageGenerator";
 import { VideoGeneratorView } from "./components/tools/VideoGenerator";
 import { SeriesStudioView } from "./components/tools/series/SeriesStudio";
 import { SeriesNotifier } from "./components/tools/series/SeriesNotifier";
+import { StudioPage } from "./components/comfy/StudioPage";
 import { ComfyConsolePip } from "./components/tools/ComfyConsolePip";
 import { OllamaClaudeView } from "./components/oclaude/OllamaClaudeView";
 import { TrainLoraView } from "./components/train/TrainLoraView";
@@ -506,6 +507,7 @@ export default function App() {
             {/* Kept mounted (just hidden) so a running image/video job keeps going and can announce itself when you are on another page. */}
             <div className={activeTab === "image" ? "contents" : "hidden"}><ImageGeneratorView modelId={selectedModelId} /></div>
             <div className={activeTab === "video" ? "contents" : "hidden"}><VideoGeneratorView modelId={selectedModelId} /></div>
+            <div className={activeTab === "audio" ? "contents" : "hidden"}><StudioPage kind="audio" modelId={selectedModelId} /></div>
             {/* Kept mounted so a running Claude Code task keeps streaming while you look at another page. */}
             <div className={activeTab === "ollamaclaude" ? "contents" : "hidden"}><OllamaClaudeView settings={settings} /></div>
             <div className={activeTab === "trainlora" ? "contents" : "hidden"}><TrainLoraView /></div>

@@ -18,15 +18,15 @@ export function StudioToolbar({ kind, icon, title, source, onSource, mode, onMod
   return (
     <div className="shrink-0 flex items-center gap-x-4 gap-y-2 flex-wrap">
       <h1 className="text-lg font-black text-white tracking-tighter flex items-center gap-2.5 mr-1">{icon}{title}</h1>
-      <div className="inline-flex gap-1 p-1 rounded-xl bg-white/5">
+      {kind !== "audio" && <div className="inline-flex gap-1 p-1 rounded-xl bg-white/5">
         <button onClick={() => onSource("local")} className={seg(source === "local")}><HardDrive size={12} /> Local</button>
         <button onClick={() => onSource("cloud")} className={seg(source === "cloud")}><Globe size={12} /> Cloud</button>
-      </div>
-      {source === "local" && <ModeSwitch kind={kind} mode={mode} onChange={onMode} />}
-      {source === "cloud" && <GeminiKeyButton tab={kind} accent={kind === "image" ? "pink" : "orange"} />}
+      </div>}
+      {source === "local" && kind !== "audio" && <ModeSwitch kind={kind} mode={mode} onChange={onMode} />}
+      {source === "cloud" && kind !== "audio" && <GeminiKeyButton tab={kind} accent={kind === "image" ? "pink" : "orange"} />}
       <button onClick={onHistory} title="Everything generated so far" className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors ${showHistory ? a.chip : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}><History size={12} /> History</button>
       <GoogleDriveButton />
-      <div className="ml-auto">{source === "local" ? <ComfyStatus /> : <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Needs internet</span>}</div>
+      <div className="ml-auto">{source === "local" || kind === "audio" ? <ComfyStatus /> : <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Needs internet</span>}</div>
     </div>
   );
 }

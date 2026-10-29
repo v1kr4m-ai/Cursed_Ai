@@ -103,7 +103,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     return [path.join(root, "ComfyUI", "user", "default", "workflows"), path.join(root, "user", "default", "workflows")].find(p => fs.existsSync(p)) || "";
   };
   const destinationFor = (kind: Kind) => store.loadConfig().destination[kind] || opts.galleryDirs[kind];
-  const isKind = (v: any): v is Kind => v === "image" || v === "video";
+  const isKind = (v: any): v is Kind => v === "image" || v === "video" || v === "audio";
 
   const workflowDict = (w: WorkflowInfo) => ({ ...w });
 

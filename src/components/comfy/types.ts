@@ -1,6 +1,6 @@
-export type Kind = "image" | "video";
+export type Kind = "image" | "video" | "audio";
 
-export interface WorkflowField { id: string; node: string; input: string; label: string; kind: string; value: any; options?: string[]; role?: "width" | "height" | "length" | "fps" | "size"; snap?: number }
+export interface WorkflowField { id: string; node: string; input: string; label: string; kind: string; value: any; options?: string[]; role?: "width" | "height" | "length" | "fps" | "size"; snap?: number; group?: string }
 export interface NodeChoice { id: string; label: string }
 
 /** What the server works out about one workflow file (see comfyTool/registry.ts). */
@@ -38,6 +38,7 @@ export interface RunRow {
 /** Colours per tab: Image is pink, Video is orange (same palette as the rest of the Image / Video pages). */
 export const ACCENT = {
   image: { solid: "bg-pink-600 hover:bg-pink-500", ring: "focus:ring-pink-500", text: "text-pink-400", soft: "bg-pink-500/10 border-pink-500/25", bar: "bg-pink-500", chip: "bg-pink-600 text-white", border: "border-pink-500/40" },
+  audio: { solid: "bg-teal-600 hover:bg-teal-500", ring: "focus:ring-teal-500", text: "text-teal-400", soft: "bg-teal-500/10 border-teal-500/25", bar: "bg-teal-500", chip: "bg-teal-600 text-white", border: "border-teal-500/40" },
   video: { solid: "bg-orange-600 hover:bg-orange-500", ring: "focus:ring-orange-500", text: "text-orange-400", soft: "bg-orange-500/10 border-orange-500/25", bar: "bg-orange-500", chip: "bg-orange-600 text-white", border: "border-orange-500/40" },
 } as const;
 

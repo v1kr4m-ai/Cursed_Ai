@@ -1,5 +1,5 @@
 import React from "react";
-import { Clapperboard, ImagePlus } from "lucide-react";
+import { AudioLines, Clapperboard, ImagePlus } from "lucide-react";
 import { DirectStudio } from "./DirectStudio";
 import { StudioToolbar, Source } from "./StudioToolbar";
 import { useLocalMode } from "./ModeSwitch";
@@ -22,11 +22,11 @@ export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) 
     window.addEventListener("cursed:studio", onReq);
     return () => window.removeEventListener("cursed:studio", onReq);
   }, [kind]);
-  const icon = kind === "image" ? <ImagePlus className="text-pink-500" size={24} /> : <Clapperboard className="text-orange-500" size={24} />;
+  const icon = kind === "image" ? <ImagePlus className="text-pink-500" size={24} /> : kind === "audio" ? <AudioLines className="text-teal-500" size={24} /> : <Clapperboard className="text-orange-500" size={24} />;
   const toolbar = (
-    <StudioToolbar kind={kind} icon={icon} title={kind === "image" ? "Image Studio" : "Video Studio"} source={source} onSource={setSource} mode={mode} onMode={setMode} showHistory={showHistory} onHistory={() => setShowHistory(h => !h)} />
+    <StudioToolbar kind={kind} icon={icon} title={kind === "image" ? "Image Studio" : kind === "audio" ? "Audio Studio" : "Video Studio"} source={source} onSource={setSource} mode={mode} onMode={setMode} showHistory={showHistory} onHistory={() => setShowHistory(h => !h)} />
   );
-  const workflows = source === "local" && mode === "workflows";
+  const workflows = kind === "audio" || (source === "local" && mode === "workflows");
   return (
     <div className="flex-1 bg-transparent p-4 h-full overflow-hidden">
       <div className="max-w-[1600px] mx-auto h-full">

@@ -14,7 +14,7 @@ interface Item {
  * when you click anywhere else; every item has delete + open-file-location.
  * Videos play inline.
  */
-export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video"; refreshKey: number }) {
+export function GalleryHistory({ kind, refreshKey }: { kind: "image" | "video" | "audio"; refreshKey: number }) {
   const [items, setItems] = React.useState<Item[]>([]);
   const [dir, setDir] = React.useState("");
   const [open, setOpen] = React.useState<Item | null>(null);

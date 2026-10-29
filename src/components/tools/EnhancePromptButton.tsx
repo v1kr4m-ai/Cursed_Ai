@@ -13,7 +13,7 @@ const BRIEF = {
  * Sparkle button that rewrites a short idea into a rich generation prompt using the chat model that is selected
  * (runs locally). The previous text can be restored with the undo arrow.
  */
-export function EnhancePromptButton({ kind, prompt, onPrompt, modelId, tab, className = "" }: { kind: "image" | "video"; prompt: string; onPrompt: (t: string) => void; modelId?: string; tab: string; className?: string }) {
+export function EnhancePromptButton({ kind, prompt, onPrompt, modelId, tab, className = "" }: { kind: "image" | "video" | "audio"; prompt: string; onPrompt: (t: string) => void; modelId?: string; tab: string; className?: string }) {
   const [busy, setBusy] = React.useState(false);
   const [previous, setPrevious] = React.useState<string | null>(null);
   const abort = React.useRef<AbortController | null>(null);

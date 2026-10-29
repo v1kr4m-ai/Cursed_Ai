@@ -3,7 +3,7 @@
  * "create an image of a red fox", "make a video of waves on a beach and generate it", "open the video generator",
  * and, once a studio is open, "generate it" / "go ahead".
  */
-export type StudioKind = "image" | "video";
+export type StudioKind = "image" | "video" | "audio";
 export interface StudioRequest { kind: StudioKind; prompt?: string; generate?: boolean }
 export interface StudioIntent { request: StudioRequest; reply: string }
 
