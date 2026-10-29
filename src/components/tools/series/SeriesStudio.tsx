@@ -1,5 +1,6 @@
 import React from "react";
 import { WorkflowPicker, WorkflowCheck } from "./WorkflowPicker";
+import { ComfyStatus } from "../ComfyStatus";
 import { motion, AnimatePresence } from "motion/react";
 import { Moon, Sun, ArrowUpRight, LayoutDashboard, Clapperboard, Plus, Trash2, ArrowLeft, Settings2, Loader2, CircleDot, MessagesSquare, LayoutGrid, Scissors, Film, Sparkles, Archive, ArchiveRestore, Download, Pencil, GitMerge } from "lucide-react";
 import { api, fileUrl, type Project, type ProjectSummary, type SeriesTemplate } from "./api";
@@ -390,7 +391,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                   <Clapperboard size={18} className="opacity-70" />
                   <span className="text-sm font-medium tracking-tight">Series Studio</span>
                   <span className="hidden sm:flex items-center gap-1 text-xs opacity-55"><Sparkles size={11} /> idea to finished episodes</span>
-                  <span className="ml-auto">{themeButton}</span>
+                  <span className="ml-auto flex items-center gap-3"><span className="rounded-full sd-frost border px-3 py-1"><ComfyStatus compact /></span>{themeButton}</span>
                 </header>
                 <div className="flex-1 min-h-0"><SeriesHome onOpen={open} /></div>
               </>
@@ -436,6 +437,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                       );
                     })}
                   </nav>
+                  <span className="rounded-full sd-frost border px-3 py-1"><ComfyStatus compact /></span>
                   {themeButton}
                 </header>
 
