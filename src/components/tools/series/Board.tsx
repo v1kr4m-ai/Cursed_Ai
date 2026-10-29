@@ -3,6 +3,7 @@ import { adoptPlannedPeople, ensureCast, peopleOf, placeCast } from "./people";
 import { syncPhotos } from "./photos";
 import { markSeen, useSeen } from "./seen";
 import { itemLabel } from "./groups";
+import { RenderQueue } from "./RenderQueue";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
@@ -432,6 +433,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
           <button onClick={async () => { for (const ep of project.episodes) if (ep.scenes.some(sc => sc.status !== "done") || ep.refs.some(r => r.status !== "done" && (r.prompt || "").trim())) { try { await api.generateEpisode(project.id, ep.id); } catch { break; } } }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500" title="Queue every picture and clip that is still missing, episode by episode">Render everything missing</button>
         )}
       </div>
+      <RenderQueue project={project} />
       {onAddEpisode && (
         <button onClick={onAddEpisode} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-700/60 bg-emerald-600/10 px-3 py-2.5 text-sm text-emerald-200 transition hover:bg-emerald-600/20">
           <Plus size={15} /> Add the next episode (episode {(project.episodes[project.episodes.length - 1]?.number || 0) + 1})

@@ -46,22 +46,24 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
   /** One sequential queue per project, plus the SSE listeners watching it. */
   const queues = new Map<string, Promise<void>>();
   const running = new Map<string, Job>();
+  /** Jobs waiting behind the one on the GPU, so a cancel can drop them too. */
+  const queued = new Map<string, Job[]>();
   const listeners = new Map<string, Set<express.Response>>();
 
-  const emit = (projectId: string, event: Json) => {
-    const payload = `data: ${JSON.stringify(event)}\n\n`;
   /** Watchers of every series at once (the app's notifier), told which series and title each event is about. */
   const everyone = new Set<express.Response>();
   /** Clips and pictures finished or failed since this project's queue last went quiet, for one "all done" notice. */
   const batch = new Map<string, { done: number; failed: number }>();
 
+  const emit = (projectId: string, event: Json) => {
+    const payload = `data: ${JSON.stringify(event)}\n\n`;
     for (const res of listeners.get(projectId) || []) res.write(payload);
-  };
-
     if (everyone.size) {
       const wide = `data: ${JSON.stringify({ ...event, projectId, title: store.get(projectId)?.title || "" })}\n\n`;
       for (const res of everyone) res.write(wide);
     }
+  };
+
   const bad = (res: express.Response, code: number, message: string) => res.status(code).json({ error: message });
 
   const findScene = (p: Project, sceneId: string) => {
@@ -105,6 +107,39 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     }
   }
 
+  // Nodes whose width/height/length really set the generated picture or clip, and the nodes that
+  // carry the frame rate. Same split the workflow registry uses.
+  const SIZE_CLASS = /Latent|ToVideo|FirstLastFrame|CameraEmbedding/i;
+  const FPS_CLASS = /CreateVideo|VideoCombine|SaveAnimated|SaveVideo|LTXVConditioning/i;
+  const LENGTH_KEYS = ["length", "num_frames", "video_frames", "frames_number", "frame_count"];
+
+  /**
+   * Write the project's size and duration straight into the graph.
+   *
+   * `fieldValues` alone is not enough: in a workflow where width/height/length are fed by other
+   * nodes (a resolution picker, a seconds-to-frames expression) they are links rather than
+   * widgets, so the registry never exposes them as fields and the workflow's own defaults win
+   * silently - which is how a vertical 7s series once rendered as a 1152x640 5s clip. Setting a
+   * literal here replaces the link, and the now-unused upstream nodes are pruned before the run.
+   */
+  function forceSizeAndLength(graph: Json, size: { width: number; height: number; length?: number; fps?: number }) {
+    for (const node of Object.values<any>(graph)) {
+      const cls = String(node?.class_type || "");
+      const inputs = node?.inputs;
+      if (!inputs) continue;
+      if (SIZE_CLASS.test(cls)) {
+        if ("width" in inputs) inputs.width = size.width;
+        if ("height" in inputs) inputs.height = size.height;
+        if (size.length !== undefined) {
+          for (const key of LENGTH_KEYS) if (key in inputs) inputs[key] = size.length;
+        }
+      }
+      if (size.fps !== undefined && FPS_CLASS.test(cls)) {
+        for (const key of ["fps", "frame_rate"]) if (key in inputs) inputs[key] = size.fps;
+      }
+    }
+  }
+
   /**
    * Map the project's size / duration / steps onto whichever inputs this particular workflow
    * exposes. Workflows name these differently, so match on the role the registry worked out
@@ -134,28 +169,73 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     return { info, graph };
   }
 
+  /** What each queued job does, the projects whose queue is paused, and the workers running now. */
+  const works = new WeakMap<Job, (job: Job) => Promise<void>>();
+  const paused = new Set<string>();
+  const pumping = new Set<string>();
+  /** How long pictures and clips took lately (ms), for the queue's time estimates. */
+  const took: Record<"ref" | "scene", number[]> = { ref: [], scene: [] };
+
   /** Queue one job behind whatever this project is already doing. */
   function enqueue(projectId: string, job: Omit<Job, "abort" | "promptId" | "progress">, work: (job: Job) => Promise<void>) {
     const full: Job = { ...job, abort: new AbortController(), promptId: null, progress: null };
-    const prev = queues.get(projectId) || Promise.resolve();
-    const next = prev.then(async () => {
-      if (full.abort.signal.aborted) return;
+    works.set(full, work);
+    queued.set(projectId, [...(queued.get(projectId) || []), full]);
+    mark(projectId, full.targetId, full.kind, { status: "queued", error: null });
+    void pump(projectId);
+    return full;
+  }
+
+  /** Runs this project's queue one job at a time, in the list's current order, until it is empty or paused. */
+  async function pump(projectId: string) {
+    if (pumping.has(projectId)) return;
+    pumping.add(projectId);
+    try {
+      for (;;) {
+        if (paused.has(projectId)) break;
+        const list = queued.get(projectId) || [];
+        const full = list.shift();
+        if (!full) break;
+        queued.set(projectId, list);
+        if (full.abort.signal.aborted) continue;
+        await runJob(projectId, full);
+      }
+    } finally { pumping.delete(projectId); }
+  }
+
+  async function runJob(projectId: string, full: Job) {
+    const work = works.get(full)!;
+    const t0 = Date.now();
+    {
       running.set(projectId, full);
       emit(projectId, { type: "started", targetId: full.targetId, kind: full.kind, label: full.label });
       try {
+        await freeOllamaForComfy(); // the render needs the GPU: Ollama lets go of its models first
         await work(full);
+        const b = batch.get(projectId) || { done: 0, failed: 0 };
+        batch.set(projectId, { ...b, done: b.done + 1 });
+        took[full.kind] = [...took[full.kind], Date.now() - t0].slice(-8);
       } catch (e: any) {
         const message = full.abort.signal.aborted ? "Cancelled." : (e?.message || String(e));
         mark(projectId, full.targetId, full.kind, { status: full.abort.signal.aborted ? "pending" : "failed", error: message });
         emit(projectId, { type: "failed", targetId: full.targetId, error: message });
+        if (!full.abort.signal.aborted) {
+          const b = batch.get(projectId) || { done: 0, failed: 0 };
+          batch.set(projectId, { ...b, failed: b.failed + 1 });
+        }
       } finally {
         if (running.get(projectId) === full) running.delete(projectId);
+        // Nothing left waiting: say how the run went, once.
+        if (!(queued.get(projectId) || []).length && !running.has(projectId)) {
+          const b = batch.get(projectId);
+          batch.delete(projectId);
+          if (b && (b.done || b.failed)) emit(projectId, { type: "idle", done: b.done, failed: b.failed });
+        }
       }
-    });
-    queues.set(projectId, next);
-    mark(projectId, full.targetId, full.kind, { status: "queued", error: null });
-    return full;
+    }
   }
+
+  const avg = (l: number[]) => (l.length ? Math.round(l.reduce((a, x) => a + x, 0) / l.length) : null);
 
   function runEventSink(projectId: string, job: Job): (e: RunEvent) => void {
     return event => {
@@ -178,28 +258,16 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         scenes: p.episodes.reduce((n, e) => n + e.scenes.length, 0),
         scenesDone: p.episodes.reduce((n, e) => n + e.scenes.filter(s => s.status === "done").length, 0),
         exports: p.episodes.filter(e => e.exportPath).length,
+        archived: !!p.archived,
       })),
       root: store.root,
-        await freeOllamaForComfy(); // the render needs the GPU: Ollama lets go of its models first
     });
-        const b = batch.get(projectId) || { done: 0, failed: 0 };
-        batch.set(projectId, { ...b, done: b.done + 1 });
   });
 
   app.post("/api/series/projects", (req, res) => {
     const title = String(req.body?.title || "").trim();
-        if (!full.abort.signal.aborted) {
-          const b = batch.get(projectId) || { done: 0, failed: 0 };
-          batch.set(projectId, { ...b, failed: b.failed + 1 });
-        }
     if (!title) return bad(res, 400, "Give the project a title.");
     res.json(store.create(title));
-        // Nothing left waiting: say how the run went, once.
-        if (!(queued.get(projectId) || []).length && !running.has(projectId)) {
-          const b = batch.get(projectId);
-          batch.delete(projectId);
-          if (b && (b.done || b.failed)) emit(projectId, { type: "idle", done: b.done, failed: b.failed });
-        }
   });
 
   app.get("/api/series/projects/:id", (req, res) => {
@@ -219,6 +287,15 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     res.json({ ok: true });
   });
 
+  /** Live job events for every series, for notifications. */
+  app.get("/api/series/events", (req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.write(": open\n\n");
+    everyone.add(res);
+    const beat = setInterval(() => res.write(": beat\n\n"), 25_000);
+    req.on("close", () => { clearInterval(beat); everyone.delete(res); });
+  });
+
   /** Live job events for one project. */
   app.get("/api/series/projects/:id/events", (req, res) => {
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
@@ -228,7 +305,6 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     listeners.get(id)!.add(res);
     const beat = setInterval(() => res.write(": beat\n\n"), 25_000);
     req.on("close", () => { clearInterval(beat); listeners.get(id)?.delete(res); });
-        archived: !!p.archived,
   });
 
   // ------------------------------------------------------------------ assets
@@ -257,15 +333,6 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       const content = await extractUpload(name, req.body);
       const text = content.kind === "text"
         ? content.text
-  /** Live job events for every series, for notifications. */
-  app.get("/api/series/events", (req, res) => {
-    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-    res.write(": open\n\n");
-    everyone.add(res);
-    const beat = setInterval(() => res.write(": beat\n\n"), 25_000);
-    req.on("close", () => { clearInterval(beat); everyone.delete(res); });
-  });
-
         : content.cells.map(c => String(c ?? "")).filter(Boolean).join("\n");
       if (!text.trim()) return bad(res, 422, "No text could be read out of that file.");
       const source: Source = { id: newId(), name, text: text.trim(), addedAt: new Date().toISOString() };
@@ -335,6 +402,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       name: String(req.query.label || path.basename(original, ext)).slice(0, 60),
       role: req.query.role === "style" || req.query.kind === "style" || req.query.kind === "palette" ? "style" : "character",
       kind: refKindInfo(String(req.query.kind || ""))?.id,
+      person: String(req.query.person || "").trim().slice(0, 60) || undefined,
       prompt: "",
       negative: "",
       seed: Math.floor(Math.random() * 100000),
@@ -372,7 +440,6 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       res.json({ comfyUp: r.ok, comfyUrl: url });
     } catch {
       res.json({ comfyUp: false, comfyUrl: url });
-      person: String(req.query.person || "").trim().slice(0, 60) || undefined,
     }
   });
 
@@ -382,6 +449,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     return enqueue(p.id, { projectId: p.id, targetId: ref.id, kind: "ref", label: `${ep.title}: ${ref.name}` }, async job => {
       const fresh = store.get(p.id)!;
       const { info, graph } = await prepare(fresh, "ref");
+      forceSizeAndLength(graph, { width: fresh.settings.width, height: fresh.settings.height });
       mark(p.id, ref.id, "ref", { status: "running", error: null });
 
       const dest = uniqueDestination(path.join(store.refsDir(fresh), `${ref.name.replace(/[^\w.-]+/g, "_")}.png`));
@@ -403,6 +471,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         onSubmitted: id => { job.promptId = id; },
       });
 
+      // A cancelled run returns without a file; it must not be recorded as finished.
+      if (job.abort.signal.aborted || !fs.existsSync(dest)) throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a picture.");
       mark(p.id, ref.id, "ref", { status: "done", file: dest, error: null });
       emit(p.id, { type: "finished", targetId: ref.id, kind: "ref", file: dest });
     });
@@ -420,6 +490,12 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       if (missing.length) throw new Error(`Render these references first: ${missing.map(r => r.name).join(", ")}`);
 
       const { info, graph } = await prepare(fresh, "scene");
+      forceSizeAndLength(graph, {
+        width: fresh.settings.width,
+        height: fresh.settings.height,
+        length: snapFrames(fresh.settings.seconds, fresh.settings.fps),
+        fps: fresh.settings.fps,
+      });
       if (refs.length > info.refImageNodeIds.length) {
         throw new Error(`This scene uses ${refs.length} references but the workflow only has ${info.refImageNodeIds.length} slots.`);
       }
@@ -441,8 +517,6 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "scene"),
         randomizeSeed: false,
-      // A cancelled run returns without a file; it must not be recorded as finished.
-      if (job.abort.signal.aborted || !fs.existsSync(dest)) throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a picture.");
         destFolder: path.dirname(dest),
         destFilename: path.basename(dest),
         onEvent: runEventSink(p.id, job),
@@ -450,6 +524,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         onSubmitted: id => { job.promptId = id; mark(p.id, scene.id, "scene", { promptId: id }); },
       });
 
+      if (job.abort.signal.aborted || !fs.existsSync(dest)) throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a clip.");
       const duration = await probeDuration(dest);
       mark(p.id, scene.id, "scene", { status: "done", clipPath: dest, durationS: duration, error: null });
       emit(p.id, { type: "finished", targetId: scene.id, kind: "scene", file: dest });
@@ -461,6 +536,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     if (!p) return bad(res, 404, "No such project.");
     const found = findRef(p, req.params.refId);
     if (!found) return bad(res, 404, "No such reference.");
+    // An attached photo has no prompt: rendering it would replace the photo with a made-up picture.
+    if (found.ref.file && !found.ref.prompt.trim()) return bad(res, 409, "This is an attached picture. It is used as it is and is never rendered.");
     generateRef(p, found.ep, found.ref);
     res.json({ ok: true });
   });
@@ -490,13 +567,64 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     res.json({ queued: refs.length + scenes.length });
   });
 
-  app.post("/api/series/projects/:id/cancel", async (req, res) => {
-    const job = running.get(req.params.id);
-    if (!job) return res.json({ ok: true, note: "Nothing running." });
-    job.abort.abort();
-      if (job.abort.signal.aborted || !fs.existsSync(dest)) throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a clip.");
-    if (job.promptId) await cancelPrompt(opts.getComfyUrl(), job.promptId).catch(() => {});
+  /** The render queue: what runs now, what waits (in order), whether it is paused, and how long a picture or clip took lately. */
+  app.get("/api/series/projects/:id/queue", (req, res) => {
+    const id = req.params.id;
+    const r = running.get(id);
+    res.json({
+      paused: paused.has(id),
+      running: r ? { targetId: r.targetId, kind: r.kind, label: r.label, progress: r.progress } : null,
+      waiting: (queued.get(id) || []).filter(j => !j.abort.signal.aborted).map(j => ({ targetId: j.targetId, kind: j.kind, label: j.label })),
+      avgMs: { ref: avg(took.ref), scene: avg(took.scene) },
+    });
+  });
+
+  /** Move a waiting job: up, down, to the top or to the bottom. */
+  app.post("/api/series/projects/:id/queue/move", (req, res) => {
+    const id = req.params.id, list = [...(queued.get(id) || [])];
+    const i = list.findIndex(j => j.targetId === req.body?.targetId);
+    if (i < 0) return bad(res, 404, "That job is not waiting in the queue.");
+    const [job] = list.splice(i, 1);
+    const to = String(req.body?.to || "");
+    const at = to === "top" ? 0 : to === "bottom" ? list.length : to === "up" ? Math.max(0, i - 1) : Math.min(list.length, i + 1);
+    list.splice(at, 0, job);
+    queued.set(id, list);
     res.json({ ok: true });
+  });
+
+  /** Take one waiting job out of the queue (the picture or clip goes back to "not rendered"). */
+  app.post("/api/series/projects/:id/queue/remove", (req, res) => {
+    const id = req.params.id, list = queued.get(id) || [];
+    const job = list.find(j => j.targetId === req.body?.targetId);
+    if (!job) return bad(res, 404, "That job is not waiting in the queue.");
+    job.abort.abort();
+    queued.set(id, list.filter(j => j !== job));
+    mark(id, job.targetId, job.kind, { status: "pending", error: null });
+    res.json({ ok: true });
+  });
+
+  /** Pause the queue (the job on the GPU finishes, nothing new starts) or carry on. */
+  app.post("/api/series/projects/:id/queue/pause", (req, res) => {
+    const id = req.params.id;
+    if (req.body?.paused) paused.add(id); else { paused.delete(id); void pump(id); }
+    res.json({ ok: true, paused: paused.has(id) });
+  });
+
+  /** Stop the job on the GPU and drop everything still waiting behind it for this project. */
+  app.post("/api/series/projects/:id/cancel", async (req, res) => {
+    const id = req.params.id;
+    const waiting = queued.get(id) || [];
+    for (const job of waiting) {
+      job.abort.abort();
+      mark(id, job.targetId, job.kind, { status: "pending", error: null });
+    }
+    queued.set(id, []);
+
+    const job = running.get(id);
+    if (!job) return res.json({ ok: true, cancelled: waiting.length, note: waiting.length ? "Queue cleared." : "Nothing running." });
+    job.abort.abort();
+    if (job.promptId) await cancelPrompt(opts.getComfyUrl(), job.promptId).catch(() => {});
+    res.json({ ok: true, cancelled: waiting.length + 1 });
   });
 
   // ---------------------------------------------------------------- assemble
@@ -507,8 +635,6 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     const ep = p.episodes.find(e => e.id === req.params.episodeId);
     if (!ep) return bad(res, 404, "No such episode.");
 
-    // An attached photo has no prompt: rendering it would replace the photo with a made-up picture.
-    if (found.ref.file && !found.ref.prompt.trim()) return bad(res, 409, "This is an attached picture. It is used as it is and is never rendered.");
     const ordered = [...ep.scenes].sort((a, b) => a.number - b.number);
     const unfinished = ordered.filter(s => s.status !== "done" || !s.clipPath);
     if (unfinished.length) return bad(res, 400, `${unfinished.length} scene(s) still need rendering.`);
@@ -558,9 +684,13 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
           id: prior?.id || newId(),
           name: String(r.name || "reference"),
           role: r.role === "style" ? "style" : "character",
+          kind: refKindInfo(String(r.kind || prior?.kind || ""))?.id,
+          person: String(r.person || prior?.person || "").trim().slice(0, 60) || undefined,
+          skip: typeof r.skip === "boolean" ? r.skip : prior?.skip,
           prompt: String(r.prompt || ""),
           negative: String(r.negative || ""),
           seed: Number(r.seed) || Math.floor(Math.random() * 100000),
+          fromRefIds: prior?.fromRefIds,
           file: prior?.file || null,
           status: (prior?.status as Status) || "pending",
           error: null,
@@ -573,6 +703,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         title: String(raw.title || `Episode ${number}`),
         era: String(raw.era || ""),
         hookOut: String(raw.hookOut || ""),
+        group: String(raw.group || old?.group || "").trim() || undefined,
         refs,
         exportPath: old?.exportPath || null,
         scenes: (Array.isArray(raw.scenes) ? raw.scenes : []).map((s: Json, j: number): Scene => {
@@ -588,6 +719,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
             shot: String(s.shot || ""),
             textCard: String(s.textCard || ""),
             refIds: refIds.length ? refIds : refs.filter(r => r.role === "style").map(r => r.id),
+            cast: Array.isArray(s.cast) ? s.cast.map((n: unknown) => String(n).trim()).filter(Boolean) : prior?.cast,
             seed: Number(s.seed) || Math.floor(Math.random() * 100000),
             promptText: prior?.promptText || "",
             promptEdited: prior?.promptEdited || false,
@@ -607,10 +739,3 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
 
   return { store };
 }
-          fromRefIds: prior?.fromRefIds,
-          kind: refKindInfo(String(r.kind || prior?.kind || ""))?.id,
-          kind: refKindInfo(String(r.kind || prior?.kind || ""))?.id,
-          person: String(r.person || prior?.person || "").trim().slice(0, 60) || undefined,
-          skip: typeof r.skip === "boolean" ? r.skip : prior?.skip,
-            cast: Array.isArray(s.cast) ? s.cast.map((n: unknown) => String(n).trim()).filter(Boolean) : prior?.cast,
-        group: String(raw.group || old?.group || "").trim() || undefined,
