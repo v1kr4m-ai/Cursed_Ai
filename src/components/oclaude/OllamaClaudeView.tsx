@@ -11,6 +11,7 @@ import { CodeBlock } from "../chat/ChatWindow";
 import { changedFiles } from "./events";
 import { ToolGroup } from "./ToolCard";
 import { useDictation } from "../../services/useDictation";
+import { askModel } from "../tools/series/api";
 import { APP_COMMANDS, Chip, QuickBar } from "./QuickBar";
 import { StatusRings } from "./StatusRings";
 import { applyEvent, emptyLive, loadSessions, newSession, noticeItem, saveSessions, titleFrom, toMarkdown, userItem, type Live, type Session } from "./events";
@@ -242,11 +243,44 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
   // Files dropped on the message box are saved in the session folder (attachments/) and mentioned with @, so Claude reads them.
   const [dragging, setDragging] = React.useState(false);
   const [sessionQuery, setSessionQuery] = React.useState("");
-  const [git, setGit] = React.useState<{ repo: boolean; branch?: string; files?: number; added?: number; removed?: number; untracked?: number } | null>(null);
+  const [git, setGit] = React.useState<{ repo: boolean; branch?: string; files?: number; added?: number; removed?: number; untracked?: number; ahead?: number; changes?: { path: string; status: string }[] } | null>(null);
+  const [gitTick, setGitTick] = React.useState(0);
   React.useEffect(() => {
     if (!session?.cwd || running) return;
     fetch("/api/oclaude/git?cwd=" + encodeURIComponent(session.cwd)).then(r => r.json()).then(setGit).catch(() => setGit(null));
-  }, [session?.cwd, running]);
+  }, [session?.cwd, running, gitTick]);
+  // Git: see a file's change, have the model write the message, commit and push.
+  const [diffOf, setDiffOf] = React.useState<{ path: string; text: string } | null>(null);
+  const [commitMsg, setCommitMsg] = React.useState("");
+  const [gitBusy, setGitBusy] = React.useState("");
+  const gitPost = async (url: string, body: any) => { const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Git failed."); return d; };
+  const showDiff = async (file: string) => { try { const d = await (await fetch(`/api/oclaude/git/diff?cwd=${encodeURIComponent(session.cwd)}&path=${encodeURIComponent(file)}`)).json(); setDiffOf({ path: file, text: d.diff || "(no change)" }); } catch { setDiffOf({ path: file, text: "Could not read the change." }); } };
+  const writeMessage = async () => {
+    if (!model || !git?.changes?.length) return;
+    setGitBusy("Writing the message...");
+    try {
+      const parts: string[] = [];
+      for (const c of git.changes.slice(0, 12)) {
+        const d = await (await fetch(`/api/oclaude/git/diff?cwd=${encodeURIComponent(session.cwd)}&path=${encodeURIComponent(c.path)}`)).json().catch(() => ({ diff: "" }));
+        parts.push(`--- ${c.path} (${c.status})\n${String(d.diff || "").slice(0, 2500)}`);
+        if (parts.join("\n").length > 14000) break;
+      }
+      const text = await askModel([{ role: "user", content: `Write a git commit message for these changes. First line: a short summary in the imperative (under 72 characters). Then a blank line and up to 5 short lines saying what changed and why. Reply with the message only, no quotes, no code fences.\n\n${parts.join("\n\n")}` }], `ollama:${model}`, undefined, undefined, 0.3);
+      setCommitMsg(text.replace(/^```[a-z]*\n?|```$/g, "").replace(/<think>[\s\S]*?<\/think>/g, "").trim());
+    } catch (e: any) { notifyError(e?.message || String(e), "ollamaclaude"); } finally { setGitBusy(""); }
+  };
+  const commit = async () => {
+    if (!commitMsg.trim()) return;
+    setGitBusy("Committing...");
+    try { const d = await gitPost("/api/oclaude/git/commit", { cwd: session.cwd, message: commitMsg }); setCommitMsg(""); notify({ message: d.out || "Committed", tab: "ollamaclaude" }); setGitTick(t => t + 1); }
+    catch (e: any) { notifyError(e?.message || String(e), "ollamaclaude"); } finally { setGitBusy(""); }
+  };
+  const push = async () => {
+    if (!confirm(`Push ${git?.branch || "this branch"} to its remote? Others with access to the repository will see the commits.`)) return;
+    setGitBusy("Pushing...");
+    try { const d = await gitPost("/api/oclaude/git/push", { cwd: session.cwd }); notify({ message: d.out || "Pushed", tab: "ollamaclaude" }); setGitTick(t => t + 1); }
+    catch (e: any) { notifyError(e?.message || String(e), "ollamaclaude"); } finally { setGitBusy(""); }
+  };
   const dictation = useDictation(input, setInput);
   const [history, setHistory] = React.useState<{ id: string; title: string; updatedAt: number }[]>([]);
   const loadHistory = React.useCallback(() => {
@@ -663,6 +697,14 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
         </div>
       </div>
       </div>
+      {diffOf && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={() => setDiffOf(null)}>
+          <div className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5"><span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-200">{diffOf.path}</span><button onClick={() => setDiffOf(null)} className="rounded p-1 text-zinc-400 hover:text-white"><X size={15} /></button></div>
+            <pre className="min-h-0 flex-1 overflow-auto p-4 font-mono text-[11px] leading-relaxed">{diffOf.text.split("\n").map((l, i) => <div key={i} className={l.startsWith("+") && !l.startsWith("+++") ? "bg-emerald-500/10 text-emerald-300" : l.startsWith("-") && !l.startsWith("---") ? "bg-rose-500/10 text-rose-300" : l.startsWith("@@") ? "text-sky-400" : "text-zinc-400"}>{l || " "}</div>)}</pre>
+          </div>
+        </div>
+      )}
       {prefs.rightPane && (
         <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/5 p-3 lg:flex">
           <div className={card}>
@@ -689,7 +731,33 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
               <span className="font-medium text-zinc-200">Changes</span>
               {git?.repo && <span className="text-[12px]"><span className="text-emerald-400">+{(git.added || 0).toLocaleString()}</span> <span className="text-rose-400">-{(git.removed || 0).toLocaleString()}</span>{git.untracked ? <span className="text-zinc-500"> +{git.untracked} new</span> : null}</span>}
             </div>
-            {files.length === 0 ? <p className="mt-1.5 text-[11px] text-zinc-500">Claude has not changed any file in this session.</p> : (
+            {git?.repo && (
+              <div className="mt-2 space-y-1.5">
+                {(git.changes || []).length > 0 && (
+                  <div className="max-h-44 space-y-0.5 overflow-y-auto">
+                    {(git.changes || []).map(c => (
+                      <button key={c.path} onClick={() => showDiff(c.path)} title="See the change" className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-[11px] hover:bg-white/5">
+                        <span className={cn("w-3 shrink-0 font-mono font-bold", c.status === "?" || c.status === "A" ? "text-emerald-400" : c.status === "D" ? "text-rose-400" : "text-amber-300")}>{c.status === "?" ? "+" : c.status}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-zinc-300" title={c.path}>{c.path}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {(git.changes || []).length > 0 ? (
+                  <>
+                    <textarea value={commitMsg} onChange={e => setCommitMsg(e.target.value)} rows={3} placeholder="Commit message" className="w-full resize-none rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500/40 focus:outline-none" />
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={writeMessage} disabled={!!gitBusy || !model} title={`Let ${model || "the model"} write the message from the changes`} className="rounded-lg bg-white/5 px-2 py-1 text-[11px] text-zinc-300 hover:bg-white/10 disabled:opacity-40">Write it for me</button>
+                      <button onClick={commit} disabled={!!gitBusy || !commitMsg.trim()} title="Commit every change shown above" className="rounded-lg bg-violet-600/80 px-2 py-1 text-[11px] text-white hover:bg-violet-500 disabled:opacity-40">Commit all</button>
+                    </div>
+                  </>
+                ) : <p className="text-[11px] text-zinc-500">Nothing to commit.</p>}
+                {!!git.ahead && <button onClick={push} disabled={!!gitBusy} className="w-full rounded-lg border border-white/10 px-2 py-1 text-[11px] text-zinc-200 hover:bg-white/5 disabled:opacity-40">Push {git.ahead} commit{git.ahead === 1 ? "" : "s"}</button>}
+                {gitBusy && <p className="flex items-center gap-1.5 text-[11px] text-zinc-400"><Loader2 size={11} className="animate-spin" />{gitBusy}</p>}
+              </div>
+            )}
+            <p className="mt-3 text-[11px] font-medium text-zinc-400">Files Claude changed in this session</p>
+            {files.length === 0 ? <p className="mt-1 text-[11px] text-zinc-500">None yet.</p> : (
               <div className="mt-2 space-y-1 text-xs">
                 {files.map(f => (
                   <div key={f.path} className="flex items-center gap-2">

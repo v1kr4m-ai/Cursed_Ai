@@ -12,6 +12,7 @@ import path from "path";
 import { spawn, execFile, type ChildProcess } from "child_process";
 import { registerOllamaRestart } from "./ollamaRestart";
 import { listFolders, listSessions, readSession } from "./oclaudeHistory";
+import { parsePorcelain } from "./gitStatus";
 
 export interface OllamaClaudeOptions { ollamaUrl: string }
 
@@ -267,7 +268,9 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
       const stat = (await git(["diff", "--shortstat", "HEAD"])) || "";
       const num = (re: RegExp) => Number(re.exec(stat)?.[1] || 0);
       const untracked = ((await git(["ls-files", "--others", "--exclude-standard"])) || "").split(/\r?\n/).filter(Boolean).length;
-      res.json({ repo: true, branch, files: num(/(\d+) files? changed/), added: num(/(\d+) insertions?/), removed: num(/(\d+) deletions?/), untracked });
+      const changes = parsePorcelain((await git(["status", "--porcelain=v1", "-uall"])) || "").slice(0, 300);
+      const ahead = Number(((await git(["rev-list", "--count", "@{u}..HEAD"])) || "0").trim()) || 0;
+      res.json({ repo: true, branch, files: num(/(\d+) files? changed/), added: num(/(\d+) insertions?/), removed: num(/(\d+) deletions?/), untracked, changes, ahead });
     })().catch(e => res.json({ repo: false, error: String(e) }));
   });
 
@@ -277,6 +280,40 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
     if (!cwd) return res.json({ sessions: [] });
     res.json({ sessions: listSessions(cwd) });
   });
+  /** One file's change, as a diff (a new file shows its whole text). */
+  app.get("/api/oclaude/git/diff", async (req, res) => {
+    const cwd = String(req.query.cwd || ""), file = String(req.query.path || "");
+    if (!cwd || !file || path.isAbsolute(file) || file.split(/[\\/]/).includes("..")) return res.status(400).json({ error: "Bad path." });
+    const run = (args: string[]) => new Promise<string>(ok => execFile("git", ["-C", cwd, ...args], { timeout: 10000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (_e, out) => ok(String(out || ""))));
+    let diff = await run(["diff", "HEAD", "--", file]);
+    if (!diff.trim()) { try { diff = fs.readFileSync(path.join(cwd, file), "utf8").split(/\r?\n/).map(l => "+" + l).join("\n"); } catch { diff = ""; } }
+    res.json({ diff: diff.slice(0, 200_000) });
+  });
+
+  /** Commit what is changed (everything, or the files given), with the message given. */
+  app.post("/api/oclaude/git/commit", async (req, res) => {
+    const cwd = String(req.body?.cwd || ""), message = String(req.body?.message || "").trim();
+    const files: string[] = Array.isArray(req.body?.files) ? req.body.files.filter((f: any) => typeof f === "string" && !path.isAbsolute(f) && !f.split(/[\\/]/).includes("..")) : [];
+    if (!cwd || !message) return res.status(400).json({ error: "Write a commit message first." });
+    const run = (args: string[]) => new Promise<{ ok: boolean; out: string }>(ok => execFile("git", ["-C", cwd, ...args], { timeout: 60000, windowsHide: true }, (e, out, err) => ok({ ok: !e, out: String(out || "") + String(err || "") })));
+    const add = await run(files.length ? ["add", "--", ...files] : ["add", "-A"]);
+    if (!add.ok) return res.status(500).json({ error: add.out.trim() || "git add failed." });
+    const c = await run(["commit", "-m", message]);
+    if (!c.ok) return res.status(500).json({ error: c.out.trim() || "git commit failed." });
+    res.json({ ok: true, out: c.out.trim().split(/\r?\n/)[0] });
+  });
+
+  /** Push the branch to its remote. */
+  app.post("/api/oclaude/git/push", (req, res) => {
+    const cwd = String(req.body?.cwd || "");
+    if (!cwd) return res.status(400).json({ error: "No folder." });
+    execFile("git", ["-C", cwd, "push"], { timeout: 120000, windowsHide: true }, (e, out, err) => {
+      const text = (String(out || "") + String(err || "")).trim();
+      if (e) return res.status(500).json({ error: text || "git push failed." });
+      res.json({ ok: true, out: text.split(/\r?\n/).slice(-2).join(" ") });
+    });
+  });
+
   /** Every folder with Claude Code sessions, for the folder tree. */
   app.get("/api/oclaude/folders", (_req, res) => res.json({ folders: listFolders() }));
   app.get("/api/oclaude/history/:id", (req, res) => {
