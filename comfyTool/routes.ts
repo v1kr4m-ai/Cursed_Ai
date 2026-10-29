@@ -339,6 +339,26 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     return out;
   };
 
+  /**
+   * The workflow that makes a picture 4x larger: "Upscale - Quick 4x upscale" next to the workflow that was run (or in
+   * its API_FORMAT / parent folder), else any small picture-in, picture-out workflow built on an upscale model.
+   */
+  function findUpscaler(near: string, oi: Json | null): string | null {
+    const dir = path.dirname(near);
+    const dirs = [...new Set([dir, path.join(dir, "API_FORMAT"), path.dirname(dir), path.join(path.dirname(dir), "API_FORMAT")])].filter(d => fs.existsSync(d));
+    const files = dirs.flatMap(d => fs.readdirSync(d).filter(f => f.toLowerCase().endsWith(".json")).map(f => path.join(d, f)));
+    const named = files.find(f => /quick 4x upscale/i.test(path.basename(f)));
+    if (named) return named;
+    for (const f of files) {
+      try {
+        const { graph } = loadApiWorkflow(f, oi);
+        const types = Object.values(graph).map((n: any) => n.class_type);
+        if (types.length <= 6 && types.includes("ImageUpscaleWithModel") && types.includes("LoadImage") && types.includes("SaveImage")) return f;
+      } catch { /* unreadable */ }
+    }
+    return null;
+  }
+
   function startRun(b: Json): string {
     const kind: Kind = b.kind;
     const runId = crypto.randomUUID().replace(/-/g, "");
@@ -362,6 +382,9 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
         const refPaths = [...(b.refImagePaths || []), ...(b.refVideoPaths || []), ...(b.refAudioPaths || [])];
         const destFilename = (typeof b.outputFilename === "string" && b.outputFilename.trim()) || autoOutputName(refPaths, state.workflow);
         await freeOllamaForComfy();
+        // "Upscale 4x" on a picture: hold the first result back, run the upscaler on it, and report the larger one.
+        const upscaling = kind === "image" && b.upscale4x === true;
+        let firstDone: RunEvent | null = null;
         await runWorkflow({
           baseUrl: opts.getComfyUrl(), workflow: graph, info, promptText: String(b.promptText || ""),
           refImagePaths: b.refImagePaths || [], refVideoPaths: b.refVideoPaths || [], refAudioPaths: b.refAudioPaths || [],
@@ -369,6 +392,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
           destFolder, destFilename, signal: state.abort.signal,
           onSubmitted: id => { state.promptId = id; },
           onEvent: e => {
+            if (e.type === "done" && upscaling && !firstDone) { firstDone = e; push(state, { type: "status", text: "Upscaling 4x..." }); return; }
             if (e.type === "done") {
               store.addHistory(e.path, state.workflow, String(b.promptText || ""), kind);
               try { promptDb.add({ kind, mode: "workflow", workflow: state.workflow, prompt: String(b.promptText || ""), params: { ...summarise(info, b.fieldValues), fieldValues: b.fieldValues || {} }, file: e.path }); driveAutosave(e.path); } catch { /* the library must never break a run */ }
@@ -376,6 +400,32 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
             push(state, e);
           },
         });
+        if (upscaling && firstDone) {
+          const up = findUpscaler(b.workflowPath, oi);
+          let reported = false;
+          const doneOriginal = () => { if (reported) return; reported = true; store.addHistory(firstDone!.path, state.workflow, String(b.promptText || ""), kind); push(state, firstDone!); };
+          if (!up) { push(state, { type: "status", text: "No 4x upscale workflow found (add one named \"Upscale - Quick 4x upscale\"), so the picture is not upscaled." }); doneOriginal(); }
+          else {
+            try {
+              const upInfo = loadWorkflowInfo(up, c.workflowRoles[up], oi);
+              const { graph: upGraph } = loadApiWorkflow(up, oi);
+              const base = path.basename(firstDone.path, path.extname(firstDone.path));
+              await runWorkflow({
+                baseUrl: opts.getComfyUrl(), workflow: upGraph, info: upInfo, promptText: "", refImagePaths: [firstDone.path], refVideoPaths: [], refAudioPaths: [],
+                fieldValues: {}, randomizeSeed: false, destFolder: path.dirname(firstDone.path), destFilename: base + "_4x", signal: state.abort.signal,
+                onSubmitted: id => { state.promptId = id; },
+                onEvent: e => {
+                  if (e.type === "done") {
+                    store.addHistory(e.path, state.workflow + " (4x)", String(b.promptText || ""), kind);
+                    try { promptDb.add({ kind, mode: "workflow", workflow: state.workflow, prompt: String(b.promptText || ""), params: { ...summarise(info, b.fieldValues), fieldValues: b.fieldValues || {}, upscaled: "4x", original: firstDone!.path }, file: e.path }); driveAutosave(e.path); } catch { /* the library must never break a run */ }
+                  }
+                  if (e.type !== "failed") push(state, e);
+                  else { push(state, { type: "status", text: "The 4x upscale failed (" + (e.message || "error") + "); here is the picture as made." }); doneOriginal(); }
+                },
+              });
+            } catch (err: any) { push(state, { type: "status", text: "The 4x upscale could not run: " + (err?.message || err) }); doneOriginal(); }
+          }
+        }
       } catch (e: any) {
         push(state, { type: "failed", message: e?.message || String(e) });
       } finally {

@@ -51,6 +51,9 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const [prompt, setPrompt] = React.useState("");
   const [fieldValues, setFieldValues] = React.useState<Record<string, any>>({});
   const [randomSeed, setRandomSeed] = React.useState(true);
+  // Pictures only: make the result 4x larger with the quick upscale workflow afterwards. Off unless ticked; the choice is remembered.
+  const [upscale4x, setUpscale4x] = React.useState(() => { try { return localStorage.getItem("cursed.tool.upscale4x") === "1"; } catch { return false; } });
+  const pickUpscale = (v: boolean) => { setUpscale4x(v); try { localStorage.setItem("cursed.tool.upscale4x", v ? "1" : "0"); } catch { /* storage blocked */ } };
   const [dest, setDest] = React.useState("");
   const [fileName, setFileName] = React.useState("");
   const [picker, setPicker] = React.useState<null | "workflows" | "refs" | "dest">(null);
@@ -272,7 +275,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
       let first = !busy;
       for (const t of jobs) {
         const { runId: id } = await postJson("/api/tool/run", {
-          kind, workflowPath: wf.path, promptText: t, fieldValues, randomizeSeed: randomSeed || many,
+          kind, workflowPath: wf.path, promptText: t, fieldValues, randomizeSeed: randomSeed || many, upscale4x: kind === "image" && upscale4x && !/upscale/i.test(wf.name),
           refImagePaths: effSlots.image, refVideoPaths: effSlots.video, refAudioPaths: effSlots.audio,
           outputFolder: dest, outputFilename: many ? "" : fileName,
         });
@@ -605,6 +608,11 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                     </div></div>
                   <div><label className={label + " !mb-1"}>File name (optional)</label>
                     <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="Automatic" className={field} /></div>
+                  {kind === "image" && !/upscale/i.test(wf?.name || "") && (
+                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer pt-1" title="After the picture is made, the 'Upscale - Quick 4x upscale' workflow makes it 4x larger. Both files are kept; the larger one is shown.">
+                      <input type="checkbox" checked={upscale4x} onChange={e => pickUpscale(e.target.checked)} /> Upscale the result 4x
+                    </label>
+                  )}
                 </Section>
               </>
             )}
