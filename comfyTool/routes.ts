@@ -501,6 +501,27 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   });
 
   // The jobs this app started (waiting, running, recent) with their place in ComfyUI's own queue.
+  /** The state of particular runs (for a set started together, such as an expression sheet). */
+  app.get("/api/tool/run-state", (req, res) => {
+    const ids = String(req.query.ids || "").split(",").filter(Boolean).slice(0, 100);
+    res.json({ runs: ids.map(id => { const s = runs.get(id); return s ? { runId: id, status: s.status, result: s.result, error: s.error } : { runId: id, status: "unknown", result: null, error: "not found" }; }) });
+  });
+
+  /** Saves a picture made in the page (a PNG data URL, such as a contact sheet) into the image output folder. */
+  app.post("/api/tool/save-image", (req, res) => {
+    const m = /^data:image\/(png|jpeg);base64,(.+)$/.exec(String(req.body?.dataUrl || ""));
+    if (!m) return res.status(400).json({ error: "Not a picture." });
+    const folder = (typeof req.body?.folder === "string" && req.body.folder.trim()) || destinationFor("image");
+    try {
+      fs.mkdirSync(folder, { recursive: true });
+      const base = String(req.body?.name || "sheet").replace(/[<>:"/\\|?*]+/g, "-").slice(0, 100) || "sheet";
+      const dest = uniqueDestination(path.join(folder, `${base}.${m[1] === "jpeg" ? "jpg" : "png"}`));
+      fs.writeFileSync(dest, Buffer.from(m[2], "base64"));
+      store.addHistory(dest, "Expression sheet", "", "image");
+      res.json({ ok: true, path: dest });
+    } catch (e: any) { res.status(500).json({ error: e?.message || String(e) }); }
+  });
+
   app.get("/api/tool/runs", async (req, res) => {
     const kind = isKind(req.query.kind) ? req.query.kind : null;
     let runningIds = new Set<string>(), pendingIds: string[] = [], reachable = true;

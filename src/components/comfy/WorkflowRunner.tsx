@@ -325,6 +325,50 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const applyExpression = (preset: Record<string, number>) => {
     for (const f of exprFields) setField(f.id, f.input in preset ? preset[f.input] : (EXPRESSION_KEYS[f.input].neutral ?? 0));
   };
+  // Expression sheet: one picture per ticked preset from the same photo, then one labelled sheet of them all.
+  const [sheetMode, setSheetMode] = React.useState(false);
+  const [sheetPick, setSheetPick] = React.useState<string[]>([]);
+  const [sheetNote, setSheetNote] = React.useState("");
+  const makeSheet = async () => {
+    if (!wf || !canRunBase || !sheetPick.length) return;
+    const base = (fileName || "expressions").replace(/\.[a-z0-9]+$/i, "");
+    setSheetNote(`Queuing ${sheetPick.length} expressions...`);
+    try {
+      const ids: { name: string; id: string }[] = [];
+      for (const name of sheetPick) {
+        const preset = EXPRESSION_PRESETS[name];
+        const values = { ...fieldValues };
+        for (const f of exprFields) values[f.id] = f.input in preset ? preset[f.input] : (EXPRESSION_KEYS[f.input].neutral ?? 0);
+        const { runId } = await postJson("/api/tool/run", { kind, workflowPath: wf.path, promptText: prompt, fieldValues: values, randomizeSeed: false, refImagePaths: effSlots.image, refVideoPaths: effSlots.video, refAudioPaths: effSlots.audio, outputFolder: dest, outputFilename: `${base}_${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` });
+        ids.push({ name, id: runId });
+      }
+      let states: any[] = [];
+      for (let i = 0; i < 1200; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        states = (await api<{ runs: any[] }>(`/api/tool/run-state?ids=${ids.map(x => x.id).join(",")}`)).runs;
+        const left = states.filter(x => !["done", "failed", "cancelled", "unknown"].includes(x.status)).length;
+        setSheetNote(`Making expressions... ${ids.length - left}/${ids.length}`);
+        if (!left) break;
+      }
+      const made = ids.map(x => ({ name: x.name, path: states.find(st => st.runId === x.id)?.result as string | null })).filter(x => x.path);
+      if (!made.length) throw new Error("None of the expressions were made.");
+      // Draw the sheet: a grid of the pictures with each expression's name under it.
+      const imgs = await Promise.all(made.map(m => new Promise<HTMLImageElement>((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = fileUrl(m.path!); })));
+      const cols = Math.ceil(Math.sqrt(made.length)), rows = Math.ceil(made.length / cols);
+      const cw = 512, ch = Math.round(cw * imgs[0].naturalHeight / imgs[0].naturalWidth), lh = 44;
+      const c = document.createElement("canvas"); c.width = cols * cw; c.height = rows * (ch + lh);
+      const g = c.getContext("2d")!; g.fillStyle = "#111"; g.fillRect(0, 0, c.width, c.height);
+      imgs.forEach((im, i) => {
+        const x = (i % cols) * cw, y = Math.floor(i / cols) * (ch + lh);
+        g.drawImage(im, x, y, cw, ch);
+        g.fillStyle = "#eee"; g.font = "bold 24px Segoe UI, Arial"; g.textAlign = "center"; g.fillText(made[i].name, x + cw / 2, y + ch + 30);
+      });
+      const saved = await postJson("/api/tool/save-image", { dataUrl: c.toDataURL("image/png"), name: `${base}_sheet`, folder: dest });
+      setResult(saved.path); setViewPath(saved.path); loadHistory();
+      setSheetNote(`Sheet saved with ${made.length} expressions${made.length < ids.length ? ` (${ids.length - made.length} failed)` : ""}.`);
+      notify({ message: `Expression sheet ready (${made.length})`, tab: kind });
+    } catch (e: any) { setSheetNote(""); setRunError(e?.message || String(e)); }
+  };
   // The prompt node's other text boxes (a song's lyrics next to its style tags) are inputs in their own right:
   // each gets its own box under the prompt instead of hiding among the settings.
   const promptTexts = wf ? wf.fields.filter(f => !f.role && !f.group && f.kind === "text" && f.node === wf.promptNodeId) : [];
@@ -568,18 +612,22 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
             {wf && wf.isRunnable && (
               <>
                 {/* Prompt */}
-                <Section title={promptTitle} icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
-                  <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} placeholder={promptHint} textLabel={promptKey ? promptTitle : undefined} />
-                </Section>
+                {/* No prompt box for a workflow that takes no prompt (a face expression editor, an upscaler...). */}
+                {wf.needsPrompt && (
+                  <Section title={promptTitle} icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
+                    <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} placeholder={promptHint} textLabel={promptKey ? promptTitle : undefined} />
+                  </Section>
+                )}
                 {exprNode && (
                   <Section title="Expression" icon={<Smile size={14} />} accent={a.text} badge={`${exprFields.length} controls`} defaultOpen>
                     {EXPRESSION_GROUPS.map(g => (
                       <div key={g.name}>
                         <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-zinc-600">{g.name}</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(g.presets).map(([name, preset]) => (
-                            <button key={name} onClick={() => applyExpression(preset)} className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/10">{name}</button>
-                          ))}
+                          {Object.entries(g.presets).map(([name, preset]) => {
+                            const on = sheetMode && sheetPick.includes(name);
+                            return <button key={name} onClick={() => (sheetMode ? setSheetPick(l => (l.includes(name) ? l.filter(x => x !== name) : [...l, name])) : applyExpression(preset))} className={`rounded-lg px-2.5 py-1 text-[11px] font-bold ${on ? a.chip : "bg-white/5 text-zinc-300 hover:bg-white/10"}`}>{name}</button>;
+                          })}
                           {g.name === "Happy" && <button onClick={() => { const names = Object.keys(EXPRESSION_PRESETS); applyExpression(EXPRESSION_PRESETS[names[Math.floor(Math.random() * names.length)]]); }} title="A random preset" className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/10"><Dices size={11} className="mr-1 inline" />Random</button>}
                         </div>
                       </div>
@@ -596,7 +644,16 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                         );
                       })}
                     </div>
-                    <p className="text-[10px] text-zinc-500">This workflow does not read the prompt: the face follows these controls. Pick a preset, then fine-tune.</p>
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/5 p-2">
+                      <label className="flex items-center gap-1.5 text-[11px] text-zinc-300"><input type="checkbox" checked={sheetMode} onChange={e => { setSheetMode(e.target.checked); setSheetNote(""); }} />Expression sheet: tick several presets</label>
+                      {sheetMode && <>
+                        <button onClick={() => setSheetPick(Object.keys(EXPRESSION_PRESETS))} className="text-[10px] text-zinc-500 underline hover:text-zinc-300">all</button>
+                        <button onClick={() => setSheetPick([])} className="text-[10px] text-zinc-500 underline hover:text-zinc-300">none</button>
+                        <button onClick={makeSheet} disabled={!sheetPick.length || !canRunBase || !!sheetNote && !/saved/i.test(sheetNote)} className={`ml-auto rounded-lg px-2.5 py-1 text-[11px] font-bold text-white disabled:opacity-40 ${a.solid}`}>Make {sheetPick.length || ""} and a sheet</button>
+                      </>}
+                      {sheetNote && <p className="w-full text-[11px] text-zinc-400">{sheetNote}</p>}
+                    </div>
+                    <p className="text-[10px] text-zinc-500">This workflow does not read the prompt: the face follows these controls. Pick a preset, then fine-tune - or tick several for a sheet of expressions (one picture each, then one sheet with all of them).</p>
                   </Section>
                 )}
                 {promptTexts.map(f => (
