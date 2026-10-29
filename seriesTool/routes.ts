@@ -8,6 +8,7 @@
  * Jobs for one project run one at a time: ComfyUI renders serially anyway, and a single queue
  * keeps the UI's idea of "what is running" honest.
  */
+import { freeOllamaForComfy } from "../gpuHandoff";
 import express from "express";
 import fs from "fs";
 import path from "path";
@@ -179,6 +180,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         exports: p.episodes.filter(e => e.exportPath).length,
       })),
       root: store.root,
+        await freeOllamaForComfy(); // the render needs the GPU: Ollama lets go of its models first
     });
         const b = batch.get(projectId) || { done: 0, failed: 0 };
         batch.set(projectId, { ...b, done: b.done + 1 });

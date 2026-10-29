@@ -10,6 +10,7 @@ import { registerBackup } from "./seriesTool/backup";
 import { registerMerge } from "./seriesTool/merge";
 import { registerComfyLogs } from "./comfyLogs";
 import { directLaunch, tailLines } from "./comfyLaunch";
+import { freeComfyForLLM, handoffEnabled, setHandoff } from "./gpuHandoff";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
@@ -210,11 +211,12 @@ async function startServer() {
   // override for where GGUF files live, instead of a hardcoded "models/".
   const CONFIG_FILE = path.join(process.cwd(), "config.json");
   interface EngineSettings { gpuLayers: "auto" | "max" | number; flashAttention: boolean; batchSize: number | null; useMmap: boolean; useMlock: boolean; keepAliveMinutes: number; threads: number | null; contextSize: number | null; preloadModel: boolean; autoStartComfy: boolean; comfyUrl: string | null; lastModel: string | null }
-  interface ServerConfig { phone?: PhoneConfig; online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[] }
+  interface ServerConfig { phone?: PhoneConfig; online?: OnlineStore; engine?: Partial<EngineSettings>; geminiKey?: string; modelsDir?: string; comfyuiPath?: string; lmstudioPath?: string; train?: TrainConfig; customDirs?: string[]; disabledSources?: string[]; gpuHandoff?: boolean }
   let serverConfig: ServerConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
       serverConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+      setHandoff(serverConfig.gpuHandoff !== false);
     } catch (e) {
       console.error("[Config] Failed to load config.json", e);
     }
@@ -565,6 +567,10 @@ async function startServer() {
   });
 
   // API Route: Real Local LLM Inference with Streaming
+  /** Automatic GPU hand-off between ComfyUI and the offline language models (on by default). */
+  app.get("/api/gpu-handoff", (_req, res) => res.json({ on: handoffEnabled }));
+  app.post("/api/gpu-handoff", (req, res) => { setHandoff(req.body?.on !== false); serverConfig.gpuHandoff = req.body?.on !== false; saveConfig(); res.json({ on: handoffEnabled }); });
+
   app.post("/api/chat", async (req, res) => {
     const { messages, prompt, model: modelName, options } = req.body;
 
@@ -614,11 +620,13 @@ async function startServer() {
       const ext = /^(ollama|lmstudio):(.+)$/.exec(modelName || "");
       if (ext) {
         console.log(`[External] Chat via ${ext[1]}: ${ext[2]}`);
+        await freeComfyForLLM(COMFYUI_URL);
         await proxyExternalChat(ext[1] as "ollama" | "lmstudio", ext[2], messages, options, res, abortController.signal);
         res.write(`data: [DONE]\n\n`);
         res.end();
         return;
       }
+      await freeComfyForLLM(COMFYUI_URL);
       await loadModel(modelName || "phi-3-mini");
 
       let finalPrompt = "";

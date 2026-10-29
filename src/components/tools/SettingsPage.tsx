@@ -51,6 +51,14 @@ function Row({ title, note, children, stack }: { title: string; note?: React.Rea
     </div>
   );
 }
+/** Automatic GPU hand-off between ComfyUI and the offline language models (a server setting, saved in config.json). */
+function GpuHandoffSwitch() {
+  const [on, setOn] = React.useState<boolean | null>(null);
+  React.useEffect(() => { fetch("/api/gpu-handoff").then(r => r.json()).then(d => setOn(!!d.on)).catch(() => setOn(null)); }, []);
+  const set = (v: boolean) => { setOn(v); fetch("/api/gpu-handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: v }) }).catch(() => {}); };
+  return on === null ? <span className="text-xs text-zinc-500">Restart the app to use this.</span> : <Switch on={on} onChange={set} />;
+}
+
 function Switch({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return <button disabled={disabled} onClick={() => onChange(!on)} role="switch" aria-checked={on} className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-40 ${on ? "bg-violet-600" : "bg-white/10"}`}><span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${on ? "left-6" : "left-1"}`} /></button>;
 }
@@ -250,6 +258,10 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
         <Row title="Windows notifications" note={perm === "denied" ? "Blocked for this window - allow notifications for it in Windows settings." : perm === "unsupported" ? "Not supported here." : "Also notify when the window is in the background."}><Switch on={settings.desktopNotify && perm === "granted"} onChange={desktop} /></Row>
       </Group>) },
 
+    { id: "gpu", cat: "integrations", title: "Share the GPU", keywords: "gpu vram memory comfyui ollama free unload share hand off out of memory", node: (
+      <Group title="Share the GPU between ComfyUI and language models">
+        <Row title="Hand the GPU over automatically" note="Before an offline language model answers, ComfyUI unloads its models; before ComfyUI renders, Ollama unloads its models. Each side loads again when it is next used, so a GPU too small for both never runs out of memory. Turn off if your GPU fits both at once."><GpuHandoffSwitch /></Row>
+      </Group>) },
     { id: "online", cat: "integrations", title: "Online models", keywords: "chatgpt openai gpt claude anthropic grok xai perplexity openrouter mistral groq deepseek api key online cloud provider model address url", node: (
       <Group title="Online models (ChatGPT, Claude, Grok, Perplexity...)" note="Optional. Add a key for a service and its models appear in the model picker, marked online. Chats with an online model are sent to that company; local models never leave this PC. Each service's address and model list can be changed, and any OpenAI-compatible service can be added.">
         <OnlineModelsSettings />

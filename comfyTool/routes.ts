@@ -1,4 +1,5 @@
 /** HTTP API of the workflow runner (everything under /api/tool). See README "Workflow runner". */
+import { freeOllamaForComfy } from "../gpuHandoff";
 import express from "express";
 import fs from "fs";
 import path from "path";
@@ -360,6 +361,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
         const destFolder = (typeof b.outputFolder === "string" && b.outputFolder.trim()) || destinationFor(kind);
         const refPaths = [...(b.refImagePaths || []), ...(b.refVideoPaths || []), ...(b.refAudioPaths || [])];
         const destFilename = (typeof b.outputFilename === "string" && b.outputFilename.trim()) || autoOutputName(refPaths, state.workflow);
+        await freeOllamaForComfy();
         await runWorkflow({
           baseUrl: opts.getComfyUrl(), workflow: graph, info, promptText: String(b.promptText || ""),
           refImagePaths: b.refImagePaths || [], refVideoPaths: b.refVideoPaths || [], refAudioPaths: b.refAudioPaths || [],
