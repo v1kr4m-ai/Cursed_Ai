@@ -73,6 +73,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const pausedRef = React.useRef<string | null>(null);
   const [viewPath, setViewPath] = React.useState<string | null>(null);
   const [activeSetup, setActiveSetup] = React.useState<string | null>(null);
+  const [setupMenu, setSetupMenu] = React.useState(false);
   // Saved setups: a named snapshot of workflow + prompt + settings + references + destination. Kept in this browser.
   interface Setup { name: string; workflow: string; prompt: string; fieldValues: Record<string, any>; randomSeed: boolean; dest: string; fileName: string; slots?: Record<"image" | "video" | "audio", string[]> }
   const setupKey = `cursed.comfySetups.${kind}`;
@@ -417,6 +418,27 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                 {workflows.length > 1 && <SortMenu options={[{ key: "name", label: "Name A → Z" }, { key: "name-desc", label: "Name Z → A" }, { key: "recent", label: "Recently used" }, { key: "ready", label: "Ready to run first" }, { key: "refs", label: "Fewest references first" }]} sort={sort} onSort={setSort} search={filter} onSearch={setFilter} />}
                 {folder && <button onClick={() => loadWorkflows(folder, selected)} disabled={loading} title="Reload the folder" className={iconBtn}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>}
                 <button onClick={() => chooseFolder("workflows")} title={folder ? `Change folder (${folder})` : "Choose the workflow folder"} className={iconBtn}><FolderOpen size={14} /></button>
+                {workflows.length > 0 && (
+                  <div className="relative">
+                    <button onClick={() => setSetupMenu(o => !o)} title={activeSetup ? `Setup: ${activeSetup}` : "Saved setups (workflow, prompt and settings)"} className={`${iconBtn} ${activeSetup ? a.text : ""}`}><Bookmark size={14} /></button>
+                    {setupMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setSetupMenu(false)} />
+                        <div className="absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-2xl border border-white/15 bg-zinc-950 py-1 shadow-2xl">
+                          <button onClick={() => { setSetupMenu(false); saveSetup(); }} disabled={!wf} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-zinc-200 hover:bg-white/5 disabled:opacity-40"><Save size={13} />Save current as a setup</button>
+                          {setups.length > 0 && <div className="my-1 border-t border-white/5" />}
+                          {setups.map(x => (
+                            <div key={x.name} className="group flex items-center hover:bg-white/5">
+                              <button onClick={() => { setSetupMenu(false); loadSetup(x.name); }} className={`min-w-0 flex-1 truncate px-3 py-2 text-left text-xs ${x.name === activeSetup ? a.text : "text-zinc-300"}`}>{x.name}</button>
+                              <button onClick={() => { deleteSetup(x.name); if (x.name === activeSetup) setActiveSetup(null); }} title={`Delete setup "${x.name}"`} className="hidden px-2 text-zinc-500 hover:text-red-400 group-hover:block"><Trash2 size={12} /></button>
+                            </div>
+                          ))}
+                          {!setups.length && <p className="px-3 py-2 text-[11px] text-zinc-500">No saved setups yet.</p>}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
               {!folder && <p className="text-[11px] text-zinc-500">Pick the folder where your ComfyUI workflows are saved.</p>}
               {folder && !loading && workflows.length === 0 && !loadError && <p className="text-[11px] text-zinc-500">No {kind} workflows here.{counts.image || counts.video ? ` This folder has ${counts.image || 0} image / ${counts.video || 0} video workflows.` : ""}</p>}
@@ -440,17 +462,6 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                         {wf.outputCandidates.map(c => <option key={c.id} value={c.id} className="bg-zinc-900">{c.label}</option>)}
                       </select></div>
                   )}
-                </div>
-              )}
-              {workflows.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Bookmark size={13} className={a.text} />
-                  <select value="" onChange={e => e.target.value && loadSetup(e.target.value)} className={`${field} !py-1.5 flex-1 cursor-pointer`}>
-                    <option value="" className="bg-zinc-900">{activeSetup ? `Setup: ${activeSetup}` : setups.length ? "Load a saved setup..." : "No saved setups yet"}</option>
-                    {setups.map(x => <option key={x.name} value={x.name} className="bg-zinc-900">{x.name}</option>)}
-                  </select>
-                  <button onClick={saveSetup} disabled={!wf} title="Save the current workflow, prompt and settings as a setup" className={iconBtn}><Save size={14} /></button>
-                  {activeSetup && <button onClick={() => { deleteSetup(activeSetup); setActiveSetup(null); }} title={`Delete setup "${activeSetup}"`} className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>}
                 </div>
               )}
             </Section>
