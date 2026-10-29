@@ -1,6 +1,6 @@
 import React from "react";
 import { ReorderGroup, Reorderable } from "../ui/Reorder";
-import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2, Ruler, ArrowLeftRight, ListPlus, Minus } from "lucide-react";
+import { Bookmark, CornerUpLeft, Pause, RotateCw, FolderOpen, Play, Square, Loader2, RefreshCw, AlertTriangle, ChevronDown, Trash2, ExternalLink, Dices, X, ImageIcon, Film, Layers, Type, SlidersHorizontal, Plus, Save, Wand2, Ruler, ArrowLeftRight, ListPlus, Minus, Smile } from "lucide-react";
 import { FolderPickerDialog } from "../tools/FolderPickerDialog";
 import { ProgressBar } from "../layout/ProgressBar";
 import { notify, notifyError } from "../../lib/notify";
@@ -22,6 +22,40 @@ const isVideo = (p: string) => /\.(mp4|webm|mov|mkv)$/i.test(p);
 const isImage = (p: string) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(p);
 
 const MAX_INSTANCES = 20;
+
+/** The face controls of ComfyUI's ExpressionEditor node (AdvancedLivePortrait), with their ranges. */
+const EXPRESSION_KEYS: Record<string, { label: string; min: number; max: number; step: number; hint: string; neutral?: number }> = {
+  smile: { label: "Smile", min: -0.3, max: 1.3, step: 0.01, hint: "Below 0 is a frown" },
+  aaa: { label: "Mouth open (aaa)", min: -30, max: 120, step: 1, hint: "Opens the mouth" },
+  eee: { label: "Wide mouth (eee)", min: -20, max: 15, step: 0.2, hint: "Stretches the mouth sideways" },
+  woo: { label: "Round mouth (woo)", min: -20, max: 15, step: 0.2, hint: "Rounds the lips" },
+  eyebrow: { label: "Eyebrows", min: -10, max: 15, step: 0.5, hint: "Up for surprise, down for anger" },
+  blink: { label: "Eyes open / closed", min: -20, max: 5, step: 0.5, hint: "Below 0 closes the eyes" },
+  wink: { label: "Wink", min: 0, max: 25, step: 0.5, hint: "Closes one eye" },
+  pupil_x: { label: "Look left / right", min: -15, max: 15, step: 0.5, hint: "Where the eyes look, sideways" },
+  pupil_y: { label: "Look up / down", min: -15, max: 15, step: 0.5, hint: "Where the eyes look, up and down" },
+  rotate_pitch: { label: "Head nod", min: -20, max: 20, step: 0.5, hint: "Tilts the head up or down" },
+  rotate_yaw: { label: "Head turn", min: -20, max: 20, step: 0.5, hint: "Turns the head left or right" },
+  rotate_roll: { label: "Head tilt", min: -20, max: 20, step: 0.5, hint: "Tilts the head sideways" },
+  src_ratio: { label: "Keep from photo", min: 0, max: 1, step: 0.01, hint: "How much of the original face is kept", neutral: 1 },
+  sample_ratio: { label: "Strength", min: 0, max: 1, step: 0.01, hint: "How strongly the expression is applied", neutral: 1 },
+  crop_factor: { label: "Crop around face", min: 1.5, max: 3, step: 0.1, hint: "How much area around the face is used", neutral: 2 },
+};
+const EXPRESSION_PRESETS: Record<string, Record<string, number>> = {
+  Neutral: {},
+  Smile: { smile: 0.8, eyebrow: 1 },
+  "Big smile": { smile: 1.2, aaa: 25, eyebrow: 2, blink: -2 },
+  Laugh: { smile: 1.3, aaa: 60, eyebrow: 4, blink: -6 },
+  Sad: { smile: -0.3, eyebrow: -4, rotate_pitch: 4, pupil_y: -4 },
+  Surprised: { aaa: 70, eyebrow: 12, woo: 4, blink: 3 },
+  Angry: { eyebrow: -9, smile: -0.25, eee: 6 },
+  Wink: { wink: 18, smile: 0.6 },
+  Kiss: { woo: 12, smile: 0.1, blink: -3 },
+  "Eyes closed": { blink: -16, smile: 0.3 },
+  "Look left": { pupil_x: -12, rotate_yaw: -8 },
+  "Look right": { pupil_x: 12, rotate_yaw: 8 },
+  "Head tilt": { rotate_roll: 10, smile: 0.5 },
+};
 const SIZE_PRESETS: Record<Kind, [number, number, string?][]> = {
   image: [[512, 512, "SD 1.5"], [768, 768], [1024, 1024, "SDXL / Flux"], [1152, 896], [896, 1152], [1344, 768, "16:9"], [768, 1344, "9:16"], [1536, 1024, "3:2"]],
   audio: [],
@@ -241,15 +275,21 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const setRole = (r: string, x: any) => setFieldValues(s => { const n = { ...s }; for (const f of roleOf(r)) n[f.id] = x; return n; });
   const sizeW = roleOf("width")[0], sizeH = roleOf("height")[0], lengthF = roleOf("length")[0], fpsF = roleOf("fps")[0];
   const roleFields = roleOf("size");
+  // Workflows with a face expression editor (ExpressionEditor, from AdvancedLivePortrait): presets and sliders.
+  const exprFields = wf ? wf.fields.filter(f => EXPRESSION_KEYS[f.input] && wf.fields.some(g => g.node === f.node && g.input === "smile")) : [];
+  const exprNode = exprFields[0]?.node;
+  const applyExpression = (preset: Record<string, number>) => {
+    for (const f of exprFields) setField(f.id, f.input in preset ? preset[f.input] : (EXPRESSION_KEYS[f.input].neutral ?? 0));
+  };
   // The prompt node's other text boxes (a song's lyrics next to its style tags) are inputs in their own right:
   // each gets its own box under the prompt instead of hiding among the settings.
   const promptTexts = wf ? wf.fields.filter(f => !f.role && !f.group && f.kind === "text" && f.node === wf.promptNodeId) : [];
-  const otherFields = wf ? wf.fields.filter(f => !f.role && !f.group && !promptTexts.includes(f)) : [];
+  const otherFields = wf ? wf.fields.filter(f => !f.role && !f.group && !promptTexts.includes(f) && !exprFields.includes(f)) : [];
   const promptKey = wf?.promptKeys?.[0] && wf.promptKeys[0] !== "text" ? wf.promptKeys[0] : "";
   const promptTitle = promptKey ? promptKey.replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "Prompt";
   const promptHint = /tags|genre|style/i.test(promptKey) ? "Style tags: genre, mood, instruments, voice, tempo (e.g. upbeat pop, female vocals, acoustic guitar, 120 bpm)" : promptKey ? `${promptTitle}...` : undefined;
   // Every other value of every node, grouped by node, for full control (folded away by default).
-  const allFields = wf ? wf.fields.filter(f => !f.role && f.group) : [];
+  const allFields = wf ? wf.fields.filter(f => !f.role && f.group && !exprFields.includes(f)) : [];
   const [allQuery, setAllQuery] = React.useState("");
   const setSize = (w: number, h: number) => { if (w > 0) setRole("width", w); if (h > 0) setRole("height", h); };
   const sizePresets = SIZE_PRESETS[kind];
@@ -487,6 +527,28 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                 <Section title={promptTitle} icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
                   <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} placeholder={promptHint} textLabel={promptKey ? promptTitle : undefined} />
                 </Section>
+                {exprNode && (
+                  <Section title="Expression" icon={<Smile size={14} />} accent={a.text} badge={`${exprFields.length} controls`} defaultOpen>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(EXPRESSION_PRESETS).map(([name, preset]) => (
+                        <button key={name} onClick={() => applyExpression(preset)} className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-bold text-zinc-300 hover:bg-white/10">{name}</button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                      {exprFields.map(f => {
+                        const k = EXPRESSION_KEYS[f.input];
+                        const v = Number(val(f) ?? 0);
+                        return (
+                          <label key={f.id} className="block" title={k.hint}>
+                            <span className="flex justify-between text-[10px] text-zinc-400"><span>{k.label}</span><span className="tabular-nums text-zinc-500">{v}</span></span>
+                            <input type="range" min={k.min} max={k.max} step={k.step} value={v} onChange={e => setField(f.id, Number(e.target.value))} className="w-full" />
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-zinc-500">This workflow does not read the prompt: the face follows these controls. Pick a preset, then fine-tune.</p>
+                  </Section>
+                )}
                 {promptTexts.map(f => (
                   <Section key={f.id} title={f.label} icon={<Type size={14} />} accent={a.text} badge={String(val(f) ?? "").trim() ? `${String(val(f)).trim().split(/\n+/).length} lines` : "empty"} defaultOpen>
                     <textarea value={val(f) ?? ""} onChange={e => setField(f.id, e.target.value)} rows={/lyric/i.test(f.label) ? 10 : 4}
@@ -663,11 +725,6 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                     </div></div>
                   <div><label className={label + " !mb-1"}>File name (optional)</label>
                     <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="Automatic" className={field} /></div>
-                  {kind === "image" && !/upscale/i.test(wf?.name || "") && (
-                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer pt-1" title="After the picture is made, the 'Upscale - Quick 4x upscale' workflow makes it 4x larger. Both files are kept; the larger one is shown.">
-                      <input type="checkbox" checked={upscale4x} onChange={e => pickUpscale(e.target.checked)} /> Upscale the result 4x
-                    </label>
-                  )}
                 </Section>
               </>
             )}
@@ -681,6 +738,11 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
 
           {/* Action bar */}
           <div className="shrink-0 border-t border-white/5 p-4 space-y-2 bg-black/20">
+            {kind === "image" && wf && (
+              <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer" title={/upscale/i.test(wf.name) ? "This workflow already upscales." : "After the picture is made, the 'Upscale - Quick 4x upscale' workflow makes it larger. Both files are kept; the larger one is shown."}>
+                <input type="checkbox" checked={upscale4x && !/upscale/i.test(wf.name)} disabled={/upscale/i.test(wf.name)} onChange={e => pickUpscale(e.target.checked)} /> Upscale the result 4x{/upscale/i.test(wf.name) ? " (this workflow already upscales)" : ""}
+              </label>
+            )}
             <div className="flex gap-2">
               <button onClick={() => submit([prompt])} disabled={!canRun} className={`flex-1 flex items-center justify-center gap-2 ${a.solid} text-white font-bold text-sm py-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-black/30`}>
                 {busy ? <ListPlus size={16} /> : <Play size={16} className="fill-current" />} {busy ? "Add to queue" : "Generate"}{count > 1 ? ` ×${count}` : ""}
