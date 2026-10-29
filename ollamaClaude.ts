@@ -11,6 +11,7 @@ import os from "os";
 import path from "path";
 import { spawn, execFile, type ChildProcess } from "child_process";
 import { registerOllamaRestart } from "./ollamaRestart";
+import { listSessions, readSession } from "./oclaudeHistory";
 
 export interface OllamaClaudeOptions { ollamaUrl: string }
 
@@ -268,6 +269,18 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
       const untracked = ((await git(["ls-files", "--others", "--exclude-standard"])) || "").split(/\r?\n/).filter(Boolean).length;
       res.json({ repo: true, branch, files: num(/(\d+) files? changed/), added: num(/(\d+) insertions?/), removed: num(/(\d+) deletions?/), untracked });
     })().catch(e => res.json({ repo: false, error: String(e) }));
+  });
+
+  /** Claude Code's own earlier sessions in a folder (from this app, the terminal or the desktop app), newest first. */
+  app.get("/api/oclaude/history", (req, res) => {
+    const cwd = String(req.query.cwd || "");
+    if (!cwd) return res.json({ sessions: [] });
+    res.json({ sessions: listSessions(cwd) });
+  });
+  app.get("/api/oclaude/history/:id", (req, res) => {
+    const items = readSession(String(req.query.cwd || ""), req.params.id);
+    if (!items) return res.status(404).json({ error: "That session was not found in this folder." });
+    res.json({ items });
   });
 
   registerOllamaRestart(app, { ollamaUrl: opts.ollamaUrl });

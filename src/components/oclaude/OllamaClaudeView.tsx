@@ -146,10 +146,12 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
         return true;
       case "clear": case "new": startNew(); return true;
       case "resume": {
-        if (!arg) { setSessionsOpen(true); note(sessions.map((s, i) => `${i + 1}. ${s.title} - ${ago(s.updatedAt)}`).join("\n") + "\n\nType /resume <number or part of the title>."); return true; }
-        const s = find(sessions, arg);
-        if (!s) { note(`No session matches "${arg}".`, "warn"); return true; }
-        setPrefs({ activeId: s.id }); notify({ message: `Back in "${s.title}"`, tab: "ollamaclaude" }); return true;
+        loadHistory();
+        if (!folderSessions.length) { note(`No earlier sessions in ${session.cwd}. Change the folder (Environment, on the right, or /folder) to see another folder's sessions.`, "warn"); return true; }
+        if (!arg) { setSessionsOpen(true); note(`Sessions in ${session.cwd}:\n` + folderSessions.map((s, i) => `${i + 1}. ${s.title} - ${ago(s.updatedAt)}${s.claudeId ? " (Claude Code)" : ""}`).join("\n") + "\n\nClick one in the list, or type /resume <number or part of the title>."); return true; }
+        const e = /^\d+$/.test(arg) ? folderSessions[Number(arg) - 1] : folderSessions.find(x => x.title.toLowerCase().includes(arg.toLowerCase()));
+        if (!e) { note(`No session in this folder matches "${arg}".`, "warn"); return true; }
+        resumeEntry(e); return true;
       }
       case "rename":
         if (!arg) { note("Type the new name after /rename.", "warn"); return true; }
@@ -246,6 +248,38 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     fetch("/api/oclaude/git?cwd=" + encodeURIComponent(session.cwd)).then(r => r.json()).then(setGit).catch(() => setGit(null));
   }, [session?.cwd, running]);
   const dictation = useDictation(input, setInput);
+  const [history, setHistory] = React.useState<{ id: string; title: string; updatedAt: number }[]>([]);
+  const loadHistory = React.useCallback(() => {
+    if (!session?.cwd) return;
+    fetch("/api/oclaude/history?cwd=" + encodeURIComponent(session.cwd)).then(r => r.json()).then(d => setHistory(d.sessions || [])).catch(() => setHistory([]));
+  }, [session?.cwd]);
+  React.useEffect(() => { loadHistory(); }, [loadHistory]);
+  type FolderEntry = { key: string; title: string; updatedAt: number; app?: Session; claudeId?: string };
+  const folderSessions: FolderEntry[] = (() => {
+    if (!session) return [];
+    const mine = sessions.filter(x => x.cwd === session.cwd);
+    const known = new Set(mine.map(x => x.claudeSessionId).filter(Boolean));
+    return [
+      ...mine.map(x => ({ key: x.id, title: x.title, updatedAt: x.updatedAt, app: x })),
+      ...history.filter(h => !known.has(h.id)).map(h => ({ key: "cc-" + h.id, title: h.title, updatedAt: h.updatedAt, claudeId: h.id })),
+    ].sort((a, b) => b.updatedAt - a.updatedAt);
+  })();
+  /** Opens a session from the folder list; one Claude Code made elsewhere is brought in with its conversation and continues where it stopped. */
+  const resumeEntry = async (e: FolderEntry) => {
+    setSessionsOpen(false);
+    if (e.app) { setPrefs({ activeId: e.app.id }); return; }
+    try {
+      const r = await fetch(`/api/oclaude/history/${e.claudeId}?cwd=${encodeURIComponent(session.cwd)}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not read that session.");
+      const rid = () => Math.random().toString(36).slice(2, 10);
+      const items = (d.items as any[]).map(it => (it.kind === "user" ? userItem(it.text) : it.kind === "text" ? { kind: "text" as const, id: rid(), text: it.text } : { kind: "tool" as const, id: rid(), toolId: it.toolId, name: it.name, input: it.input, status: "done" as const }));
+      const s2: Session = { ...newSession(session.cwd, model), title: e.title, claudeSessionId: e.claudeId, items, updatedAt: e.updatedAt };
+      setSessions(l => { const n = [s2, ...l]; saveSessions(n); return n; });
+      setPrefs({ activeId: s2.id });
+      notify({ message: `Resumed "${e.title}" - your next message continues it`, tab: "ollamaclaude" });
+    } catch (err: any) { notifyError(err?.message || String(err), "ollamaclaude"); }
+  };
   const filePicker = React.useRef<HTMLInputElement>(null);
   const dropFiles = async (files: FileList | null) => {
     setDragging(false);
@@ -394,21 +428,27 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
           <button onClick={() => setPrefs({ rightPane: !prefs.rightPane })} title={prefs.rightPane ? "Hide the details" : "Show the details"} className="hidden p-2 text-zinc-500 transition-colors hover:text-white lg:block"><PanelRight size={18} /></button>
           <button onClick={() => setSetupOpen(v => !v)} title="Session settings" className={cn("p-2 transition-colors", setupOpen ? "text-violet-400" : "text-zinc-500 hover:text-white")}><Settings2 size={18} /></button>
           <div className="relative">
-            <button onClick={() => setSessionsOpen(v => !v)} title="Sessions" className="p-2 text-zinc-500 transition-colors hover:text-white"><Archive size={18} /></button>
+            <button onClick={() => { if (!sessionsOpen) loadHistory(); setSessionsOpen(v => !v); }} title="Sessions in this folder" className="p-2 text-zinc-500 transition-colors hover:text-white"><Archive size={18} /></button>
             {sessionsOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setSessionsOpen(false)} />
-                <div className="absolute right-0 top-full z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-2xl border border-white/15 bg-zinc-950 py-1 shadow-2xl shadow-black/60">
-                  <button onClick={() => startNew()} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-violet-300 hover:bg-white/5"><Plus size={15} />New session</button>
-                  {sessions.map(s => (
-                    <div key={s.id} className={cn("group flex items-center gap-2 px-4 py-2 hover:bg-white/5", s.id === session.id && "bg-white/[0.04]")}>
-                      <button onClick={() => { setPrefs({ activeId: s.id }); setSessionsOpen(false); }} className="min-w-0 flex-1 text-left">
-                        <p className="truncate text-sm text-zinc-200">{s.title}</p>
-                        <p className="truncate text-[10px] text-zinc-600">{s.model || "no model"} - {ago(s.updatedAt)} - {s.cwd.split(/[\\/]/).pop()}</p>
+                <div className="absolute right-0 top-full z-50 mt-2 max-h-[28rem] w-96 overflow-y-auto rounded-2xl border border-white/15 bg-zinc-950 py-1 shadow-2xl shadow-black/60">
+                  <div className="flex items-center gap-2 px-4 pb-1 pt-2.5">
+                    <p className="min-w-0 flex-1 truncate text-[11px] text-zinc-500" title={session.cwd}>Sessions in <span className="text-zinc-300">{session.cwd.split(/[\\/]/).filter(Boolean).pop()}</span></p>
+                    <button onClick={() => { setSessionsOpen(false); chooseFolder(); }} className="shrink-0 rounded-lg px-2 py-1 text-[11px] text-violet-300 hover:bg-white/5">Change folder</button>
+                  </div>
+                  <button onClick={() => startNew()} className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-violet-300 hover:bg-white/5"><Plus size={15} />New session here</button>
+                  {folderSessions.map((e, i) => (
+                    <div key={e.key} className={cn("group flex items-center gap-2 px-4 py-2 hover:bg-white/5", e.app?.id === session.id && "bg-white/[0.04]")}>
+                      <span className="w-5 shrink-0 text-right text-[10px] text-zinc-600">{i + 1}</span>
+                      <button onClick={() => resumeEntry(e)} className="min-w-0 flex-1 text-left">
+                        <p className="truncate text-sm text-zinc-200">{e.title}</p>
+                        <p className="truncate text-[10px] text-zinc-600">{ago(e.updatedAt)}{e.claudeId ? " - made in Claude Code, click to continue it here" : e.app?.model ? ` - ${e.app.model}` : ""}</p>
                       </button>
-                      <button onClick={() => removeSession(s.id)} title="Delete" className="hidden text-zinc-600 hover:text-rose-400 group-hover:block"><Trash2 size={13} /></button>
+                      {e.app && <button onClick={() => removeSession(e.app!.id)} title="Delete" className="hidden text-zinc-600 hover:text-rose-400 group-hover:block"><Trash2 size={13} /></button>}
                     </div>
                   ))}
+                  {!folderSessions.length && <p className="px-4 py-3 text-xs text-zinc-500">No sessions in this folder yet.</p>}
                 </div>
               </>
             )}
