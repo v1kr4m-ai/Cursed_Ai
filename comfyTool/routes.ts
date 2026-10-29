@@ -1,5 +1,6 @@
 /** HTTP API of the workflow runner (everything under /api/tool). See README "Workflow runner". */
 import { freeOllamaForComfy } from "../gpuHandoff";
+import { remakeApiCopy, syncApiCopies } from "./apiSync";
 import express from "express";
 import fs from "fs";
 import path from "path";
@@ -147,10 +148,18 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     c.workflowFolder = folder;
     store.saveConfig(c);
     const oi = await objectInfo(true);
+    // Workflows edited in ComfyUI get a fresh API copy before they are read.
+    const synced = syncApiCopies(folder, oi);
     const all = listWorkflows(folder, c.workflowRoles, oi);
     const others: Record<string, number> = { image: 0, video: 0, audio: 0, "3d": 0 };
     for (const w of all) others[w.outputKind]++;
-    res.json({ workflows: all.filter(w => w.outputKind === kind).map(workflowDict), counts: others, comfyNodeListAvailable: !!oi, folder });
+    res.json({ workflows: all.filter(w => w.outputKind === kind).map(workflowDict), counts: others, comfyNodeListAvailable: !!oi, folder, synced });
+  });
+
+  /** Rebuild one workflow's API copy from the version ComfyUI's editor saved. */
+  app.post("/api/tool/remake-api", async (req, res) => {
+    try { res.json({ ok: true, path: remakeApiCopy(String(req.body?.path || ""), await objectInfo()) }); }
+    catch (e: any) { res.status(400).json({ error: e?.message || String(e) }); }
   });
 
   app.post("/api/tool/workflow-roles", async (req, res) => {

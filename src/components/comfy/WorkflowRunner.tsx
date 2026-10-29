@@ -588,6 +588,11 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               {st && !st.comfyReachable && <p className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> ComfyUI is not reachable - start it before running.</p>}
               {wf && !wf.isRunnable && wf.missing.some(m => !/custom node/.test(m)) && <p className="text-[11px] text-red-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>Cannot run: {wf.missing.filter(m => !/custom node/.test(m)).join("; ")}</span></p>}
               {wf && !!wf.missingNodes?.length && <MissingNodes key={wf.path} types={wf.missingNodes} onDone={() => loadWorkflows(folder, selected)} />}
+              {wf && (
+                <button onClick={async () => { try { await postJson("/api/tool/remake-api", { path: wf.path }); notify({ message: `API copy of "${wf.name.replace(/^API_FORMAT\//, "")}" made again from the editor version`, tab: kind }); loadWorkflows(folder, selected); } catch (e: any) { notifyError(e?.message || String(e), kind); } }}
+                  title="Make this workflow's API copy (API_FORMAT) again from the version ComfyUI's editor saved. Copies are kept in step by themselves once the editor version changes; use this for a copy that was already out of date."
+                  className="text-[10px] text-zinc-500 underline decoration-dotted hover:text-zinc-300">Remake API copy</button>
+              )}
               {wf?.warnings.map((w, i) => <p key={i} className="text-[11px] text-amber-400 flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> <span>{w}</span></p>)}
               {wf && (wf.needsAssignment.length > 0 || !wf.promptNodeId && wf.needsPrompt || !wf.outputNodeId) && (
                 <div className="grid grid-cols-2 gap-2">
