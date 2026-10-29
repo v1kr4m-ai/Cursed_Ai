@@ -1,5 +1,7 @@
 import React from "react";
-import { Loader2, Power, FolderOpen } from "lucide-react";
+import { Loader2, Power, PowerOff, FolderOpen, MemoryStick } from "lucide-react";
+import { freeComfyMemory, stopComfy } from "../../services/comfyPower";
+import { notify } from "../../lib/notify";
 import { FolderPickerDialog } from "./FolderPickerDialog";
 
 /**
@@ -59,6 +61,17 @@ export function ComfyStatus({ onReady }: { onReady?: () => void }) {
     }
   };
 
+  const [stopping, setStopping] = React.useState(false);
+  const stop = async () => {
+    if (!confirm("Stop ComfyUI? Anything it is rendering now is lost. Its GPU memory goes back to the offline language models.")) return;
+    setStopping(true); setError(null);
+    try { await stopComfy(); notify({ message: "ComfyUI stopped - its GPU memory is free" }); await check(); } catch (e: any) { setError(e.message); } finally { setStopping(false); }
+  };
+  const free = async () => {
+    setError(null);
+    try { await freeComfyMemory(); notify({ message: "ComfyUI let go of its models - GPU memory is free, ComfyUI keeps running" }); } catch (e: any) { setError(e.message); }
+  };
+
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <span className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${running ? "text-emerald-400" : "text-zinc-500"}`}>
@@ -74,6 +87,12 @@ export function ComfyStatus({ onReady }: { onReady?: () => void }) {
           {starting ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />}
           {starting ? "Starting (can take a minute)..." : "Start ComfyUI"}
         </button>
+      )}
+      {running && (
+        <>
+          <button onClick={free} title="Keep ComfyUI running but unload its models from the GPU, so an offline language model fits" className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl"><MemoryStick size={12} /> Free GPU memory</button>
+          <button onClick={stop} disabled={stopping} title="Stop ComfyUI completely" className="flex items-center gap-2 bg-rose-500/15 hover:bg-rose-500/25 disabled:opacity-60 text-rose-200 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl">{stopping ? <Loader2 size={12} className="animate-spin" /> : <PowerOff size={12} />}{stopping ? "Stopping..." : "Stop ComfyUI"}</button>
+        </>
       )}
       <button
         onClick={() => setPickerOpen(true)}

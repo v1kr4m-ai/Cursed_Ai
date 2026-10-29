@@ -1,6 +1,7 @@
 import React from "react";
-import { Copy, Minimize2, Maximize2, Pause, Play, Trash2 } from "lucide-react";
+import { Copy, Minimize2, Maximize2, Pause, Play, Power, Trash2 } from "lucide-react";
 import { setPipped } from "./consolePip";
+import { stopComfy } from "../../services/comfyPower";
 import { appendChunks, emptyLines, toneOf, type ComfyLines, type Tone } from "./comfyLines";
 
 const TONE: Record<Tone, string> = { error: "text-red-400", warn: "text-yellow-400", run: "text-cyan-300", progress: "text-emerald-300", plain: "text-zinc-300" };
@@ -59,6 +60,7 @@ export function ComfyConsole({ floating = false }: { floating?: boolean }) {
           <button onClick={() => setPaused(p => !p)} className={btn}>{paused ? <Play size={12} /> : <Pause size={12} />}{paused ? "Resume" : "Pause"}</button>
           <button onClick={copyAll} className={btn}><Copy size={12} />{copied ? "Copied" : "Copy"}</button>
           <button onClick={() => { setState(emptyLines()); held.current = null; }} className={btn}><Trash2 size={12} />Clear</button>
+          {up && <button onClick={() => { if (confirm("Stop ComfyUI? Its GPU memory goes back to the offline language models.")) stopComfy().catch(e => alert(e.message)); }} className={btn} title="Stop ComfyUI so its GPU memory is free"><Power size={12} />Stop</button>}
           {floating
             ? <button onClick={() => setPipped(false)} className={btn} title="Put the console back in the Console page"><Minimize2 size={12} />Dock</button>
             : <button onClick={() => setPipped(true)} className={btn} title="Float the console over the app so you can watch it while you work"><Maximize2 size={12} />Pop out</button>}

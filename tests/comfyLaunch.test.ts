@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { directLaunch, splitCommand, tailLines } from "../comfyLaunch";
+import { directLaunch, listeningPids, splitCommand, tailLines } from "../comfyLaunch";
 import { parseComfyCommand } from "../src/services/comfyIntent";
 
 describe("starting ComfyUI without a window", () => {
@@ -38,6 +38,19 @@ describe("starting ComfyUI without a window", () => {
 describe("telling the assistant to start ComfyUI", () => {
   it("understands the ways people ask", () => {
     for (const t of ["start ComfyUI", "Please start comfy UI", "can you launch comfyui", "turn on ComfyUI for me", "run Comfy UI", "open comfyui"]) expect(parseComfyCommand(t), t).toBe("start");
+  });
+  it("understands being asked to stop it", () => {
+    for (const t of ["stop ComfyUI", "please shut down comfy ui", "turn off comfyui", "close comfy"]) expect(parseComfyCommand(t), t).toBe("stop");
+  });
+  it("finds what listens on ComfyUI's port", () => {
+    const out = [
+      "  TCP    0.0.0.0:3000   0.0.0.0:0   LISTENING   2780",
+      "  TCP    127.0.0.1:8188   0.0.0.0:0   LISTENING   9120",
+      "  TCP    127.0.0.1:8188   127.0.0.1:5000   ESTABLISHED   9120",
+      "  TCP    [::]:8188   [::]:0   LISTENING   9120",
+    ].join("\r\n");
+    expect(listeningPids(out, 8188)).toEqual([9120]);
+    expect(listeningPids(out, 9999)).toEqual([]);
   });
   it("understands a question about it", () => {
     for (const t of ["is ComfyUI running?", "is comfy ui on", "check if ComfyUI is running"]) expect(parseComfyCommand(t), t).toBe("status");

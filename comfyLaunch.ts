@@ -48,3 +48,13 @@ export function tailLines(file: string, count = 300, maxAgeMs = Infinity): strin
     } finally { fs.closeSync(fd); }
   } catch { return []; }
 }
+
+/** Process ids listening on a TCP port, from `netstat -ano` output (Windows). */
+export function listeningPids(netstat: string, port: number): number[] {
+  const pids = new Set<number>();
+  for (const line of netstat.split(/\r?\n/)) {
+    const m = /^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)/i.exec(line);
+    if (m && Number(m[1]) === port && Number(m[2]) > 4) pids.add(Number(m[2]));
+  }
+  return [...pids];
+}

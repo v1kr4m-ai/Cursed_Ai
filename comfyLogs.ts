@@ -5,6 +5,8 @@
  * The page asks for what is new since the last line it has: GET /api/comfyui/logs?since=<time of the last entry>.
  */
 import type express from "express";
+import { execFile } from "child_process";
+import { listeningPids } from "./comfyLaunch";
 
 export interface LogEntry { t: string; m: string }
 
@@ -29,5 +31,28 @@ export function registerComfyLogs(app: express.Express, opts: { comfyUrl: () => 
       // Not answering (starting, stopped or crashed): what ComfyUI wrote to its console file the last time the app started it.
       res.json({ up: false, supported: true, entries: [], next: since, restarted: false, startup: opts.startupLog?.() || [] });
     }
+  });
+
+  /**
+   * Stop ComfyUI, however it was started (by this app or its own shortcut), so its GPU memory goes back to the
+   * offline language models: whatever listens on ComfyUI's port is ended, with its child processes.
+   */
+  app.post("/api/comfyui/stop", async (_req, res) => {
+    if (process.platform !== "win32") return res.status(501).json({ error: "Stopping ComfyUI from here works on Windows only." });
+    const port = Number(new URL(opts.comfyUrl()).port || 8188);
+    const run = (cmd: string, args: string[]) => new Promise<string>(ok => execFile(cmd, args, { windowsHide: true, timeout: 15000 }, (_e, out) => ok(String(out || ""))));
+    const pids = listeningPids(await run("netstat", ["-ano", "-p", "tcp"]), port);
+    if (!pids.length) return res.json({ ok: true, wasRunning: false });
+    for (const pid of pids) await run("taskkill", ["/PID", String(pid), "/T", "/F"]);
+    res.json({ ok: true, wasRunning: true, stopped: pids });
+  });
+
+  /** Keep ComfyUI running but let go of the models it holds in GPU memory (ComfyUI's own /free). */
+  app.post("/api/comfyui/free", async (_req, res) => {
+    try {
+      const r = await fetch(`${opts.comfyUrl()}/free`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unload_models: true, free_memory: true }), signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return res.status(502).json({ error: `ComfyUI answered ${r.status}` });
+      res.json({ ok: true });
+    } catch { res.status(503).json({ error: "ComfyUI is not running." }); }
   });
 }

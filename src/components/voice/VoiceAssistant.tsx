@@ -204,7 +204,11 @@ export function VoiceAssistant({ selectedModel, onNewMessage, settings, onSetVoi
       let answer: string;
       try {
         const st = await (await fetch("/api/comfyui/status")).json();
-        if (st.running) answer = "ComfyUI is already running.";
+        if (comfyCmd === "stop") {
+          if (!st.running) answer = "ComfyUI is not running.";
+          else { await fetch("/api/comfyui/stop", { method: "POST" }); answer = "ComfyUI is stopped. Its GPU memory is free for the language models."; }
+        }
+        else if (st.running) answer = "ComfyUI is already running.";
         else if (comfyCmd === "status") answer = st.starting ? "ComfyUI is still starting up." : "ComfyUI is not running.";
         else if (!st.canLaunch) answer = "I do not know where ComfyUI is installed. Set its folder in the Engine tab first.";
         else {
