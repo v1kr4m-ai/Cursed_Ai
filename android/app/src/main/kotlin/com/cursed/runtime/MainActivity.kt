@@ -77,6 +77,8 @@ class MainActivity : AppCompatActivity() {
     private var shellContent: FrameLayout? = null
     private var chatView: View? = null
     private var settings: PhoneSettings? = null
+    /** Files shared to the app before it was connected to the PC; sent on once it is. */
+    private var pendingShare: List<Uri> = emptyList()
     private var settingsView: View? = null
 
     /** The phone's own file picker, for Phone settings > Add a model. */
@@ -120,6 +122,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         webView = buildWebView()
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        pendingShare = ShareIn.urisOf(intent)
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.parseColor("#0E0E10")) }
         setContentView(root)
 
@@ -129,6 +132,26 @@ class MainActivity : AppCompatActivity() {
             "phone" -> openOnPhone()
             else -> showChooser()
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val shared = ShareIn.urisOf(intent)
+        if (shared.isEmpty()) return
+        pendingShare = shared
+        takeShare()
+    }
+
+    /** Sends shared files on to the PC, or says a PC is needed first. */
+    private fun takeShare() {
+        if (pendingShare.isEmpty()) return
+        if (pcUsed == null) {
+            if (tab != null && !pcMode) { android.widget.Toast.makeText(this, "Sharing sends pictures to your PC. Connect to your PC first.", android.widget.Toast.LENGTH_LONG).show(); pendingShare = emptyList() }
+            return // still connecting, or on the connect screen: sent once connected
+        }
+        val files = pendingShare
+        pendingShare = emptyList()
+        ShareIn(this) { openPc(it) }.handle(files)
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -388,6 +411,7 @@ class MainActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(bar)
         selectTab("chat")
+        takeShare()
     }
 
     private fun selectTab(id: String) {
