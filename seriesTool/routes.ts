@@ -219,7 +219,13 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         took[full.kind] = [...took[full.kind], Date.now() - t0].slice(-8);
       } catch (e: any) {
         const message = full.abort.signal.aborted ? "Cancelled." : (e?.message || String(e));
-        mark(projectId, full.targetId, full.kind, { status: full.abort.signal.aborted ? "pending" : "failed", error: message });
+        // A scene or picture that already had a good result keeps it (and stays done, so joining is not blocked);
+        // the failure is still reported below.
+        const cur = store.get(projectId);
+        const item: any = cur && (full.kind === "scene" ? findScene(cur, full.targetId)?.scene : findRef(cur, full.targetId)?.ref);
+        const had = item && (full.kind === "scene" ? item.clipPath : item.file);
+        const keep = !!had && fs.existsSync(had);
+        mark(projectId, full.targetId, full.kind, { status: keep ? "done" : full.abort.signal.aborted ? "pending" : "failed", error: keep ? null : message });
         emit(projectId, { type: "failed", targetId: full.targetId, error: message });
         if (!full.abort.signal.aborted) {
           const b = batch.get(projectId) || { done: 0, failed: 0 };

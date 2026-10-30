@@ -230,11 +230,29 @@ function SceneList({ project, episode, scenes, running, onChanged }: {
   const [takes, setTakes] = React.useState<Record<string, Take[]>>({});
   const sig = episode.scenes.map(s => s.status + s.clipPath).join("|");
   React.useEffect(() => { api.takes(project.id, episode.id).then(d => setTakes(d.takes)).catch(() => {}); }, [project.id, episode.id, sig]);
-  return <>{scenes.map(s => <SceneCard key={s.id} project={project} episode={episode} scene={s} running={running} onChanged={onChanged} takes={takes[s.id] || []} />)}</>;
+  // Finished scenes ticked to be rendered again together (each gets a new seed; the old takes stay to compare).
+  const [picked, setPicked] = React.useState<string[]>([]);
+  const pick = (id: string) => setPicked(l => (l.includes(id) ? l.filter(x => x !== id) : [...l, id]));
+  const redo = async () => {
+    const ids = picked;
+    setPicked([]);
+    for (const id of ids) { try { await api.generateScene(project.id, id); } catch (e: any) { notifyError(e?.message || String(e), "series"); } }
+    notify({ message: `${ids.length} scene${ids.length === 1 ? "" : "s"} queued to render again`, tab: "series" });
+  };
+  return <>
+    {picked.length > 0 && (
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-sky-800/60 bg-sky-950/80 px-3 py-2 text-xs text-sky-100 backdrop-blur">
+        <span className="flex-1">{picked.length} scene{picked.length === 1 ? "" : "s"} ticked. Each gets a new take; the current ones are kept, so you can compare and pick.</span>
+        <button onClick={() => setPicked([])} className="rounded-md border border-sky-700 px-2.5 py-1 hover:bg-sky-900">Clear</button>
+        <button onClick={redo} className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 font-medium text-white hover:bg-sky-500"><RefreshCw size={12} />Render {picked.length} again</button>
+      </div>
+    )}
+    {scenes.map(s => <SceneCard key={s.id} project={project} episode={episode} scene={s} running={running} onChanged={onChanged} takes={takes[s.id] || []} picked={picked.includes(s.id)} onPick={() => pick(s.id)} />)}
+  </>;
 }
 
-function SceneCard({ project, episode, scene, running, onChanged, takes = [] }: {
-  project: Project; episode: Episode; scene: Scene; takes?: Take[];
+function SceneCard({ project, episode, scene, running, onChanged, takes = [], picked, onPick }: {
+  project: Project; episode: Episode; scene: Scene; takes?: Take[]; picked?: boolean; onPick?: () => void;
   running: { targetId: string; progress: [number, number] | null } | null;
   onChanged: (p: Project) => void;
 }) {
@@ -281,6 +299,9 @@ function SceneCard({ project, episode, scene, running, onChanged, takes = [] }: 
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
       className={`rounded-lg border bg-neutral-900/50 overflow-hidden transition-colors ${isRunning ? "border-sky-700/70" : "border-neutral-800 hover:border-neutral-700"}`}>
       <div className="flex items-start gap-3 p-3">
+        {onPick && scene.status === "done" && running?.targetId !== scene.id && (
+          <input type="checkbox" checked={!!picked} onChange={onPick} title="Tick to render this scene again (with other ticked scenes)" className="mt-1 shrink-0 accent-sky-500" />
+        )}
         {scene.clipPath ? (
           <motion.button whileHover={{ scale: 1.06 }} onClick={play} title={fresh ? "New - play this clip" : "Play this clip"} className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-black">
             <video src={fileUrl(scene.clipPath) + "#t=0.4"} muted playsInline preload="metadata" className="h-full w-full object-cover" />
