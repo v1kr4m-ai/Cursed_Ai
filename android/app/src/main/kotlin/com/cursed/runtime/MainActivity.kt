@@ -76,6 +76,12 @@ class MainActivity : AppCompatActivity() {
     private var tab: String? = null
     private var shellContent: FrameLayout? = null
     private var chatView: View? = null
+    private var settings: PhoneSettings? = null
+    private var settingsView: View? = null
+
+    /** The phone's own file picker, for Phone settings > Add a model. */
+    private var onPicked: ((Uri?) -> Unit)? = null
+    private val pickDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> onPicked?.invoke(uri); onPicked = null }
     private var tabBar: LinearLayout? = null
 
     /** The voice assistant asks the page for the microphone; the phone asks you once, then the page may listen. */
@@ -366,9 +372,12 @@ class MainActivity : AppCompatActivity() {
         (webView.parent as? android.view.ViewGroup)?.removeView(webView)
         content.addView(webView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         webView.loadUrl(webUrl)
-        val chat = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }).view()
+        val chat = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }, { selectTab("settings") }).view()
         chatView = chat
         content.addView(chat, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        val ps = PhoneSettings(this, prefs, { cb -> onPicked = cb; pickDocument.launch(arrayOf("*/*")) }, { selectTab("chat") }, { pcMode = false; showChooser() })
+        settings = ps
+        settingsView = ps.view().also { content.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)) }
 
         val tabs = if (pcMode) listOf("chat" to "Chat", "image" to "Image", "video" to "Video", "series" to "Series", "more" to "More") else listOf("chat" to "Chat", "more" to "Studio")
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(Color.parseColor("#141416")) }
@@ -384,13 +393,16 @@ class MainActivity : AppCompatActivity() {
     private fun selectTab(id: String) {
         tab = id
         val onChat = id == "chat"
+        val onSettings = id == "settings"
         chatView?.visibility = if (onChat) View.VISIBLE else View.GONE
-        webView.visibility = if (onChat) View.GONE else View.VISIBLE
-        showingWeb = !onChat
+        settingsView?.visibility = if (onSettings) View.VISIBLE else View.GONE
+        if (onSettings) settings?.refresh()
+        webView.visibility = if (onChat || onSettings) View.GONE else View.VISIBLE
+        showingWeb = !onChat && !onSettings
         webTabs[id]?.let { webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('cursed:goto',{detail:{tab:'$it'}}))", null) }
         tabBar?.let { bar ->
             for (i in 0 until bar.childCount) (bar.getChildAt(i) as TextView).apply {
-                val on = tag == id
+                val on = tag == id || (id == "settings" && tag == "chat")
                 setTextColor(Color.parseColor(if (on) "#FFFFFF" else "#71717A"))
                 setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
                 setBackgroundColor(Color.parseColor(if (on) "#27272A" else "#141416"))
@@ -410,6 +422,7 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
+            tab == "settings" -> selectTab("chat")
             tab != null && tab != "chat" && webView.canGoBack() -> webView.goBack()
             tab != null && tab != "chat" -> selectTab("chat")
             // From the chat, back returns to the connect screen (to change the PC or the mode).

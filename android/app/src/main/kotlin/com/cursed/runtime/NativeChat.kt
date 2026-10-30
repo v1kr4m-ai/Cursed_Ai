@@ -39,6 +39,7 @@ class NativeChat(
     private val pcBase: () -> String?,
     private val openPc: (String) -> HttpURLConnection,
     private val startPhoneEngine: () -> Unit,
+    private val openSettings: () -> Unit,
 ) {
     private val ui = Handler(Looper.getMainLooper())
     private val messages = JSONArray(prefs.getString("chat_messages", "[]"))
@@ -69,6 +70,10 @@ class NativeChat(
             text = "New chat"; isAllCaps = false; textSize = 13f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18)
             setOnClickListener { if (!busy) { while (messages.length() > 0) messages.remove(0); save(); render() } }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { leftMargin = dp(8) })
+        bar.addView(Button(ctx).apply {
+            text = "⚙"; textSize = 16f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18); contentDescription = "Phone settings"
+            setOnClickListener { openSettings() }
+        }, LinearLayout.LayoutParams(dp(44), dp(38)).apply { leftMargin = dp(8) })
         col.addView(bar)
 
         list = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(4), dp(12), dp(12)) }
