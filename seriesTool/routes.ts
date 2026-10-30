@@ -15,6 +15,8 @@ import path from "path";
 import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTool/registry";
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
 import { probeDuration, stitch } from "./ffmpeg";
+import { takesIn } from "./takes";
+import { upsertOutput } from "./finishCore";
 import { extractUpload } from "../comfyTool/extract";
 import { fillSlots, refSourceFiles } from "./refSources";
 import { refKindInfo } from "./refKinds";
@@ -568,6 +570,30 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     res.json({ ok: true, clipPath: dest });
   });
 
+  /** Every take of each scene of an episode (all renders are kept), so one can be picked for the join. */
+  app.get("/api/series/projects/:id/episodes/:episodeId/takes", (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const ep = p.episodes.find(e => e.id === req.params.episodeId);
+    if (!ep) return bad(res, 404, "No such episode.");
+    const out: Record<string, { path: string; at: number }[]> = {};
+    for (const s of ep.scenes) out[s.id] = takesIn(store.clipsDir(p), ep.number, s.number);
+    res.json({ takes: out });
+  });
+
+  /** Use an earlier (or later) take of a scene as its clip. */
+  app.post("/api/series/projects/:id/scenes/:sceneId/take", async (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const found = findScene(p, req.params.sceneId);
+    if (!found) return bad(res, 404, "No such scene.");
+    if (found.scene.status === "running" || found.scene.status === "queued") return bad(res, 409, "This scene is rendering right now.");
+    const take = takesIn(store.clipsDir(p), found.ep.number, found.scene.number).find(t => path.resolve(t.path) === path.resolve(String(req.body?.path || "")));
+    if (!take) return bad(res, 400, "That is not a take of this scene.");
+    mark(p.id, found.scene.id, "scene", { status: "done", clipPath: take.path, durationS: await probeDuration(take.path), error: null });
+    res.json({ ok: true });
+  });
+
   /** Queue everything an episode still needs: missing references first, then unrendered scenes. */
   app.post("/api/series/projects/:id/episodes/:episodeId/generate", (req, res) => {
     const p = store.get(req.params.id);
@@ -667,8 +693,14 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         fps: p.settings.fps,
         onLine: line => emit(p.id, { type: "ffmpeg", text: line }),
       });
-      ep.exportPath = outFile;
-      store.save(p);
+      // Record when it was joined, so players load the new file and versions made from the old join show as
+      // out of date; a version pinned as final was made from the old clips, so the pin goes too.
+      const fresh = store.get(p.id) || p;
+      const fep = fresh.episodes.find(e => e.id === ep.id) || ep;
+      fep.exportPath = outFile;
+      fep.outputs = upsertOutput(fep.outputs, "joined", outFile);
+      if (fep.finalKind && fep.finalKind !== "joined") fep.finalKind = undefined;
+      store.save(fresh);
       emit(p.id, { type: "stitched", episodeId: ep.id, file: outFile });
       res.json({ file: outFile });
     } catch (e: any) {

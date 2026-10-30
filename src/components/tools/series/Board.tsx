@@ -1,4 +1,4 @@
-import React from "react";
+import React from "react";
 import { adoptPlannedPeople, ensureCast, peopleOf, placeCast } from "./people";
 import { syncPhotos } from "./photos";
 import { markSeen, useSeen } from "./seen";
@@ -13,9 +13,12 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Play, RefreshCw, Image as ImageIcon, Film, ChevronRight, X, AlertTriangle,
   Clock, Loader2, CheckCircle2, CircleSlash, Trash2, Wand2, Clapperboard, Mic,
-  Plus,
+  Plus, Check,
 } from "lucide-react";
-import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type Status } from "./api";
+import { notifyError } from "../../../lib/notify";
+import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type Status, type Take } from "./api";
+/** Same file, whatever the slashes or letter case (Windows paths). */
+const sameFile = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
 import { RefDrop } from "./RefDrop";
 
 /**
@@ -197,8 +200,20 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
   );
 }
 
-function SceneCard({ project, episode, scene, running, onChanged }: {
-  project: Project; episode: Episode; scene: Scene;
+/** The scenes of an episode, with every take of each one (re-renders are kept, so an older take can be picked). */
+function SceneList({ project, episode, scenes, running, onChanged }: {
+  project: Project; episode: Episode; scenes: Scene[];
+  running: { targetId: string; progress: [number, number] | null } | null;
+  onChanged: (p: Project) => void;
+}) {
+  const [takes, setTakes] = React.useState<Record<string, Take[]>>({});
+  const sig = episode.scenes.map(s => s.status + s.clipPath).join("|");
+  React.useEffect(() => { api.takes(project.id, episode.id).then(d => setTakes(d.takes)).catch(() => {}); }, [project.id, episode.id, sig]);
+  return <>{scenes.map(s => <SceneCard key={s.id} project={project} episode={episode} scene={s} running={running} onChanged={onChanged} takes={takes[s.id] || []} />)}</>;
+}
+
+function SceneCard({ project, episode, scene, running, onChanged, takes = [] }: {
+  project: Project; episode: Episode; scene: Scene; takes?: Take[];
   running: { targetId: string; progress: [number, number] | null } | null;
   onChanged: (p: Project) => void;
 }) {
@@ -206,7 +221,13 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
   const [playing, setPlaying] = React.useState(false);
   const { isNew } = useSeen(project.id);
   const fresh = isNew(scene.clipPath);
-  const play = () => { setPlaying(true); markSeen(project.id, scene.clipPath); };
+  const play = () => { setPlaying(true); setShownTake(null); markSeen(project.id, scene.clipPath); };
+  const [shownTake, setShownTake] = React.useState<string | null>(null);
+  const useTake = async () => {
+    if (!shownTake) return;
+    try { await api.pickTake(project.id, scene.id, shownTake); onChanged(await api.get(project.id)); setShownTake(null); }
+    catch (e: any) { notifyError(e?.message || String(e), "series"); }
+  };
   const [draft, setDraft] = React.useState(scene);
   React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
 
@@ -245,10 +266,29 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
         {playing && scene.clipPath && (
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={() => setPlaying(false)}>
             <div className="max-h-full space-y-2" onClick={e => e.stopPropagation()}>
-              <video src={fileUrl(scene.clipPath)} controls autoPlay loop playsInline className="max-h-[80vh] max-w-full rounded-lg bg-black" />
+              <video key={shownTake || scene.clipPath} src={fileUrl(shownTake || scene.clipPath)} controls autoPlay loop playsInline className="max-h-[80vh] max-w-full rounded-lg bg-black" />
+              {takes.length > 1 && (
+                <div className="space-y-1">
+                  <div className="text-[11px] text-neutral-400">{takes.length} takes of this scene - the ticked one is joined. Click one to watch it, then use it.</div>
+                  <div className="flex max-w-[80vw] gap-1.5 overflow-x-auto pb-1">
+                    {takes.map((t, i) => {
+                      const used = sameFile(t.path, scene.clipPath), shown = sameFile(t.path, shownTake || scene.clipPath);
+                      return (
+                        <button key={t.path} onClick={() => setShownTake(t.path)} title={t.path.split(/[\\/]/).pop() + " - " + new Date(t.at).toLocaleString()}
+                          className={"relative h-20 w-14 shrink-0 overflow-hidden rounded border-2 bg-black " + (shown ? "border-sky-400" : "border-transparent opacity-75 hover:opacity-100")}>
+                          <video src={fileUrl(t.path) + "#t=0.4"} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <span className="absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[9px] text-white">{i + 1}</span>
+                          {used && <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white"><Check size={10} /></span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs text-neutral-300">
                 <span>Episode {episode.number}, scene {scene.number}</span>
                 <span className="flex gap-2">
+                  {shownTake && !sameFile(shownTake, scene.clipPath) && <button onClick={useTake} className="rounded-md bg-emerald-600 px-2.5 py-1 font-medium text-white hover:bg-emerald-500">Use this take</button>}
                   <button onClick={() => { api.generateScene(project.id, scene.id); setPlaying(false); }} className="rounded-md border border-neutral-600 px-2.5 py-1 hover:bg-neutral-800">Render again</button>
                   <button onClick={() => setPlaying(false)} className="rounded-md border border-neutral-600 px-2.5 py-1 hover:bg-neutral-800">Close</button>
                 </span>
@@ -262,6 +302,7 @@ function SceneCard({ project, episode, scene, running, onChanged }: {
             {fresh && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}
             <Badge status={isRunning ? "running" : scene.status} progress={running?.progress} />
             {scene.durationS && <span className="text-[11px] text-neutral-500">{scene.durationS.toFixed(2)}s</span>}
+            {takes.length > 1 && <span className="rounded-full bg-sky-500/20 px-1.5 py-px text-[10px] font-semibold text-sky-300" title="This scene was rendered more than once. Play it to see every take and pick the one to join.">{takes.length} takes{(() => { const i = takes.findIndex(t => sameFile(t.path, scene.clipPath)); return i >= 0 ? `, using #${i + 1}` : ""; })()}</span>}
           </div>
           <div className="mt-1 line-clamp-2 text-sm text-neutral-200">{scene.vo || <span className="text-neutral-600">No {fmt.lineLabel.toLowerCase()} yet</span>}</div>
           {draft.refIds.length > 0 && (
@@ -492,9 +533,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                     <div className="space-y-2">
                       <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">Scenes{onlyTodo ? " that need work" : ""}</h4>
                       {onlyTodo && !ep.scenes.some(s => s.status !== "done") && <p className="text-xs text-emerald-300">All clips of this episode are done.</p>}
-                      {[...ep.scenes].sort((a, b) => a.number - b.number).filter(s => !onlyTodo || s.status !== "done").map(s => (
-                        <SceneCard key={s.id} project={project} episode={ep} scene={s} running={running} onChanged={onChanged} />
-                      ))}
+                      <SceneList project={project} episode={ep} scenes={[...ep.scenes].sort((a, b) => a.number - b.number).filter(s => !onlyTodo || s.status !== "done")} running={running} onChanged={onChanged} />
                     </div>
                   </div>
                 </motion.div>

@@ -110,6 +110,9 @@ export const CHAT_PRESETS: { label: string; text: string }[] = [
   { label: "What's missing?", text: "What is missing or unclear in this idea? Ask me the one most important question." },
 ];
 
+/** One render of a scene; every render is kept, and the scene's clipPath is the one that is joined. */
+export interface Take { path: string; at: number }
+
 export interface ProjectSummary {
   id: string; title: string; dir: string; updatedAt: string;
   episodes: number; scenes: number; scenesDone: number; exports: number;
@@ -139,6 +142,8 @@ export const api = {
   savePlan: (id: string, episodes: any[], keepRendered = true) =>
     call<Project>(`/api/series/projects/${id}/plan`, { method: "POST", body: JSON.stringify({ episodes, keepRendered }) }),
   generateRef: (id: string, refId: string) => call(`/api/series/projects/${id}/refs/${refId}/generate`, { method: "POST" }),
+  takes: (id: string, episodeId: string) => call<{ takes: Record<string, Take[]> }>(`/api/series/projects/${id}/episodes/${episodeId}/takes`),
+  pickTake: (id: string, sceneId: string, path: string) => call<{ ok: true }>(`/api/series/projects/${id}/scenes/${sceneId}/take`, { method: "POST", body: JSON.stringify({ path }) }),
   generateScene: (id: string, sceneId: string) => call(`/api/series/projects/${id}/scenes/${sceneId}/generate`, { method: "POST" }),
   generateEpisode: (id: string, episodeId: string, redo = false) =>
     call<{ queued: number }>(`/api/series/projects/${id}/episodes/${episodeId}/generate`, { method: "POST", body: JSON.stringify({ redo }) }),

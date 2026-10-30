@@ -1,9 +1,10 @@
 import React from "react";
-import { Scissors, Loader2, ChevronDown, Download, Film } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Scissors, Loader2, ChevronDown, Download, Film, Play } from "lucide-react";
 import { api, fileUrl, type Episode, type ExportKind, type Project } from "./api";
 import { SubtitlesPanel } from "./Subtitles";
 import { AudioPanel } from "./AudioPanel";
-import { OutputStage, KINDS, finalOutput, listOutputs, chooseExportFolder } from "./Outputs";
+import { OutputStage, KINDS, finalOutput, listOutputs, chooseExportFolder, outputUrl } from "./Outputs";
 import { HoverVideo } from "./DashKit";
 import { markSeen, useSeen } from "./seen";
 import { itemLabel } from "./groups";
@@ -24,6 +25,7 @@ function Chip({ on, children }: { on: boolean; children: React.ReactNode }) {
 
 function EpisodeRow({ project, episode, onChanged, open, onToggle }: { project: Project; episode: Episode; onChanged: (p: Project) => void; open: boolean; onToggle: () => void }) {
   const [busy, setBusy] = React.useState(false);
+  const [playing, setPlaying] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<"subtitles" | "audio">("subtitles");
 
@@ -55,12 +57,23 @@ function EpisodeRow({ project, episode, onChanged, open, onToggle }: { project: 
     <div className="rounded-xl border border-neutral-800 bg-neutral-900/30">
       <div role="button" tabIndex={0} onClick={() => { if (!open) markSeen(project.id, fin?.path, episode.exportPath, ...(episode.outputs || []).map(o => o.path)); onToggle(); }} onKeyDown={e => (e.key === "Enter" || e.key === " ") && onToggle()} className="flex cursor-pointer items-center gap-3 p-3">
         <ChevronDown size={16} className={"shrink-0 opacity-60 transition-transform " + (open ? "" : "-rotate-90")} />
-        {fin ? <HoverVideo src={fileUrl(fin.path)} className="h-12 w-8 shrink-0 rounded bg-black object-cover" /> : <div className="h-12 w-8 shrink-0 rounded bg-current/10" />}
+        {fin ? <HoverVideo src={outputUrl(fin)} className="h-12 w-8 shrink-0 rounded bg-black object-cover" /> : <div className="h-12 w-8 shrink-0 rounded bg-current/10" />}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-sm font-medium text-neutral-100"><span className="truncate">{episode.number}. {itemLabel(project, episode) && <span className="text-amber-200/70">{itemLabel(project, episode)} - </span>}{episode.title}</span>{fresh && <span className="rounded-full bg-amber-400 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-black">New</span>}</div>
           <div className="text-[11px] text-neutral-500">{done.length}/{ordered.length} scenes rendered{total ? ` - ${total.toFixed(1)}s total` : ""}</div>
           <div className="mt-1 flex flex-wrap gap-1"><Chip on={ready}>Rendered</Chip><Chip on={!!episode.exportPath}>Joined</Chip><Chip on={made.includes("subtitled") || made.includes("final")}>Subtitled</Chip><Chip on={made.includes("audio") || made.includes("final")}>Audio</Chip>{fin && <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold " + KINDS[fin.kind].chip}>Final: {KINDS[fin.kind].label}</span>}</div>
         </div>
+        {fin && <button onClick={e => { e.stopPropagation(); setPlaying(true); }} title={"Play " + KINDS[fin.kind].label.toLowerCase()} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-neutral-700 hover:bg-neutral-800"><Play size={14} /></button>}
+        {playing && fin && createPortal(
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" onClick={e => { e.stopPropagation(); setPlaying(false); }}>
+            <div className="max-h-full space-y-2" onClick={e => e.stopPropagation()}>
+              <video src={outputUrl(fin)} controls autoPlay playsInline className="max-h-[80vh] max-w-full rounded-lg bg-black" />
+              <div className="flex items-center justify-between gap-3 text-xs text-neutral-300">
+                <span>Episode {episode.number} - {KINDS[fin.kind].label}</span>
+                <button onClick={() => setPlaying(false)} className="rounded-md border border-neutral-600 px-2.5 py-1 hover:bg-neutral-800">Close</button>
+              </div>
+            </div>
+          </div>, document.body)}
         <button onClick={run} disabled={!ready || busy} className="flex shrink-0 items-center gap-2 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-600/80 px-3 py-2 text-xs font-medium text-white">
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
           {episode.exportPath ? "Join again" : "Join into one file"}

@@ -25,9 +25,13 @@ export function finalOutput(ep: Episode): Output | null {
   const list = listOutputs(ep);
   return (ep.finalKind && list.find(o => o.kind === ep.finalKind)) || list[list.length - 1] || null;
 }
-/** True when the subtitles or audio were edited after this version was rendered. */
+/** A version's address, changed whenever it is made again so players load the new file and not a cached one. */
+export const outputUrl = (o: Output) => fileUrl(o.path) + (o.at ? "&v=" + encodeURIComponent(o.at) : "");
+/** True when the scenes were joined again, or the subtitles or audio edited, after this version was rendered. */
 export function outdated(ep: Episode, o: Output): boolean {
   if (!o.at) return false;
+  const joined = ep.outputs?.find(x => x.kind === "joined");
+  if (o.kind !== "joined" && joined?.at && joined.at > o.at) return true;
   const subs = (o.kind === "subtitled" || o.kind === "final") && !!ep.subtitles?.updatedAt && ep.subtitles.updatedAt > o.at;
   const aud = (o.kind === "audio" || o.kind === "final") && !!ep.audio?.updatedAt && ep.audio.updatedAt > o.at;
   return subs || aud;
@@ -77,11 +81,11 @@ export function OutputStage({ project, episode, onChanged }: { project: Project;
           <span className={"rounded-full px-2 py-0.5 font-semibold " + KINDS[shown.kind].chip}>{KINDS[shown.kind].label}</span>
           {shown === newest && all.length > 1 && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 font-semibold text-amber-600">Latest</span>}
           {fin && shown.path === fin.path && <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 font-semibold text-emerald-600"><Star size={10} className="fill-current" />{episode.finalKind ? "Final (pinned)" : "Final (newest)"}</span>}
-          {outdated(episode, shown) && <span className="rounded-full bg-rose-500/20 px-2 py-0.5 font-semibold text-rose-600" title="Subtitles or audio changed after this was rendered">Out of date - render again</span>}
+          {outdated(episode, shown) && <span className="rounded-full bg-rose-500/20 px-2 py-0.5 font-semibold text-rose-600" title="The scenes were joined again, or the subtitles or audio changed, after this was rendered">Out of date - render again</span>}
           <span className="opacity-55">{KINDS[shown.kind].note}{shown.at ? " - " + ago(shown.at) : ""}</span>
         </div>
         <div className="flex justify-center rounded-xl bg-black/50 p-2">
-          <video key={shown.path} src={fileUrl(shown.path)} controls className="max-h-[360px] max-w-full rounded" />
+          <video key={outputUrl(shown)} src={outputUrl(shown)} controls className="max-h-[360px] max-w-full rounded" />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           {pinned
@@ -100,7 +104,7 @@ export function OutputStage({ project, episode, onChanged }: { project: Project;
           return (
             <button key={o.kind} onClick={() => setPicked(o.kind)} title={KINDS[o.kind].label + " - " + KINDS[o.kind].note}
               className={"group relative w-24 shrink-0 overflow-hidden rounded-lg border-2 text-left transition " + (on ? "border-sky-400" : "border-transparent opacity-80 hover:opacity-100")}>
-              <HoverVideo src={fileUrl(o.path)} className="aspect-[9/14] w-full bg-black object-cover" />
+              <HoverVideo src={outputUrl(o)} className="aspect-[9/14] w-full bg-black object-cover" />
               <span className={"absolute left-1 top-1 rounded px-1 py-0.5 text-[9px] font-bold " + KINDS[o.kind].chip}>{KINDS[o.kind].label}</span>
               {o === newest && <span className="absolute right-1 top-1 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-bold text-white">NEW</span>}
               {fin && o.path === fin.path && <Star size={12} className="absolute bottom-1 right-1 fill-emerald-400 text-emerald-400 drop-shadow" />}
