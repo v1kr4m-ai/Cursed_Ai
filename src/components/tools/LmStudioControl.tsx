@@ -2,6 +2,7 @@ import React from "react";
 import { FolderOpen, Loader2, Power } from "lucide-react";
 import { nativeFolder } from "../comfy/types";
 import { notify, notifyError } from "../../lib/notify";
+import { pickFolder } from "./pickFolder";
 
 /** LM Studio status with a Start button (like ComfyUI's) and a way to point at its install folder. */
 export function LmStudioControl() {
@@ -23,8 +24,8 @@ export function LmStudioControl() {
     finally { setBusy(false); check(); }
   };
   const choose = async () => {
-    const p = await nativeFolder(st?.path || undefined);
-    if (typeof p !== "string") return;
+    const p = await pickFolder(st?.path || undefined, "LM Studio folder");
+    if (!p) return;
     try {
       const r = await fetch("/api/lmstudio/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: p }) });
       const d = await r.json();

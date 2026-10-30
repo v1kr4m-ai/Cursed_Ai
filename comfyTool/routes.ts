@@ -1,5 +1,6 @@
 /** HTTP API of the workflow runner (everything under /api/tool). See README "Workflow runner". */
 import { freeOllamaForComfy } from "../gpuHandoff";
+import { isLoopback } from "../phoneAccess";
 import { remakeApiCopy, syncApiCopies } from "./apiSync";
 import express from "express";
 import fs from "fs";
@@ -277,6 +278,8 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
   const pickedDirs = new Set<string>();
   app.post("/api/tool/native-pick", (req, res) => {
     if (process.platform !== "win32") return res.status(501).json({ error: "native dialog only on Windows" });
+    // A phone or other device would get the dialog on the PC's screen; it picks with its own file input instead.
+    if (!isLoopback(req.socket.remoteAddress)) return res.status(501).json({ error: "native dialog only on this PC" });
     const mode = req.body?.mode === "folder" ? "folder" : "files";
     const initial = typeof req.body?.initial === "string" && fs.existsSync(req.body.initial) ? req.body.initial : "";
     const script = [

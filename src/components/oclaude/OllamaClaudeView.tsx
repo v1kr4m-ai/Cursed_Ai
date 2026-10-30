@@ -15,6 +15,7 @@ import { askModel } from "../tools/series/api";
 import { APP_COMMANDS, Chip, QuickBar } from "./QuickBar";
 import { StatusRings } from "./StatusRings";
 import { applyEvent, emptyLive, loadSessions, newSession, noticeItem, saveSessions, titleFrom, toMarkdown, userItem, type Live, type Session } from "./events";
+import { pickFolder } from "../tools/pickFolder";
 
 interface ModelInfo { name: string; compatible: boolean; reason: string; tools: boolean; thinking: boolean; vision: boolean; cloud: boolean; contextLength: number | null; sizeBytes: number | null; params: string }
 interface Status {
@@ -117,12 +118,12 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     setSessions(l => { const n = l.filter(s => s.id !== id); saveSessions(n); if (id === prefs.activeId) setPrefs({ activeId: n[0]?.id || "" }); return n; });
   };
   const chooseFolder = async () => {
-    const p = await nativeFolder(session?.cwd);
-    if (typeof p === "string" && session) update(session.id, s => ({ ...s, cwd: p, claudeSessionId: undefined, init: undefined }));
+    const p = await pickFolder(session?.cwd, "Work in which folder?");
+    if (p && session) update(session.id, s => ({ ...s, cwd: p, claudeSessionId: undefined, init: undefined }));
   };
   const addFolder = async () => {
-    const p = await nativeFolder(session?.cwd);
-    if (typeof p === "string" && !prefs.addDirs.includes(p)) setPrefs({ addDirs: [...prefs.addDirs, p] });
+    const p = await pickFolder(session?.cwd, "Add which folder?");
+    if (p && !prefs.addDirs.includes(p)) setPrefs({ addDirs: [...prefs.addDirs, p] });
   };
   const choosePermission = (id: string) => {
     if (id === "bypassPermissions" && !window.confirm("Full access lets Claude run any command and change any file in the working folder without asking. Only use it in a folder you can afford to lose. Switch on?")) return;

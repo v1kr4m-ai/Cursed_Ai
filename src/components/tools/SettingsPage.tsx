@@ -13,6 +13,7 @@ import { OnlineModelsSettings } from "./OnlineModelsSettings";
 import { PhoneAccessSettings } from "./PhoneAccessSettings";
 import { GoogleConnectPanel, useGoogleStatus } from "../comfy/google";
 import { nativeFolder, postJson, api } from "../comfy/types";
+import { pickFolder } from "./pickFolder";
 
 const CATEGORIES = [
   { id: "general", label: "General", icon: SettingsIcon },
@@ -125,8 +126,8 @@ export function SettingsPage({ settings, setSettings, chats, onImportChats, onCl
     finally { if (importRef.current) importRef.current.value = ""; }
   };
   const pickDest = async (kind: "image" | "video") => {
-    const p = await nativeFolder(dest[kind] || dest[`${kind}Default` as "imageDefault"]);
-    if (typeof p === "string") { await postJson("/api/tool/state", { kind, destination: p }); loadDest(); notify({ message: `${kind === "image" ? "Images" : "Videos"} now save to ${p}`, tab: "settings" }); }
+    const p = await pickFolder(dest[kind] || dest[`${kind}Default` as "imageDefault"], "Save to which folder?");
+    if (p) { await postJson("/api/tool/state", { kind, destination: p }); loadDest(); notify({ message: `${kind === "image" ? "Images" : "Videos"} now save to ${p}`, tab: "settings" }); }
   };
   const resetDest = async (kind: "image" | "video") => { await postJson("/api/tool/state", { kind, destination: "" }); loadDest(); };
   const saveGemini = async () => {

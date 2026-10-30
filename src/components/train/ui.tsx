@@ -2,6 +2,7 @@ import React from "react";
 import { FolderOpen, Info, Loader2, Maximize2, Minimize2, Square, Trash2 } from "lucide-react";
 import { nativeFolder } from "../comfy/types";
 import type { Job } from "./trainApi";
+import { pickFolder } from "../tools/pickFolder";
 
 export const inputCls = "w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50";
 
@@ -139,7 +140,7 @@ export function FolderField({ label, value, onChange, hint, placeholder }: { lab
     <Field label={label} hint={hint}>
       <div className="flex gap-2">
         <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={inputCls + " font-mono text-xs"} />
-        <button type="button" onClick={async () => { const p = await nativeFolder(value || undefined); if (typeof p === "string") onChange(p); }} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white/5 px-3 text-xs font-bold text-zinc-300 hover:bg-white/10"><FolderOpen size={14} />Browse</button>
+        <button type="button" onClick={async () => { const p = await pickFolder(value || undefined); if (p) onChange(p); }} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white/5 px-3 text-xs font-bold text-zinc-300 hover:bg-white/10"><FolderOpen size={14} />Browse</button>
       </div>
     </Field>
   );

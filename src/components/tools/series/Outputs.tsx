@@ -5,6 +5,7 @@ import { nativeFolder } from "../../comfy/types";
 import { HoverVideo } from "./DashKit";
 import { postJson } from "../../comfy/types";
 import { notify, notifyError } from "../../../lib/notify";
+import { pickFolder } from "../pickFolder";
 
 export const KINDS: Record<OutputKind, { label: string; note: string; chip: string }> = {
   joined: { label: "Joined", note: "The scenes cut together - no subtitles, no added sound", chip: "bg-neutral-500 text-white" },
@@ -40,8 +41,8 @@ export function outdated(ep: Episode, o: Output): boolean {
 export async function chooseExportFolder(): Promise<string | null> {
   let last = "";
   try { last = localStorage.getItem("cursed.series.exportDir") || ""; } catch { /* storage blocked */ }
-  const picked = await nativeFolder(last || undefined);
-  if (typeof picked !== "string") { if (picked === undefined) notifyError("The folder picker is not available.", "series"); return null; }
+  const picked = await pickFolder(last || undefined, "Export to which folder?");
+  if (!picked) return null;
   try { localStorage.setItem("cursed.series.exportDir", picked); } catch { /* storage blocked */ }
   return picked;
 }

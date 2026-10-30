@@ -15,6 +15,7 @@ import { baselineSeen } from "./seen";
 import { nativeFolder } from "../../comfy/types";
 import { notify } from "../../../lib/notify";
 import type { AIModel } from "../../../types";
+import { pickFolder } from "../pickFolder";
 
 /**
  * Series Studio: take an idea from a conversation to finished episodes without leaving the app.
@@ -82,7 +83,7 @@ function SeriesHome({ onOpen }: { onOpen: (id: string) => void }) {
 
 OK: include the rendered clips and exports (bigger file).
 Cancel: story, plan and pictures only (small; clips can be rendered again).`);
-    const dest = await nativeFolder();
+    const dest = await pickFolder(undefined, "Save the backup in which folder?");
     if (!dest) return;
     try {
       const r = await api.backup(p.id, dest, withClips);
