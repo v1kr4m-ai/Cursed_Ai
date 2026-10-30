@@ -31,6 +31,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -53,6 +54,9 @@ import javax.net.ssl.X509TrustManager
 import kotlin.concurrent.thread
 
 /**
+ * The app is a native shell around the studio: a bottom bar with a native Chat screen (answers from a model on the PC
+ * or on this phone) and the studio's own pages (Image, Video, Series, More) shown in a WebView.
+ *
  * Two ways to use Cursed_Ai on a phone:
  *  - "Connect to my PC": the studio you already use on the PC, shown in this app. The PC does the work (models, ComfyUI,
  *    series); the phone is the screen. Needs the PC's address and the access code from Settings > Phone & other devices.
@@ -66,6 +70,13 @@ class MainActivity : AppCompatActivity() {
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var showingWeb = false
     private var pcMode = false
+    /** The PC address that answered (secure, or the plain one for an older PC app), for the native chat's requests. */
+    private var pcUsed: String? = null
+    /** The tab shown in the bottom bar's shell, or null when the connect screen is shown. */
+    private var tab: String? = null
+    private var shellContent: FrameLayout? = null
+    private var chatView: View? = null
+    private var tabBar: LinearLayout? = null
 
     /** The voice assistant asks the page for the microphone; the phone asks you once, then the page may listen. */
     private var micRequest: PermissionRequest? = null
@@ -174,6 +185,7 @@ class MainActivity : AppCompatActivity() {
     /** The first screen: connect to the PC, or use the phone's own engine. */
     private fun showChooser(message: String? = null) {
         showingWeb = false
+        tab = null
         root.removeAllViews()
         val scroll = ScrollView(this)
         val col = LinearLayout(this).apply {
@@ -310,7 +322,8 @@ class MainActivity : AppCompatActivity() {
                     if (seen[0] != null && prefs.getString("pc_cert", null) == null) e.putString("pc_cert", seen[0])
                     e.apply()
                     pcMode = true
-                    openWeb("$used/__phone-login?code=" + URLEncoder.encode(code, "UTF-8"))
+                    pcUsed = used
+                    showShell("$used/__phone-login?code=" + URLEncoder.encode(code, "UTF-8"))
                 } else if (auto) {
                     showChooser(result.second)
                 } else onFail(result.second)
@@ -328,8 +341,61 @@ class MainActivity : AppCompatActivity() {
     private fun openOnPhone() {
         prefs.edit().putString("mode", "phone").apply()
         pcMode = false
+        pcUsed = null
         startForegroundService(Intent(this, CursedRuntimeService::class.java))
-        openWeb("http://127.0.0.1:11434/index.html")
+        showShell("http://127.0.0.1:11434/index.html")
+    }
+
+    /** Requests to the connected PC carry the access code and use its pinned certificate. */
+    private fun openPc(path: String): HttpURLConnection =
+        open(URL((pcUsed ?: throw IllegalStateException("Not connected to a PC.")) + path), arrayOfNulls(1)).apply {
+            setRequestProperty("x-cursed-code", prefs.getString("pc_code", "") ?: "")
+        }
+
+    private fun phoneEngine() { startForegroundService(Intent(this, CursedRuntimeService::class.java)) }
+
+    /** The studio pages behind each web tab (the page listens for this event to switch). */
+    private val webTabs = mapOf("image" to "image", "video" to "video", "series" to "series")
+
+    /** The bottom bar: native Chat plus the studio's pages. Connected to a PC: Chat, Image, Video, Series, More; on the phone alone: Chat and Studio. */
+    private fun showShell(webUrl: String) {
+        root.removeAllViews()
+        val content = FrameLayout(this)
+        shellContent = content
+        root.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        (webView.parent as? android.view.ViewGroup)?.removeView(webView)
+        content.addView(webView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        webView.loadUrl(webUrl)
+        val chat = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }).view()
+        chatView = chat
+        content.addView(chat, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        val tabs = if (pcMode) listOf("chat" to "Chat", "image" to "Image", "video" to "Video", "series" to "Series", "more" to "More") else listOf("chat" to "Chat", "more" to "Studio")
+        val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(Color.parseColor("#141416")) }
+        tabBar = bar
+        for ((id, label) in tabs) bar.addView(TextView(this).apply {
+            text = label; tag = id; textSize = 13f; gravity = Gravity.CENTER; setPadding(0, dp(14), 0, dp(14))
+            setOnClickListener { selectTab(id) }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(bar)
+        selectTab("chat")
+    }
+
+    private fun selectTab(id: String) {
+        tab = id
+        val onChat = id == "chat"
+        chatView?.visibility = if (onChat) View.VISIBLE else View.GONE
+        webView.visibility = if (onChat) View.GONE else View.VISIBLE
+        showingWeb = !onChat
+        webTabs[id]?.let { webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('cursed:goto',{detail:{tab:'$it'}}))", null) }
+        tabBar?.let { bar ->
+            for (i in 0 until bar.childCount) (bar.getChildAt(i) as TextView).apply {
+                val on = tag == id
+                setTextColor(Color.parseColor(if (on) "#FFFFFF" else "#71717A"))
+                setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
+                setBackgroundColor(Color.parseColor(if (on) "#27272A" else "#141416"))
+            }
+        }
     }
 
     private fun openWeb(url: String) {
@@ -344,9 +410,10 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
-            showingWeb && webView.canGoBack() -> webView.goBack()
-            // At the start of the studio, back returns to the connect screen (to change the PC or the mode).
-            showingWeb -> { prefs.edit().remove("mode").apply(); pcMode = false; showChooser() }
+            tab != null && tab != "chat" && webView.canGoBack() -> webView.goBack()
+            tab != null && tab != "chat" -> selectTab("chat")
+            // From the chat, back returns to the connect screen (to change the PC or the mode).
+            tab == "chat" -> { prefs.edit().remove("mode").apply(); pcMode = false; showChooser() }
             else -> super.onBackPressed()
         }
     }
