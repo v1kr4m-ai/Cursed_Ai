@@ -12,7 +12,7 @@ import { ShareMenu } from "./ShareMenu";
 import { MissingNodes } from "./MissingNodes";
 import { SendToSeries } from "./SendToSeries";
 import { Converter } from "./Converter";
-import { QueueList } from "./shared";
+import { DragBar, QueueList, useStageHeight, useStudioLayout } from "./shared";
 import { SortMenu } from "./SortMenu";
 import { HistoryPanel, PromptItem } from "./HistoryPanel";
 import { ACCENT, HistoryItem, WorkflowField, Kind, MediaItem, RunRow, WorkflowInfo, api, fileUrl, nativeFiles, nativeFolder, postJson } from "./types";
@@ -120,6 +120,8 @@ function Media({ path, className }: { path: string; className?: string }) {
  */
 export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHistory }: { kind: Kind; modelId?: string; toolbar?: React.ReactNode; showHistory?: boolean; onCloseHistory?: () => void }) {
   const a = ACCENT[kind];
+  const layout = useStudioLayout(`studio-${kind}-workflows`);
+  const stageH = useStageHeight(`stage-${kind}`);
   const ring = `focus:ring-1 ${a.ring}`;
   const [st, setSt] = React.useState<ToolState | null>(null);
   const [folder, setFolder] = React.useState("");
@@ -543,7 +545,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
     <div className="h-full flex flex-col gap-3 min-h-0">
       {toolbar}
 
-      <div className="flex-1 min-h-0 grid gap-4 lg:grid-cols-[minmax(340px,420px)_1fr] overflow-y-auto lg:overflow-hidden">
+      <div className={"flex-1 min-h-0 grid gap-4 overflow-y-auto lg:overflow-hidden " + layout.gridCls} style={layout.gridStyle}>
         {/* ───────── Controls ───────── */}
         <ReorderGroup id={`studio-${kind}-workflows`}>
         <div className="glass rounded-3xl border-white/5 flex flex-col min-h-0 overflow-hidden">
@@ -873,6 +875,8 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
         </div>
         </ReorderGroup>
 
+        <DragBar axis="x" value={layout.panelW} onChange={layout.setPanelW} onReset={() => layout.setPanelW(400)} title="Drag to resize the settings panel and the canvas" />
+
         {/* ───────── Canvas ───────── */}
         <ReorderGroup id={`studio-${kind}-workflows-canvas`}>
         <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto pr-0.5">
@@ -882,7 +886,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
             <QueueList kind={kind} rows={active.map(r => ({ id: r.runId, label: r.workflow, status: r.status, detail: r.progress ? `${r.progress[0]}/${r.progress[1]}` : undefined, pausable: !!r.pausable, cancellable: r.cancellable }))} onPause={pauseJob} onResume={resumeJob} onCancel={cancelOther} onRemove={dropJob} />
             </>
           ) : (<>
-          <div className="relative min-h-[300px] lg:min-h-0 lg:flex-1 rounded-3xl border border-white/5 bg-black/30 overflow-hidden flex items-center justify-center">
+          <div ref={stageH.ref} style={stageH.style} className={"relative " + stageH.cls + " rounded-3xl border border-white/5 bg-black/30 overflow-hidden flex items-center justify-center"}>
             <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
             {busy ? (
               <div className="relative w-full h-full flex flex-col items-center justify-center p-6 gap-5">
@@ -903,6 +907,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
             )}
             {runError && !busy && <div className="absolute inset-x-4 bottom-4 text-[12px] text-red-300 bg-red-950/70 border border-red-500/30 rounded-xl px-4 py-2.5 flex items-start gap-2 backdrop-blur"><AlertTriangle size={14} className="mt-0.5 shrink-0" /> <span>{runError}</span></div>}
           </div>
+          {stageH.bar}
 
           {/* Result actions */}
           {stagePath && !busy && (
