@@ -44,7 +44,14 @@ export function ToastHost({ activeTab, onNavigate }: { activeTab: string; onNavi
       if (n.onlyIfAway && looking) return;
       // A desktop notification too when the window is in the background and the browser already allows it.
       // In the Android app the page cannot use the browser's notifications; the app offers its own.
-      if (document.hidden && (window as any).CursedAndroid?.notify) { try { (window as any).CursedAndroid.notify("Cursed_Ai", n.message); } catch { /* bridge missing */ } }
+      // The newer app also shows the picture and opens the right tab when the notification is tapped.
+      const android = (window as any).CursedAndroid;
+      if (document.hidden && android) {
+        try {
+          if (android.notifyRich) android.notifyRich("Cursed_Ai", n.message, n.tab || "", n.thumb ? new URL(n.thumb, location.href).pathname + new URL(n.thumb, location.href).search : "");
+          else android.notify?.("Cursed_Ai", n.message);
+        } catch { /* bridge missing */ }
+      }
       if (document.hidden && savedSetting("desktopNotify", false) && typeof Notification !== "undefined" && Notification.permission === "granted") {
         try { new Notification("Cursed_Ai", { body: n.message }); } catch { /* not allowed here */ }
       }

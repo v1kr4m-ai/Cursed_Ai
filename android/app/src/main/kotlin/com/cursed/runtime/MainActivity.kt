@@ -12,6 +12,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
@@ -97,12 +98,33 @@ class MainActivity : AppCompatActivity() {
     /** Lets the studio page raise a real Android notification (a finished render, an error) while the app is in the background. */
     inner class Bridge {
         @JavascriptInterface
-        fun notify(title: String, body: String) {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("cursed_jobs", "Renders and jobs", NotificationManager.IMPORTANCE_DEFAULT))
-            val open = PendingIntent.getActivity(this@MainActivity, 0, Intent(this@MainActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            val n = Notification.Builder(this@MainActivity, "cursed_jobs").setSmallIcon(R.mipmap.ic_launcher).setContentTitle(title).setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(open).setAutoCancel(true).build()
-            if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) nm.notify((System.currentTimeMillis() % 100000).toInt(), n)
+        fun notify(title: String, body: String) = notifyRich(title, body, "", "")
+
+        /**
+         * A notification for a finished job: with the picture when there is one (`thumbPath` on the PC, fetched over
+         * the same pinned connection), and opening the app on `tab` when tapped.
+         */
+        @JavascriptInterface
+        fun notifyRich(title: String, body: String, tab: String, thumbPath: String) {
+            thread {
+                val picture = if (thumbPath.isNotEmpty() && pcUsed != null) try {
+                    val bytes = openPc(thumbPath).run { connectTimeout = 5000; readTimeout = 15000; inputStream.use { it.readBytes() }.also { disconnect() } }
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    var scale = 1
+                    while (bounds.outWidth / scale > 1024 || bounds.outHeight / scale > 1024) scale *= 2
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = scale })
+                } catch (e: Exception) { null } else null
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("cursed_jobs", "Renders and jobs", NotificationManager.IMPORTANCE_DEFAULT))
+                val id = (System.currentTimeMillis() % 100000).toInt()
+                val launch = Intent(this@MainActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("open_tab", tab)
+                val open = PendingIntent.getActivity(this@MainActivity, id, launch, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                val b = Notification.Builder(this@MainActivity, "cursed_jobs").setSmallIcon(R.mipmap.ic_launcher).setContentTitle(title).setContentText(body).setContentIntent(open).setAutoCancel(true)
+                if (picture != null) b.setLargeIcon(picture).setStyle(Notification.BigPictureStyle().bigPicture(picture).setSummaryText(body))
+                else b.setStyle(Notification.BigTextStyle().bigText(body))
+                if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) nm.notify(id, b.build())
+            }
         }
     }
 
@@ -136,6 +158,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        intent.getStringExtra("open_tab")?.takeIf { it.isNotEmpty() && tab != null }?.let { openTab(it) }
         val shared = ShareIn.urisOf(intent)
         if (shared.isEmpty()) return
         pendingShare = shared
@@ -412,6 +435,14 @@ class MainActivity : AppCompatActivity() {
         root.addView(bar)
         selectTab("chat")
         takeShare()
+    }
+
+    /** Opens the studio page a notification is about: one of the bar's tabs, or any other page under More. */
+    private fun openTab(page: String) {
+        if (page == "chat") return selectTab("chat")
+        if (page in webTabs) return selectTab(page)
+        selectTab("more")
+        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('cursed:goto',{detail:{tab:'${page.replace("'", "")}'}}))", null)
     }
 
     private fun selectTab(id: String) {
