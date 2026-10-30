@@ -84,6 +84,21 @@ class MainActivity : AppCompatActivity() {
 
     /** The phone's own file picker, for Phone settings > Add a model. */
     private var onPicked: ((Uri?) -> Unit)? = null
+    /** The phone's speech recognizer for the chat's 🎤 (it shows its own listening screen; offline where the phone has the language). */
+    private var onHeard: ((String?) -> Unit)? = null
+    private val recognize = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val heard = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        onHeard?.invoke(if (r.resultCode == RESULT_OK) heard else null); onHeard = null
+    }
+    private fun listen(cb: (String?) -> Unit) {
+        onHeard = cb
+        val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to Cursed_Ai")
+        try { recognize.launch(i) } catch (e: Exception) { onHeard = null; cb(null); android.widget.Toast.makeText(this, "This phone has no speech recognizer (install or enable Google voice typing).", android.widget.Toast.LENGTH_LONG).show() }
+    }
+
     private val pickDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> onPicked?.invoke(uri); onPicked = null }
     private var tabBar: LinearLayout? = null
 
@@ -395,7 +410,7 @@ class MainActivity : AppCompatActivity() {
         pcMode = false
         pcUsed = null
         startForegroundService(Intent(this, CursedRuntimeService::class.java))
-        showShell("http://127.0.0.1:11434/index.html")
+        showShell(null) // the studio pages need the PC; on the phone alone there is Chat and Settings
     }
 
     /** Requests to the connected PC carry the access code and use its pinned certificate. */
@@ -409,23 +424,23 @@ class MainActivity : AppCompatActivity() {
     /** The studio pages behind each web tab (the page listens for this event to switch). */
     private val webTabs = mapOf("image" to "image", "video" to "video", "series" to "series")
 
-    /** The bottom bar: native Chat plus the studio's pages. Connected to a PC: Chat, Image, Video, Series, More; on the phone alone: Chat and Studio. */
-    private fun showShell(webUrl: String) {
+    /** The bottom bar: native Chat plus the studio's pages. Connected to a PC: Chat, Image, Video, Series, More; on the phone alone: Chat and Settings. */
+    private fun showShell(webUrl: String?) {
         root.removeAllViews()
         val content = FrameLayout(this)
         shellContent = content
         root.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         (webView.parent as? android.view.ViewGroup)?.removeView(webView)
         content.addView(webView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        webView.loadUrl(webUrl)
-        val chat = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }, { selectTab("settings") }).view()
+        if (webUrl != null) webView.loadUrl(webUrl)
+        val chat = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }, { selectTab("settings") }, { listen(it) }).view()
         chatView = chat
         content.addView(chat, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         val ps = PhoneSettings(this, prefs, { cb -> onPicked = cb; pickDocument.launch(arrayOf("*/*")) }, { selectTab("chat") }, { pcMode = false; showChooser() })
         settings = ps
         settingsView = ps.view().also { content.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)) }
 
-        val tabs = if (pcMode) listOf("chat" to "Chat", "image" to "Image", "video" to "Video", "series" to "Series", "more" to "More") else listOf("chat" to "Chat", "more" to "Studio")
+        val tabs = if (pcMode) listOf("chat" to "Chat", "image" to "Image", "video" to "Video", "series" to "Series", "more" to "More") else listOf("chat" to "Chat", "settings" to "Settings")
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(Color.parseColor("#141416")) }
         tabBar = bar
         for ((id, label) in tabs) bar.addView(TextView(this).apply {
@@ -457,7 +472,8 @@ class MainActivity : AppCompatActivity() {
         webTabs[id]?.let { webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('cursed:goto',{detail:{tab:'$it'}}))", null) }
         tabBar?.let { bar ->
             for (i in 0 until bar.childCount) (bar.getChildAt(i) as TextView).apply {
-                val on = tag == id || (id == "settings" && tag == "chat")
+                val hasSettingsTab = (0 until bar.childCount).any { bar.getChildAt(it).tag == "settings" }
+                val on = tag == id || (id == "settings" && !hasSettingsTab && tag == "chat")
                 setTextColor(Color.parseColor(if (on) "#FFFFFF" else "#71717A"))
                 setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
                 setBackgroundColor(Color.parseColor(if (on) "#27272A" else "#141416"))

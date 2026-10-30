@@ -9,6 +9,34 @@
 #include <sys/time.h>
 
 #include "llama.h"
+
+// Tokens are pieces of UTF-8 that can end in the middle of a character (accents, Hindi, emoji). JNI's NewStringUTF
+// wants complete "modified UTF-8" and aborts the app on anything else (and on 4-byte characters such as emoji), so
+// text goes to Java as UTF-16 instead, and an unfinished character waits in `pending` for the next token.
+static jstring take_utf16(JNIEnv *env, std::string &pending) {
+    std::u16string out;
+    size_t i = 0;
+    while (i < pending.size()) {
+        unsigned char c = (unsigned char) pending[i];
+        size_t len = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 0;
+        if (len == 0) { out.push_back(0xFFFD); i++; continue; }      // not a valid start byte
+        if (i + len > pending.size()) break;                           // the rest of this character comes later
+        uint32_t cp = len == 1 ? c : c & (0xFF >> (len + 1));
+        bool ok = true;
+        for (size_t k = 1; k < len; k++) {
+            unsigned char cc = (unsigned char) pending[i + k];
+            if ((cc >> 6) != 0x2) { ok = false; break; }
+            cp = (cp << 6) | (cc & 0x3F);
+        }
+        if (!ok) { out.push_back(0xFFFD); i++; continue; }
+        if (cp >= 0x10000) { cp -= 0x10000; out.push_back((char16_t) (0xD800 + (cp >> 10))); out.push_back((char16_t) (0xDC00 + (cp & 0x3FF))); }
+        else out.push_back((char16_t) cp);
+        i += len;
+    }
+    pending.erase(0, i);
+    if (out.empty()) return nullptr;
+    return env->NewString(reinterpret_cast<const jchar *>(out.data()), (jsize) out.size());
+}
 #include "ggml-backend.h"
 
 #define TAG "CursedNative"
@@ -179,6 +207,7 @@ Java_com_cursed_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong mod
         int tokens_generated = 0;
         const int max_new_tokens = max_tokens > 0 ? max_tokens : 512;
         uint32_t n_cur = (uint32_t) n_tokens;
+        std::string pending;
 
         llama_batch batch = llama_batch_get_one(tokens.data(), (int32_t) tokens.size());
         if (llama_decode(inst->ctx, batch) != 0) {
@@ -199,9 +228,11 @@ Java_com_cursed_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong mod
             char piece_buf[256];
             int32_t piece_len = llama_token_to_piece(inst->vocab, new_token, piece_buf, sizeof(piece_buf), 0, true);
             if (piece_len > 0) {
-                jstring tokenStr = env->NewStringUTF(std::string(piece_buf, piece_len).c_str());
-                env->CallVoidMethod(callback, onTokenMethod, tokenStr);
-                env->DeleteLocalRef(tokenStr);
+                pending.append(piece_buf, piece_len);
+                if (jstring tokenStr = take_utf16(env, pending)) {
+                    env->CallVoidMethod(callback, onTokenMethod, tokenStr);
+                    env->DeleteLocalRef(tokenStr);
+                }
             }
             tokens_generated++;
 

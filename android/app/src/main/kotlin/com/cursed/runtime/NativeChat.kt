@@ -8,6 +8,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -40,6 +42,8 @@ class NativeChat(
     private val openPc: (String) -> HttpURLConnection,
     private val startPhoneEngine: () -> Unit,
     private val openSettings: () -> Unit,
+    /** Opens the phone's speech recognizer and hands back what was said (null when nothing was). */
+    private val listen: ((String?) -> Unit) -> Unit,
 ) {
     private val ui = Handler(Looper.getMainLooper())
     private val messages = JSONArray(prefs.getString("chat_messages", "[]"))
@@ -52,6 +56,30 @@ class NativeChat(
     private lateinit var input: EditText
     private lateinit var send: Button
     private lateinit var modelBtn: Button
+    private lateinit var status: TextView
+    private lateinit var speakBtn: Button
+
+    /** Spoken replies (the 🔈 switch): the phone's own text-to-speech reads each finished answer. */
+    private var speak = prefs.getBoolean("chat_speak", false)
+    private var tts: TextToSpeech? = null
+    private fun say(text: String) {
+        if (!speak || text.isBlank()) return
+        val go = { t: TextToSpeech -> t.speak(text.take(3900), TextToSpeech.QUEUE_FLUSH, null, "reply") }
+        tts?.let { go(it); return }
+        var made: TextToSpeech? = null
+        made = TextToSpeech(ctx) { ok ->
+            if (ok != TextToSpeech.SUCCESS) return@TextToSpeech
+            made!!.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(id: String?) { ui.post { setStatus("Speaking... (tap 🔈 to stop)") } }
+                override fun onDone(id: String?) { ui.post { setStatus("") } }
+                @Deprecated("Deprecated in Java") override fun onError(id: String?) { ui.post { setStatus("") } }
+            })
+            tts = made; go(made!!)
+        }
+    }
+
+    /** The line above the message box: waiting for the model, replying, listening, speaking. */
+    private fun setStatus(t: String) { status.text = t; status.visibility = if (t.isEmpty()) View.GONE else View.VISIBLE }
 
     private fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
     private fun round(color: String, r: Int) = GradientDrawable().apply { setColor(Color.parseColor(color)); cornerRadius = dp(r).toFloat() }
@@ -70,6 +98,11 @@ class NativeChat(
             text = "New chat"; isAllCaps = false; textSize = 13f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18)
             setOnClickListener { if (!busy) { while (messages.length() > 0) messages.remove(0); save(); render() } }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { leftMargin = dp(8) })
+        speakBtn = Button(ctx).apply {
+            textSize = 15f; background = round("#18181B", 18); contentDescription = "Speak replies"
+            setOnClickListener { speak = !speak; prefs.edit().putBoolean("chat_speak", speak).apply(); if (!speak) { tts?.stop(); setStatus("") }; render() }
+        }
+        bar.addView(speakBtn, LinearLayout.LayoutParams(dp(44), dp(38)).apply { leftMargin = dp(8) })
         bar.addView(Button(ctx).apply {
             text = "⚙"; textSize = 16f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18); contentDescription = "Phone settings"
             setOnClickListener { openSettings() }
@@ -80,6 +113,9 @@ class NativeChat(
         scroll = ScrollView(ctx).apply { addView(list); isFillViewport = true }
         col.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
+        status = TextView(ctx).apply { textSize = 12f; setTextColor(Color.parseColor("#A78BFA")); setPadding(dp(16), dp(4), dp(16), 0); visibility = View.GONE }
+        col.addView(status)
+
         // Message box and send / stop.
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM; setPadding(dp(10), dp(8), dp(10), dp(10)) }
         input = EditText(ctx).apply {
@@ -87,6 +123,14 @@ class NativeChat(
             maxLines = 6; textSize = 15f; setTextColor(Color.WHITE); setHintTextColor(Color.parseColor("#71717A"))
             background = round("#18181B", 20); setPadding(dp(14), dp(10), dp(14), dp(10))
         }
+        row.addView(Button(ctx).apply {
+            text = "🎤"; textSize = 16f; background = round("#18181B", 20); contentDescription = "Talk"
+            setOnClickListener {
+                if (busy) return@setOnClickListener
+                tts?.stop(); setStatus("Listening...")
+                listen { heard -> setStatus(""); if (!heard.isNullOrBlank()) { input.setText(heard); sendMessage() } }
+            }
+        }, LinearLayout.LayoutParams(dp(46), dp(46)).apply { rightMargin = dp(6) })
         row.addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         send = Button(ctx).apply {
             isAllCaps = false; textSize = 14f; setTextColor(Color.WHITE)
@@ -107,6 +151,8 @@ class NativeChat(
     private fun render() {
         modelBtn.text = model?.let { "${it.name}  ·  ${if (it.onPhone) "on this phone" else "on your PC"}  ▾" } ?: "Choose a model  ▾"
         send.text = if (busy) "Stop" else "Send"
+        speakBtn.text = if (speak) "🔊" else "🔈"
+        speakBtn.setTextColor(Color.parseColor(if (speak) "#A78BFA" else "#71717A"))
         send.background = round(if (busy) "#DC2626" else "#7C3AED", 20)
         list.removeAllViews()
         if (messages.length() == 0) list.addView(TextView(ctx).apply {
@@ -222,6 +268,7 @@ class NativeChat(
         val answer = JSONObject().put("role", "assistant").put("content", "")
         messages.put(answer)
         busy = true; save(); render()
+        setStatus(if (m.onPhone) "Waiting for the phone's model (the first answer loads it)..." else "Waiting for the model on your PC...")
         val history = JSONArray((0 until messages.length() - 1).map { messages.getJSONObject(it) }.filter { !it.optBoolean("error") }.map { JSONObject().put("role", it.getString("role")).put("content", it.getString("content")) })
         thread {
             try {
@@ -241,13 +288,13 @@ class NativeChat(
                         val j = runCatching { JSONObject(data) }.getOrNull() ?: continue
                         if (j.has("error") && !j.isNull("error")) throw Exception(j.getString("error"))
                         val tok = j.optString("token", "")
-                        if (tok.isNotEmpty()) ui.post { answer.put("content", answer.getString("content") + tok); showLast(answer.getString("content")) }
+                        if (tok.isNotEmpty()) ui.post { answer.put("content", answer.getString("content") + tok); showLast(answer.getString("content")); setStatus("Replying...") }
                     }
                 }
             } catch (e: Exception) {
                 if (busy) ui.post { if (answer.getString("content").isEmpty()) answer.put("content", e.message ?: "Something went wrong.").put("error", true) }
             } finally {
-                ui.post { busy = false; live = null; save(); render() }
+                ui.post { busy = false; live = null; save(); render(); setStatus(""); if (!answer.optBoolean("error")) say(answer.getString("content")) }
             }
         }
     }

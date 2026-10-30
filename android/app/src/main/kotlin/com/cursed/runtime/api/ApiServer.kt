@@ -174,9 +174,14 @@ class ApiServer(private val context: Context, private val port: Int = 11434) {
                 post("/api/chat") {
                     val request = call.receive<ChatRequest>()
 
+                    // A new message takes over: the answer still running (or one whose reader went away, e.g. after
+                    // Stop) is stopped first. One that does not stop within 15 s is treated as stuck and cleared, so
+                    // the engine can never stay "busy" for good.
                     if (ModelManager.currentState == ModelManager.EngineState.BUSY) {
-                        call.respond(io.ktor.http.HttpStatusCode.TooManyRequests, mapOf("error" to "Engine is busy"))
-                        return@post
+                        ModelManager.stopCurrentInference()
+                        var waited = 0
+                        while (ModelManager.currentState == ModelManager.EngineState.BUSY && waited < 15000) { kotlinx.coroutines.delay(100); waited += 100 }
+                        if (ModelManager.currentState == ModelManager.EngineState.BUSY) ModelManager.setBusy(false)
                     }
 
                     val channel = Channel<String>(Channel.UNLIMITED)
