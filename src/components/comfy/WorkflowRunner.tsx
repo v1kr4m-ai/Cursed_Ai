@@ -911,6 +911,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               {stageItem?.prompt && <button onClick={() => reusePrompt(stageItem)} title="Reuse this prompt" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><CornerUpLeft size={13} /> Prompt</button>}
               {isImage(stagePath) && wf && wf.refImageCount > 0 && <button onClick={() => useAsReference(stagePath)} title="Use as reference image" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><ImageIcon size={13} /> Reference</button>}
               {isImage(stagePath) && !stagePath.startsWith("data:") && <SendToSeries path={stagePath} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`} />}
+              {kind === "audio" && /\.(mp3|wav|flac|ogg|m4a)$/i.test(stagePath) && <SendToSeries audio path={stagePath} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`} />}
               <ShareMenu kind={kind} url={(stagePath.startsWith("data:") || stagePath.startsWith("blob:") || stagePath.startsWith("/api/")) ? stagePath : fileUrl(stagePath)} caption={stageItem?.prompt} onReveal={() => reveal(stagePath)} tab={kind} />
               <button onClick={() => reveal(stagePath)} title="Show in folder" className={iconBtn}><ExternalLink size={14} /></button>
               <button onClick={() => removeResult(stagePath)} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>

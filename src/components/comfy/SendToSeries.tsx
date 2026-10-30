@@ -10,8 +10,9 @@ const field = "w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1 te
 /**
  * Sends a finished picture to a series as a reference photo of one of its episodes: a face from an expression
  * sheet, an outfit, a location. It lands done, exactly like a picture dropped on the Develop tab.
+ * With `audio`, the file is added to the episode's audio tracks instead (from the start, ready to place and mix).
  */
-export function SendToSeries({ path, className }: { path: string; className: string }) {
+export function SendToSeries({ path, className, audio }: { path: string; className: string; audio?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [list, setList] = React.useState<ProjectSummary[] | null>(null);
   const [project, setProject] = React.useState<Project | null>(null);
@@ -39,18 +40,24 @@ export function SendToSeries({ path, className }: { path: string; className: str
     setBusy(true);
     try {
       const blob = await (await fetch(fileUrl(path))).blob();
-      const name = path.split(/[\\/]/).pop() || "picture.png";
+      const name = path.split(/[\\/]/).pop() || (audio ? "audio.mp3" : "picture.png");
+      if (audio) {
+        await api.uploadAudio(project.id, episodeId, new File([blob], name, { type: blob.type || "audio/mpeg" }), 0);
+        notify({ message: `Added to "${project.title}" as an audio track`, tab: "series" });
+        setOpen(false);
+        return;
+      }
       const info = REF_KINDS.find(k => k.id === kind)!;
       await api.uploadRef(project.id, episodeId, new File([blob], name, { type: blob.type || "image/png" }), label.trim() || person.trim() || name.replace(/\.[^.]+$/, ""), info.role, kind, kind === "person" ? person.trim() : undefined);
       notify({ message: `Added to "${project.title}" as ${info.label.toLowerCase()}`, tab: "series" });
       setOpen(false);
-    } catch (e: any) { notifyError(e?.message || String(e), "image"); }
+    } catch (e: any) { notifyError(e?.message || String(e), audio ? "audio" : "image"); }
     finally { setBusy(false); }
   };
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(o => !o)} title="Add this picture to a series as a reference photo" className={className}><Clapperboard size={13} /> Series</button>
+      <button onClick={() => setOpen(o => !o)} title={audio ? "Add this to an episode's audio tracks" : "Add this picture to a series as a reference photo"} className={className}><Clapperboard size={13} /> Series</button>
       {open && (
         <div className="absolute bottom-full right-0 z-30 mb-2 w-72 space-y-2 rounded-xl border border-white/10 bg-zinc-950 p-3 shadow-2xl">
           {list === null ? <p className="flex items-center gap-1.5 text-[11px] text-zinc-500"><Loader2 size={12} className="animate-spin" />Loading series...</p>
@@ -64,6 +71,7 @@ export function SendToSeries({ path, className }: { path: string; className: str
                 {project.episodes.length > 1 && <select value={episodeId} onChange={e => setEpisodeId(e.target.value)} className={field}>
                   {project.episodes.map(e => <option key={e.id} value={e.id}>Episode {e.number}{e.title ? `: ${e.title}` : ""}</option>)}
                 </select>}
+                {!audio && <>
                 <select value={kind} onChange={e => setKind(e.target.value as RefKind)} className={field}>
                   {REF_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
                 </select>
@@ -72,7 +80,8 @@ export function SendToSeries({ path, className }: { path: string; className: str
                   <datalist id="send-series-people">{people.map(n => <option key={n} value={n} />)}</datalist>
                 </>}
                 <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Name of the picture (optional)" className={field} />
-                <button onClick={send} disabled={busy || !episodeId} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-white/10 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 disabled:opacity-40">{busy && <Loader2 size={12} className="animate-spin" />}Add to series</button>
+                </>}
+                <button onClick={send} disabled={busy || !episodeId} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-white/10 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 disabled:opacity-40">{busy && <Loader2 size={12} className="animate-spin" />}{audio ? "Add to the episode's audio" : "Add to series"}</button>
               </>}
             </>}
         </div>
