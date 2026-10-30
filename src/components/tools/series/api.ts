@@ -152,6 +152,12 @@ export const api = {
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/burn`, { method: "POST" }),
   redoSceneSubtitles: (id: string, episodeId: string, sceneId: string, source: string) =>
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/scene`, { method: "POST", body: JSON.stringify({ sceneId, source }) }),
+  async uploadClip(id: string, sceneId: string, file: File) {
+    const res = await fetch(`/api/series/projects/${id}/scenes/${sceneId}/clip?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "Content-Type": "video/mp4" }, body: file });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not use that clip.");
+    return data as { ok: true; clipPath: string };
+  },
   async uploadAudio(id: string, episodeId: string, file: File, offset = 0) {
     const res = await fetch(`/api/series/projects/${id}/episodes/${episodeId}/audio/upload?name=${encodeURIComponent(file.name)}&offset=${offset}`, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
     const data = await res.json();

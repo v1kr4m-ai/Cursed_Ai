@@ -10,6 +10,7 @@ import type { StudioRequest } from "../../services/studioIntent";
 import { PreviousResults } from "./PreviousResults";
 import { savedSetting } from "../../lib/settingsStore";
 import { ShareMenu } from "./ShareMenu";
+import { SendToSeries } from "./SendToSeries";
 import { MediaView, QueueList, QueueRow, Section, Stage, StudioFrame, fieldCls, iconBtn, isImagePath, label } from "./shared";
 import { ACCENT, Kind, api, fileUrl, nativeFiles, postJson } from "./types";
 
@@ -360,6 +361,8 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
           <p className="text-[11px] text-zinc-500 truncate flex-1 min-w-[140px]" title={view?.prompt}>{view?.prompt || (stageFile ?? "")}</p>
           {view?.prompt && <button onClick={() => setPrompt(view.prompt!)} title="Reuse this prompt" className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><CornerUpLeft size={13} /> Prompt</button>}
           {engine === "quick" && isImagePath(stageSrc) && <button onClick={() => useResultAsImage(stageSrc)} title={kind === "video" ? "Start the next clip from this image" : "Use as reference image"} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`}><ImageIcon size={13} /> {kind === "video" ? "Start frame" : "Reference"}</button>}
+          {/\.(png|jpe?g|webp)$/i.test(stageSrc) && <SendToSeries path={stageSrc} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`} />}
+          {kind === "video" && /\.mp4$/i.test(stageSrc) && <SendToSeries mode="video" path={stageSrc} className={`${iconBtn} flex items-center gap-1.5 text-[11px] font-semibold`} />}
           <ShareMenu kind={kind} url={stageSrc} caption={view?.prompt} onReveal={stageFile ? reveal : undefined} tab={kind} />
           {stageFile && <button onClick={reveal} title="Show in folder" className={iconBtn}><ExternalLink size={14} /></button>}
           {stageFile && <button onClick={removeResult} title="Delete this result" className={`${iconBtn} hover:!text-red-400`}><Trash2 size={14} /></button>}

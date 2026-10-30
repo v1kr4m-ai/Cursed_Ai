@@ -551,6 +551,23 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     res.json({ ok: true });
   });
 
+  /** Use a finished video (from the Video studio, say) as a scene's clip instead of rendering one. */
+  app.post("/api/series/projects/:id/scenes/:sceneId/clip", express.raw({ type: "*/*", limit: "2gb" }), async (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const found = findScene(p, req.params.sceneId);
+    if (!found) return bad(res, 404, "No such scene.");
+    if (found.scene.status === "running" || found.scene.status === "queued") return bad(res, 409, "This scene is rendering right now. Cancel it first.");
+    if (path.extname(String(req.query.name || "")).toLowerCase() !== ".mp4") return bad(res, 400, "Attach an MP4 video.");
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return bad(res, 400, "That file was empty.");
+    const dest = uniqueDestination(path.join(store.clipsDir(p), `ep${String(found.ep.number).padStart(2, "0")}_scene${String(found.scene.number).padStart(2, "0")}.mp4`));
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, req.body);
+    mark(p.id, found.scene.id, "scene", { status: "done", clipPath: dest, durationS: await probeDuration(dest), error: null });
+    emit(p.id, { type: "finished", targetId: found.scene.id, kind: "scene", file: dest });
+    res.json({ ok: true, clipPath: dest });
+  });
+
   /** Queue everything an episode still needs: missing references first, then unrendered scenes. */
   app.post("/api/series/projects/:id/episodes/:episodeId/generate", (req, res) => {
     const p = store.get(req.params.id);
