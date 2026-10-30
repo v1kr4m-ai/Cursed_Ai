@@ -14,6 +14,7 @@ import { freeComfyForLLM, handoffEnabled, setHandoff } from "./gpuHandoff";
 import { nodeList, registerWorkflowHub, workflowFolder } from "./workflowHub";
 import { registerComfyNodes } from "./comfyNodes";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
+import { HTTPS_PORT, listenHttps } from "./lanHttps";
 import { registerOllamaClaude } from "./ollamaClaude";
 import { registerTrainTool } from "./trainTool/routes";
 import { registerSpeechTool } from "./trainTool/speech";
@@ -56,7 +57,7 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
   // Other devices on the network need an access code (this PC never does). serverConfig and saveConfig are defined further down; they are only used when a request arrives.
-  registerPhoneAccess(app, { get: () => serverConfig.phone || {}, set: c => { serverConfig.phone = c; saveConfig(); }, port: PORT });
+  registerPhoneAccess(app, { get: () => serverConfig.phone || {}, set: c => { serverConfig.phone = c; saveConfig(); }, port: PORT, httpsPort: HTTPS_PORT });
 
   // Default express.json() limit is 100kb - too small for base64-encoded
   // reference/source images (image generation, ComfyUI img2img/SVD), which
@@ -1776,6 +1777,8 @@ async function startServer() {
     if (e.code === "EAFNOSUPPORT" || e.code === "EADDRNOTAVAIL") app.listen(PORT, "0.0.0.0", onListening); // IPv6 off on this PC
     else throw e;
   });
+  // The same studio over HTTPS for phones (their browsers allow the microphone only on a secure page).
+  listenHttps(app, path.join(process.cwd(), "https"));
 }
 
 startServer();

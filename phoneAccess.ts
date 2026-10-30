@@ -39,9 +39,9 @@ export function decide(input: { ip?: string; enabled: boolean; code: string; coo
 }
 
 /** The addresses a phone can use to reach this PC. */
-export function lanAddresses(port: number): string[] {
+export function lanAddresses(port: number, scheme = "http"): string[] {
   const out: string[] = [];
-  for (const list of Object.values(os.networkInterfaces())) for (const n of list || []) if (n.family === "IPv4" && !n.internal) out.push(`http://${n.address}:${port}`);
+  for (const list of Object.values(os.networkInterfaces())) for (const n of list || []) if (n.family === "IPv4" && !n.internal) out.push(`${scheme}://${n.address}:${port}`);
   return out;
 }
 
@@ -54,7 +54,7 @@ const loginPage = (error = "") => page(`<h1>Cursed_Ai</h1><p>Enter the access co
 <form method="post" action="/__phone-login"><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" autofocus><button>Open the studio</button></form>`);
 const offPage = page(`<h1>Phone access is off</h1><p>The PC has switched off access from other devices. Turn it on in <b>Settings &gt; General &gt; Phone &amp; other devices</b> on the PC.</p>`);
 
-export function registerPhoneAccess(app: express.Express, opts: { get: () => PhoneConfig; set: (c: PhoneConfig) => void; port: number }) {
+export function registerPhoneAccess(app: express.Express, opts: { get: () => PhoneConfig; set: (c: PhoneConfig) => void; port: number; httpsPort?: number }) {
   const cfg = () => {
     const c = opts.get();
     if (!c.code) opts.set({ ...c, code: newCode() });
@@ -104,7 +104,8 @@ export function registerPhoneAccess(app: express.Express, opts: { get: () => Pho
   app.get("/api/phone/info", (req, res) => {
     if (!local(req, res)) return;
     const { enabled, code } = cfg();
-    res.json({ enabled, code, port: opts.port, addresses: lanAddresses(opts.port), firewall: `netsh advfirewall firewall add rule name="Cursed_Ai phone" dir=in action=allow protocol=TCP localport=${opts.port} profile=private` });
+    const ports = [opts.port, opts.httpsPort].filter(Boolean).join(",");
+    res.json({ enabled, code, port: opts.port, addresses: lanAddresses(opts.port), secureAddresses: opts.httpsPort ? lanAddresses(opts.httpsPort, "https") : [], firewall: `netsh advfirewall firewall add rule name="Cursed_Ai phone" dir=in action=allow protocol=TCP localport=${ports} profile=private` });
   });
 
   app.post("/api/phone/config", express.json(), (req, res) => {

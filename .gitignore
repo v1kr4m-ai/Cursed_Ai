@@ -70,3 +70,6 @@ modules/**/*.zip
 /train/
 /unsloth_compiled_cache/
 comfy-object-info.json
+
+# HTTPS certificate for phones (holds a private key)
+/https/

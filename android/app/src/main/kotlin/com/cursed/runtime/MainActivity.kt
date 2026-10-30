@@ -39,9 +39,17 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.cursed.runtime.services.CursedRuntimeService
+import android.net.http.SslCertificate
+import android.net.http.SslError
+import android.webkit.SslErrorHandler
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.cert.X509Certificate
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 import kotlin.concurrent.thread
 
 /**
@@ -143,6 +151,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         webViewClient = object : WebViewClient() {
+            // The PC's secure address uses a certificate the PC made itself. It is trusted only if it is the one
+            // remembered when this phone first connected (trust on first use); anything else is refused.
+            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                val pin = prefs.getString("pc_cert", null)
+                val der = error?.certificate?.let { SslCertificate.saveState(it).getByteArray("x509-certificate") }
+                if (pcMode && pin != null && der != null && fingerprint(der) == pin) handler?.proceed() else handler?.cancel()
+            }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame != true) return
                 Log.e("Cursed", "WebView error ${error?.errorCode}: ${error?.description}")
@@ -172,7 +187,7 @@ class MainActivity : AppCompatActivity() {
 
         col.addView(text("Connect to my PC", 16f, "#FFFFFF", bold = true, topDp = 28))
         col.addView(text("The studio you use on the PC, with its models, ComfyUI and series. On the PC open Settings > General > Phone & other devices to see the address and code.", 12f, "#A1A1AA", topDp = 4))
-        val address = field("PC address, e.g. 192.168.1.5:3000", prefs.getString("pc_address", "") ?: "", InputType.TYPE_TEXT_VARIATION_URI)
+        val address = field("PC address, e.g. 192.168.1.5", prefs.getString("pc_address", "") ?: "", InputType.TYPE_TEXT_VARIATION_URI)
         val code = field("Access code (6 digits)", prefs.getString("pc_code", "") ?: "", InputType.TYPE_CLASS_NUMBER)
         col.addView(address); col.addView(code)
         val status = text(message ?: "", 12f, if (message != null) "#FCA5A5" else "#A1A1AA", topDp = 6)
@@ -216,29 +231,67 @@ class MainActivity : AppCompatActivity() {
         setOnClickListener { onClick() }
     }
 
-    /** "192.168.1.5" -> http://192.168.1.5:3000 ; a full address is kept. */
+    /** "192.168.1.5" -> https://192.168.1.5:3443 (the PC's secure address, needed for the microphone); a full address is kept. */
     private fun baseUrl(input: String): String {
         var a = input.trim().trimEnd('/')
-        if (!a.startsWith("http://") && !a.startsWith("https://")) a = "http://$a"
+        if (!a.startsWith("http://") && !a.startsWith("https://")) a = "https://" + a.removeSuffix(":3000") // an address saved before the secure one existed
         val hostPart = a.substringAfter("://").substringBefore("/")
-        if (!hostPart.contains(":") && a.startsWith("http://")) a += ":3000"
+        if (!hostPart.contains(":")) a += if (a.startsWith("https://")) ":3443" else ":3000"
         return a
+    }
+
+    /** The plain address of the same PC, for a PC app that has no secure address yet. */
+    private fun plainUrl(base: String): String? =
+        if (base.startsWith("https://") && base.endsWith(":3443")) "http://" + base.removePrefix("https://").removeSuffix(":3443") + ":3000" else null
+
+    private fun fingerprint(der: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(der).joinToString("") { "%02x".format(it) }
+
+    /**
+     * Opens a connection; for https, accepts the PC's own certificate if it is the remembered one, or - when none is
+     * remembered yet - any, reporting what it saw in `seen` so it can be remembered after the code is accepted.
+     */
+    private fun open(url: URL, seen: Array<String?>): HttpURLConnection {
+        val c = url.openConnection() as HttpURLConnection
+        if (c is HttpsURLConnection) {
+            val pin = prefs.getString("pc_cert", null)
+            val trust = object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                    val fp = fingerprint(chain[0].encoded)
+                    if (pin != null && fp != pin) throw java.security.cert.CertificateException("This is not the PC this phone connected to before.")
+                    seen[0] = fp
+                }
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            }
+            c.sslSocketFactory = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }.socketFactory
+            c.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true } // the certificate itself is pinned above
+        }
+        return c
     }
 
     /** Checks the PC answers and accepts the code, then opens the studio in the WebView (the login sets the cookie). */
     private fun connect(address: String, code: String, auto: Boolean, onFail: (String) -> Unit = { showChooser(it) }) {
         val base = baseUrl(address)
+        // Typing the address in by hand starts afresh: the PC's certificate is learned again on this connect.
+        if (!auto) prefs.edit().remove("pc_cert").apply()
         if (auto) {
             // Reopening the last PC: say what is happening while it answers.
             root.removeAllViews()
             root.addView(text("Connecting to your PC...", 15f, "#D4D4D8", topDp = 200))
         }
         thread {
+            val seen = arrayOfNulls<String>(1)
+            var used = base
             val result: Pair<Boolean, String> = try {
-                val url = URL("$base/__phone-login?code=" + URLEncoder.encode(code, "UTF-8"))
-                val c = (url.openConnection() as HttpURLConnection).apply { connectTimeout = 5000; readTimeout = 6000; instanceFollowRedirects = false }
-                val status = c.responseCode
-                c.disconnect()
+                val status = try {
+                    ask(base, code, seen)
+                } catch (e: java.io.IOException) {
+                    // An older PC app has no secure address: use the plain one (no microphone on the phone then).
+                    val plain = plainUrl(base) ?: throw e
+                    if (e is javax.net.ssl.SSLException && e.cause is java.security.cert.CertificateException) throw e
+                    used = plain
+                    ask(plain, code, seen)
+                }
                 when (status) {
                     302, 200 -> if (status == 302) true to "" else false to "The PC answered, but it wants an access code. Type the 6-digit code from Settings > General > Phone & other devices."
                     401 -> false to "That code is not right. Check Settings > General > Phone & other devices on the PC (a new code replaces the old one)."
@@ -246,19 +299,30 @@ class MainActivity : AppCompatActivity() {
                     429 -> false to "Too many wrong codes. Wait a minute and try again."
                     else -> false to "The PC answered with an unexpected error ($status)."
                 }
+            } catch (e: javax.net.ssl.SSLException) {
+                false to "The PC's certificate changed, so this may not be your PC. If you reinstalled the app or moved the studio to another PC, type the address and code again and tap Connect."
             } catch (e: Exception) {
                 false to "Could not reach $base. Check that the PC app is running, the phone is on the same Wi-Fi, and Windows allows the port (the command is shown in Settings > Phone & other devices)."
             }
             handler.post {
                 if (result.first) {
-                    prefs.edit().putString("mode", "pc").putString("pc_address", address).putString("pc_code", code).apply()
+                    val e = prefs.edit().putString("mode", "pc").putString("pc_address", address).putString("pc_code", code)
+                    if (seen[0] != null && prefs.getString("pc_cert", null) == null) e.putString("pc_cert", seen[0])
+                    e.apply()
                     pcMode = true
-                    openWeb("$base/__phone-login?code=" + URLEncoder.encode(code, "UTF-8"))
+                    openWeb("$used/__phone-login?code=" + URLEncoder.encode(code, "UTF-8"))
                 } else if (auto) {
                     showChooser(result.second)
                 } else onFail(result.second)
             }
         }
+    }
+
+    private fun ask(base: String, code: String, seen: Array<String?>): Int {
+        val c = open(URL("$base/__phone-login?code=" + URLEncoder.encode(code, "UTF-8")), seen).apply { connectTimeout = 5000; readTimeout = 6000; instanceFollowRedirects = false }
+        val status = c.responseCode
+        c.disconnect()
+        return status
     }
 
     private fun openOnPhone() {

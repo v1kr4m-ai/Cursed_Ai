@@ -2,7 +2,7 @@ import React from "react";
 import { Check, Copy, Loader2, RefreshCw, Smartphone } from "lucide-react";
 import { notifyError } from "../../lib/notify";
 
-interface Info { enabled: boolean; code: string; port: number; addresses: string[]; firewall?: string }
+interface Info { enabled: boolean; code: string; port: number; addresses: string[]; secureAddresses?: string[]; firewall?: string }
 
 const btn = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold disabled:opacity-40 transition-colors";
 
@@ -64,10 +64,25 @@ export function PhoneAccessSettings() {
             </div>
           </div>
 
+          {!!info.secureAddresses?.length && (
+            <div className="py-4">
+              <p className="text-sm font-bold tracking-tight text-zinc-100">Secure address (for the microphone)</p>
+              <p className="mt-0.5 text-xs text-zinc-500">Phone browsers allow the microphone only on a secure page. Open this one instead to talk to the studio. The first time, the phone warns that the connection is not private, because this PC made its own certificate: tap Advanced, then Proceed (Android) or Show details, then visit this website (iPhone).</p>
+              <div className="mt-3 space-y-1.5">
+                {info.secureAddresses.map(a => (
+                  <div key={a} className="flex items-center gap-2">
+                    <span className="rounded-lg bg-black/30 px-3 py-1.5 font-mono text-xs text-emerald-300">{a}</span>
+                    <button onClick={() => copy(a, a)} className={btn}>{copied === a ? <Check size={13} /> : <Copy size={13} />}Copy</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {info.firewall && (
             <div className="py-4">
               <p className="text-sm font-bold tracking-tight text-zinc-100">If the phone cannot connect</p>
-              <p className="mt-0.5 text-xs text-zinc-500">Windows may block the port. Run this once in a Command Prompt opened as administrator (it allows the port on private networks only):</p>
+              <p className="mt-0.5 text-xs text-zinc-500">Windows may block the ports. Run this once in a Command Prompt opened as administrator (it allows the port on private networks only):</p>
               <div className="mt-3 flex items-start gap-2">
                 <code className="min-w-0 flex-1 break-all rounded-lg bg-black/30 px-3 py-2 font-mono text-[11px] text-zinc-300">{info.firewall}</code>
                 <button onClick={() => copy(info.firewall!, "fw")} className={btn}>{copied === "fw" ? <Check size={13} /> : <Copy size={13} />}Copy</button>
