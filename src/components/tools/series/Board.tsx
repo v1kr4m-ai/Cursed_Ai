@@ -15,7 +15,7 @@ import {
   Clock, Loader2, CheckCircle2, CircleSlash, Trash2, Wand2, Clapperboard, Mic,
   Plus, Check,
 } from "lucide-react";
-import { notifyError } from "../../../lib/notify";
+import { notify, notifyError } from "../../../lib/notify";
 import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type Status, type Take } from "./api";
 /** Same file, whatever the slashes or letter case (Windows paths). */
 const sameFile = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
@@ -200,6 +200,27 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
   );
 }
 
+/** Offers to delete the takes no scene uses (shown only when there are some), with the space it frees. */
+function UnusedTakes({ project }: { project: Project }) {
+  const [info, setInfo] = React.useState<{ count: number; bytes: number } | null>(null);
+  const sig = project.episodes.map(e => e.scenes.map(s => s.status + s.clipPath).join()).join("|");
+  const load = React.useCallback(() => { api.unusedTakes(project.id).then(setInfo).catch(() => setInfo(null)); }, [project.id]);
+  React.useEffect(load, [load, sig]);
+  if (!info?.count) return null;
+  const mb = (b: number) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`;
+  const clean = async () => {
+    if (!window.confirm(`Delete ${info.count} take${info.count === 1 ? "" : "s"} no scene uses (${mb(info.bytes)})? The take each scene joins is kept.`)) return;
+    try { const r = await api.deleteUnusedTakes(project.id); notify({ message: `Deleted ${r.count} unused takes, ${mb(r.bytes)} freed`, tab: "series" }); load(); }
+    catch (e: any) { notifyError(e?.message || String(e), "series"); }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-[11px] text-neutral-400">
+      <span className="flex-1">{info.count} older take{info.count === 1 ? "" : "s"} no scene uses ({mb(info.bytes)}). Play a scene to see its takes.</span>
+      <button onClick={clean} className="flex items-center gap-1 rounded-lg border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800"><Trash2 size={11} />Delete unused takes</button>
+    </div>
+  );
+}
+
 /** The scenes of an episode, with every take of each one (re-renders are kept, so an older take can be picked). */
 function SceneList({ project, episode, scenes, running, onChanged }: {
   project: Project; episode: Episode; scenes: Scene[];
@@ -223,6 +244,11 @@ function SceneCard({ project, episode, scene, running, onChanged, takes = [] }: 
   const fresh = isNew(scene.clipPath);
   const play = () => { setPlaying(true); setShownTake(null); markSeen(project.id, scene.clipPath); };
   const [shownTake, setShownTake] = React.useState<string | null>(null);
+  const dropTake = async (path: string) => {
+    if (!window.confirm("Delete this take? The file is removed from the series' clips folder.")) return;
+    try { await api.deleteTake(project.id, scene.id, path); if (shownTake === path) setShownTake(null); onChanged(await api.get(project.id)); }
+    catch (e: any) { notifyError(e?.message || String(e), "series"); }
+  };
   const useTake = async () => {
     if (!shownTake) return;
     try { await api.pickTake(project.id, scene.id, shownTake); onChanged(await api.get(project.id)); setShownTake(null); }
@@ -275,10 +301,11 @@ function SceneCard({ project, episode, scene, running, onChanged, takes = [] }: 
                       const used = sameFile(t.path, scene.clipPath), shown = sameFile(t.path, shownTake || scene.clipPath);
                       return (
                         <button key={t.path} onClick={() => setShownTake(t.path)} title={t.path.split(/[\\/]/).pop() + " - " + new Date(t.at).toLocaleString()}
-                          className={"relative h-20 w-14 shrink-0 overflow-hidden rounded border-2 bg-black " + (shown ? "border-sky-400" : "border-transparent opacity-75 hover:opacity-100")}>
+                          className={"group relative h-20 w-14 shrink-0 overflow-hidden rounded border-2 bg-black " + (shown ? "border-sky-400" : "border-transparent opacity-75 hover:opacity-100")}>
                           <video src={fileUrl(t.path) + "#t=0.4"} muted playsInline preload="metadata" className="h-full w-full object-cover" />
                           <span className="absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[9px] text-white">{i + 1}</span>
                           {used && <span className="absolute bottom-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white"><Check size={10} /></span>}
+                          {!used && <span role="button" title="Delete this take" onClick={e => { e.stopPropagation(); dropTake(t.path); }} className="absolute bottom-0.5 right-0.5 hidden h-4 w-4 place-items-center rounded-full bg-rose-600 text-white group-hover:grid"><X size={10} /></span>}
                         </button>
                       );
                     })}
@@ -474,6 +501,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
           <button onClick={async () => { for (const ep of project.episodes) if (ep.scenes.some(sc => sc.status !== "done") || ep.refs.some(r => r.status !== "done" && (r.prompt || "").trim())) { try { await api.generateEpisode(project.id, ep.id); } catch { break; } } }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500" title="Queue every picture and clip that is still missing, episode by episode">Render everything missing</button>
         )}
       </div>
+      <UnusedTakes project={project} />
       <RenderQueue project={project} />
       {onAddEpisode && (
         <button onClick={onAddEpisode} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-700/60 bg-emerald-600/10 px-3 py-2.5 text-sm text-emerald-200 transition hover:bg-emerald-600/20">

@@ -15,7 +15,7 @@ import path from "path";
 import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTool/registry";
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
 import { probeDuration, stitch } from "./ffmpeg";
-import { takesIn } from "./takes";
+import { takesIn, unusedTakes } from "./takes";
 import { upsertOutput } from "./finishCore";
 import { extractUpload } from "../comfyTool/extract";
 import { fillSlots, refSourceFiles } from "./refSources";
@@ -592,6 +592,35 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     if (!take) return bad(res, 400, "That is not a take of this scene.");
     mark(p.id, found.scene.id, "scene", { status: "done", clipPath: take.path, durationS: await probeDuration(take.path), error: null });
     res.json({ ok: true });
+  });
+
+  /** Delete one take a scene does not use. */
+  app.delete("/api/series/projects/:id/scenes/:sceneId/take", (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const found = findScene(p, req.params.sceneId);
+    if (!found) return bad(res, 404, "No such scene.");
+    const take = takesIn(store.clipsDir(p), found.ep.number, found.scene.number).find(t => path.resolve(t.path) === path.resolve(String(req.body?.path || "")));
+    if (!take) return bad(res, 400, "That is not a take of this scene.");
+    if (found.scene.clipPath && path.resolve(found.scene.clipPath).toLowerCase() === path.resolve(take.path).toLowerCase()) return bad(res, 400, "This take is the one the scene uses. Pick another take first.");
+    fs.rmSync(take.path, { force: true });
+    res.json({ ok: true });
+  });
+
+  /** How many takes no scene uses, and their size; POST deletes them. */
+  app.get("/api/series/projects/:id/unused-takes", (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const list = unusedTakes(store.clipsDir(p), p.episodes);
+    res.json({ count: list.length, bytes: list.reduce((n, t) => n + fs.statSync(t.path).size, 0) });
+  });
+  app.post("/api/series/projects/:id/unused-takes/delete", (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const list = unusedTakes(store.clipsDir(p), p.episodes);
+    let bytes = 0;
+    for (const t of list) { bytes += fs.statSync(t.path).size; fs.rmSync(t.path, { force: true }); }
+    res.json({ count: list.length, bytes });
   });
 
   /** Queue everything an episode still needs: missing references first, then unrendered scenes. */

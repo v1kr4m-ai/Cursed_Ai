@@ -333,7 +333,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
     try { setProject(await api.get(id)); }
     catch (e: any) {
       setError(e?.message || String(e));
-      if (/not found|404/i.test(String(e?.message))) { store.set(LAST_KEY, null); setProjectId(null); } // the remembered series no longer exists
+      if (/not found|404|no such project/i.test(String(e?.message))) { store.set(LAST_KEY, null); setProjectId(null); } // the remembered series no longer exists
     }
   }, []);
 

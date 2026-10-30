@@ -144,6 +144,9 @@ export const api = {
   generateRef: (id: string, refId: string) => call(`/api/series/projects/${id}/refs/${refId}/generate`, { method: "POST" }),
   takes: (id: string, episodeId: string) => call<{ takes: Record<string, Take[]> }>(`/api/series/projects/${id}/episodes/${episodeId}/takes`),
   pickTake: (id: string, sceneId: string, path: string) => call<{ ok: true }>(`/api/series/projects/${id}/scenes/${sceneId}/take`, { method: "POST", body: JSON.stringify({ path }) }),
+  deleteTake: (id: string, sceneId: string, path: string) => call<{ ok: true }>(`/api/series/projects/${id}/scenes/${sceneId}/take`, { method: "DELETE", body: JSON.stringify({ path }) }),
+  unusedTakes: (id: string) => call<{ count: number; bytes: number }>(`/api/series/projects/${id}/unused-takes`),
+  deleteUnusedTakes: (id: string) => call<{ count: number; bytes: number }>(`/api/series/projects/${id}/unused-takes/delete`, { method: "POST" }),
   generateScene: (id: string, sceneId: string) => call(`/api/series/projects/${id}/scenes/${sceneId}/generate`, { method: "POST" }),
   generateEpisode: (id: string, episodeId: string, redo = false) =>
     call<{ queued: number }>(`/api/series/projects/${id}/episodes/${episodeId}/generate`, { method: "POST", body: JSON.stringify({ redo }) }),
