@@ -420,19 +420,19 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                       </div>
                     )}
                   </div>
-                  <nav className="ml-auto flex items-center gap-1 rounded-full sd-frost border p-1">
+                  <nav className="ml-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-full sd-frost border p-1 sm:max-w-none sm:overflow-visible">
                     {STAGES.map(s => {
                       const Icon = s.icon;
                       const active = stage === s.id;
                       return (
-                        <button key={s.id} onClick={() => { setFocusEpisode(null); setAddFocus(false); setStage(s.id); }} title={s.hint} className="relative rounded-full px-3 py-1.5 text-xs">
+                        <button key={s.id} onClick={() => { setFocusEpisode(null); setAddFocus(false); setStage(s.id); }} title={s.hint} className="relative shrink-0 rounded-full px-2.5 py-1.5 text-xs sm:shrink sm:px-3">
                           {active && (
                             <motion.span layoutId="series-stage-pill" transition={{ type: "spring", stiffness: 420, damping: 32 }}
                               className="absolute inset-0 rounded-full sd-dark" />
                           )}
                           <span className={`relative flex items-center gap-1.5 transition-opacity ${active ? "text-white" : "opacity-65 hover:opacity-100"}`}>
                             <Icon size={13} />
-                            {s.id === "dashboard" && project ? <span className="max-w-[10rem] truncate">{project.title}</span> : s.id !== "settings" && s.label}
+                            {s.id === "dashboard" && project ? <span className="max-w-[5rem] truncate sm:max-w-[10rem]">{project.title}</span> : s.id !== "settings" && <span className={active ? "" : "hidden sm:inline"}>{s.label}</span>}
                           </span>
                         </button>
                       );
