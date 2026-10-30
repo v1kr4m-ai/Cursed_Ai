@@ -447,12 +447,18 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
 
   // -------------------------------------------------------------- generation
 
+  const newSeed = () => Math.floor(Math.random() * 1e9);
+
   function generateRef(p: Project, ep: Episode, ref: Ref) {
     return enqueue(p.id, { projectId: p.id, targetId: ref.id, kind: "ref", label: `${ep.title}: ${ref.name}` }, async job => {
       const fresh = store.get(p.id)!;
       const { info, graph } = await prepare(fresh, "ref");
       forceSizeAndLength(graph, { width: fresh.settings.width, height: fresh.settings.height });
-      mark(p.id, ref.id, "ref", { status: "running", error: null });
+      // A picture that was already made is being made again, so it gets a new seed (the same seed and prompt would
+      // give back the same picture). The seed used is stored, so a picture can be traced back to it.
+      const liveRef = fresh.episodes.flatMap(e => e.refs).find(r => r.id === ref.id) || ref;
+      const seed = liveRef.file && liveRef.prompt.trim() ? newSeed() : liveRef.seed;
+      mark(p.id, ref.id, "ref", { status: "running", error: null, seed });
 
       const dest = uniqueDestination(path.join(store.refsDir(fresh), `${ref.name.replace(/[^\w.-]+/g, "_")}.png`));
       await runWorkflow({
@@ -465,7 +471,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "ref"),
-        randomizeSeed: false,
+        seed,
         destFolder: path.dirname(dest),
         destFilename: path.basename(dest),
         onEvent: runEventSink(p.id, job),
@@ -503,7 +509,9 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       }
 
       const promptText = liveScene.promptEdited ? liveScene.promptText : buildScenePrompt(fresh, liveEp, liveScene);
-      mark(p.id, scene.id, "scene", { status: "running", error: null, promptText });
+      // Rendering a scene again: a new seed, or ComfyUI hands back the same clip from its cache.
+      const seed = liveScene.clipPath ? newSeed() : liveScene.seed;
+      mark(p.id, scene.id, "scene", { status: "running", error: null, promptText, seed });
 
       // Unused reference slots are passed blank, which bypasses them for this run.
       const refPaths = fillSlots(refs.map(r => r.file || ""), info.refImageBypassable, info.refImageNodeIds.length);
@@ -518,7 +526,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
         refAudioPaths: new Array(info.refAudioNodeIds.length).fill(""),
         fieldValues: fieldValuesFor(info, fresh, "scene"),
-        randomizeSeed: false,
+        seed,
         destFolder: path.dirname(dest),
         destFilename: path.basename(dest),
         onEvent: runEventSink(p.id, job),

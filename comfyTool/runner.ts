@@ -42,6 +42,8 @@ export interface InjectArgs {
   refAudioFilenames?: string[];
   fieldValues?: Record<string, any>;
   randomizeSeed?: boolean;
+  /** One seed for every seed input (ignored when randomizeSeed is set). Same seed + same inputs = same result. */
+  seed?: number;
 }
 
 /**
@@ -70,13 +72,13 @@ export function injectWorkflow(a: InjectArgs): Json {
     if (spec && spec.node in result) result[spec.node].inputs[spec.input] = coerce(value, spec.kind);
   }
 
-  if (a.randomizeSeed) {
+  if (a.randomizeSeed || a.seed !== undefined) {
     // ComfyUI skips nodes whose inputs are unchanged since the last run (cache hit), so a repeat run with the same
-    // seed would produce nothing new. A fresh seed on every run avoids that.
+    // seed would produce nothing new. A fresh seed on every run avoids that; a given seed makes a run repeatable.
     for (const node of Object.values<any>(result)) {
       for (const key of ["seed", "noise_seed"]) {
         const v = node.inputs?.[key];
-        if (typeof v === "number" && Number.isInteger(v)) node.inputs[key] = Math.floor(Math.random() * 2 ** 48);
+        if (typeof v === "number" && Number.isInteger(v)) node.inputs[key] = a.randomizeSeed ? Math.floor(Math.random() * 2 ** 48) : a.seed;
       }
     }
   }
@@ -200,6 +202,8 @@ export interface RunArgs {
   refAudioPaths?: string[];
   fieldValues?: Record<string, any>;
   randomizeSeed?: boolean;
+  /** One seed for every seed input (ignored when randomizeSeed is set). Same seed + same inputs = same result. */
+  seed?: number;
   destFolder: string;
   destFilename: string;
   onEvent: EventSink;
@@ -215,7 +219,7 @@ export async function runWorkflow(a: RunArgs): Promise<void> {
   // A blank path is a bypassed slot - nothing to upload.
   const uploadAll = (paths: string[]) => Promise.all(paths.map(p => (p ? uploadFile(a.baseUrl, p) : Promise.resolve(p))));
   const [images, videos, audios] = [await uploadAll(a.refImagePaths), await uploadAll(a.refVideoPaths || []), await uploadAll(a.refAudioPaths || [])];
-  let graph = injectWorkflow({ workflow: a.workflow, info: a.info, promptText: a.promptText, refImageFilenames: images, refVideoFilenames: videos, refAudioFilenames: audios, fieldValues: a.fieldValues, randomizeSeed: a.randomizeSeed });
+  let graph = injectWorkflow({ workflow: a.workflow, info: a.info, promptText: a.promptText, refImageFilenames: images, refVideoFilenames: videos, refAudioFilenames: audios, fieldValues: a.fieldValues, randomizeSeed: a.randomizeSeed, seed: a.seed });
   graph = pruneToOutput(graph, a.info.outputNodeId);
 
   // Listen BEFORE submitting: a fast (or fully cached) run can finish before a socket opened afterwards sees a message.
