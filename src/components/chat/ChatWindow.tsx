@@ -510,7 +510,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
       </div>
     )}
     <MicStatus phase={micPhase({ listening: isDictating, transcribing: isTranscribing, ready: micReady, heard: micHeard })} level={micLevel} />
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-1.5 flex items-end gap-1.5 transition-all duration-300 ease-out shadow-xl shadow-black/40 focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-1.5 flex flex-wrap sm:flex-nowrap items-end gap-1.5 transition-all duration-300 ease-out shadow-xl shadow-black/40 focus-within:border-violet-500/40 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_28px_-6px_rgba(139,92,246,0.45)]">
       <div className="flex shrink-0 gap-0.5 mb-0.5 ml-0.5">
         {modelPicker}
         <button
@@ -531,7 +531,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           />
         )}
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="order-first basis-full min-w-0 sm:order-none sm:basis-auto sm:flex-1">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -557,7 +557,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
         <button
           onClick={handleStopGeneration}
           title="Stop generating (Esc)"
-          className="w-9 h-9 rounded-xl mb-0.5 mr-0.5 flex items-center justify-center bg-red-600 text-white hover:bg-red-500 hover:scale-105 active:scale-95 shadow-lg shadow-red-900/40 transition-all animate-[cursed-pop_0.25s_ease-out]"
+          className="w-9 h-9 rounded-xl mb-0.5 mr-0.5 ml-auto sm:ml-0 flex items-center justify-center bg-red-600 text-white hover:bg-red-500 hover:scale-105 active:scale-95 shadow-lg shadow-red-900/40 transition-all animate-[cursed-pop_0.25s_ease-out]"
         >
           <Square size={15} className="fill-current" />
         </button>
@@ -567,7 +567,7 @@ export function ChatWindow({ chat, onUpdateChat, onArchiveChat, onCreateChat, mo
           onClick={onSend}
           disabled={!canSend}
           className={cn(
-            "w-9 h-9 rounded-xl transition-all duration-200 mb-0.5 mr-0.5 flex items-center justify-center",
+            "w-9 h-9 rounded-xl transition-all duration-200 mb-0.5 mr-0.5 ml-auto sm:ml-0 flex items-center justify-center",
             canSend
              ? "bg-violet-600 text-white hover:bg-violet-500 hover:scale-105 active:scale-95 shadow-lg shadow-violet-900/40 animate-[cursed-pop_0.3s_ease-out]"
              : "bg-white/5 text-zinc-600 cursor-not-allowed"
