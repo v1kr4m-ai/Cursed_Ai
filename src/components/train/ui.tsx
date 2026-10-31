@@ -38,6 +38,17 @@ export function Card({ title, icon, note, children, right, info }: { title: stri
 }
 
 /** Where a job is, read from what it printed (later lines win). Export steps print no percentage, so they are shown as "working". */
+const MOBILE_STAGES: [RegExp, string, boolean][] = [
+  [/\[mobile\] done/, "Finishing", true],
+  [/\[mobile\] GGUF saved/, "Finishing", true],
+  [/\[mobile\] making the phone file/, "Making the phone file (GGUF)", true],
+  [/\[mobile\] testing on/, "Testing on the held-out examples", true],
+  [/\[mobile\] saved the model/, "Saving the model", true],
+  [/\[mobile\] trained \d+ steps/, "Saving the model", true],
+  [/\[mobile\] training:/, "Training", false],
+  [/\[mobile\] loading/, "Loading the model", true],
+  [/\[mobile\] reading/, "Reading the data", true],
+];
 const SPEECH_STAGES: [RegExp, string, boolean][] = [
   [/\[speech\] done/, "Finishing", true],
   [/\[speech\] saving the model/, "Saving the model", true],
@@ -51,8 +62,8 @@ const SPEECH_STAGES: [RegExp, string, boolean][] = [
   [/\[speech\] reading clips/, "Looking at the clips", true],
 ];
 function stageOf(kind: string, lines: string[]): { text: string; indeterminate: boolean } | null {
-  if (kind !== "llm" && kind !== "stt") return null;
-  const rules: [RegExp, string, boolean][] = kind === "stt" ? SPEECH_STAGES : [
+  if (kind !== "llm" && kind !== "stt" && kind !== "mobile") return null;
+  const rules: [RegExp, string, boolean][] = kind === "mobile" ? MOBILE_STAGES : kind === "stt" ? SPEECH_STAGES : [
     [/\[train\.py\] done/, "Finishing", true],
     [/Converting GGUF bf16 into/, "Shrinking to q4_k_m (several minutes)", true],
     [/Converting model into bf16|Installing llama\.cpp/, "Converting to GGUF", true],

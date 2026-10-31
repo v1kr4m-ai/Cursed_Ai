@@ -28,7 +28,7 @@ import { StudioPage } from "./components/comfy/StudioPage";
 import { ComfyConsolePip } from "./components/tools/ComfyConsolePip";
 import { OllamaClaudeView } from "./components/oclaude/OllamaClaudeView";
 import { TrainLoraView } from "./components/train/TrainLoraView";
-import { FineTuneView } from "./components/train/FineTuneView";
+import { FineTuneSwitch } from "./components/train/FineTuneSwitch";
 import { SpeechTrainView } from "./components/train/SpeechTrainView";
 import { ThemeQuick } from "./components/tools/ThemeSettings";
 import { effectiveTheme, themeById } from "./lib/themes";
@@ -511,7 +511,7 @@ export default function App() {
             {/* Kept mounted so a running Claude Code task keeps streaming while you look at another page. */}
             <div className={activeTab === "ollamaclaude" ? "contents" : "hidden"}><OllamaClaudeView settings={settings} /></div>
             <div className={activeTab === "trainlora" ? "contents" : "hidden"}><TrainLoraView /></div>
-            <div className={activeTab === "finetune" ? "contents" : "hidden"}><FineTuneView /></div>
+            <div className={activeTab === "finetune" ? "contents" : "hidden"}><FineTuneSwitch /></div>
             <div className={activeTab === "trainspeech" ? "contents" : "hidden"}><SpeechTrainView /></div>
             <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} models={models} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
             {activeTab === "settings" && (

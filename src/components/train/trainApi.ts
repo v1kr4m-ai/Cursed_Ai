@@ -1,7 +1,7 @@
 import React from "react";
 import { notify } from "../../lib/notify";
 
-export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv";
+export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv" | "mobile";
 
 export interface JobState {
   kind: JobKind; label: string; running: boolean; startedAt: number | null; endedAt: number | null; code: number | null;
@@ -56,6 +56,7 @@ const JOB_INFO: Record<JobKind, { name: string; tab: string }> = {
   stt: { name: "Speech-to-text training", tab: "trainspeech" },
   tts: { name: "Text-to-speech training", tab: "trainspeech" },
   speechprep: { name: "Clip preparation", tab: "trainspeech" },
+  mobile: { name: "Phone model training", tab: "finetune" },
   speechenv: { name: "Speech setup, download or conversion", tab: "trainspeech" },
 };
 const took = (ms: number) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
@@ -72,7 +73,7 @@ function announce(k: JobKind, next: JobState, lines: string[]) {
   const failed = next.failed || (next.code != null && next.code !== 0);
   if (failed) { notify({ kind: "error", tab, message: `${name} failed: ${whyFailed(lines) || "see the log"}` }); return; }
   if (k === "pairs") return; // the Fine-tune page already says how many pairs were added
-  const score = [...lines].reverse().find(l => l.startsWith("[speech] RESULT"))?.replace("[speech] RESULT", "").trim();
+  const score = [...lines].reverse().find(l => /^\[(speech|mobile)\] RESULT/.test(l))?.replace(/^\[(speech|mobile)\] RESULT/, "").trim();
   notify({ kind: "success", tab, message: `${name} finished${next.startedAt && next.endedAt ? ` in ${took(next.endedAt - next.startedAt)}` : ""}${score ? `. ${score}` : ""}` });
 }
 
