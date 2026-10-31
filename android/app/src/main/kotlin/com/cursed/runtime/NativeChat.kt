@@ -30,7 +30,7 @@ data class ChatModel(val id: String, val name: String, val onPhone: Boolean, val
 /**
  * The native chat screen. Answers come from a model on the PC (the studio's own engine, Ollama, LM Studio or an online
  * model set up there) or from the small engine on this phone; the person picks which. The conversation is kept on the
- * phone (one chat at a time, "New chat" starts over).
+ * phone: every chat is kept (☰ lists them, newest first, to reopen or delete; ＋ starts a new one), each with its model.
  *
  * `pcBase` is the connected PC's address (null when there is none), `openPc` opens a request to it with the access
  * code and the PC's pinned certificate, and `startPhoneEngine` starts the on-phone engine (http://127.0.0.1:11434).
@@ -46,7 +46,23 @@ class NativeChat(
     private val listen: ((String?) -> Unit) -> Unit,
 ) {
     private val ui = Handler(Looper.getMainLooper())
-    private val messages = JSONArray(prefs.getString("chat_messages", "[]"))
+    /** All saved chats ({id, updated, model, messages}), newest last; `messages` is the open one's list. */
+    private val chats: JSONArray = prefs.getString("chats", null)?.let { JSONArray(it) } ?: JSONArray().apply {
+        // The single chat kept before there were several.
+        val old = JSONArray(prefs.getString("chat_messages", "[]"))
+        if (old.length() > 0) put(JSONObject().put("id", "c" + System.currentTimeMillis()).put("updated", System.currentTimeMillis()).put("messages", old))
+    }
+    private var current: JSONObject = run {
+        val id = prefs.getString("chat_current", null)
+        (0 until chats.length()).map { chats.getJSONObject(it) }.firstOrNull { it.optString("id") == id } ?: newChat()
+    }
+    private val messages: JSONArray get() = current.getJSONArray("messages")
+    private fun newChat(): JSONObject = JSONObject().put("id", "c" + System.currentTimeMillis()).put("updated", System.currentTimeMillis()).put("messages", JSONArray()).also { chats.put(it) }
+    private fun titleOf(c: JSONObject): String {
+        val ms = c.getJSONArray("messages")
+        val first = (0 until ms.length()).map { ms.getJSONObject(it) }.firstOrNull { it.optString("role") == "user" }?.optString("content")?.trim()
+        return first?.replace(Regex("\\s+"), " ")?.take(48)?.ifEmpty { null } ?: "New chat"
+    }
     private var model: ChatModel? = prefs.getString("chat_model", null)?.let { JSONObject(it) }?.let { ChatModel(it.getString("id"), it.getString("name"), it.getBoolean("onPhone")) }
     private var live: HttpURLConnection? = null
     private var busy = false
@@ -95,9 +111,13 @@ class NativeChat(
         }
         bar.addView(modelBtn, LinearLayout.LayoutParams(0, dp(38), 1f))
         bar.addView(Button(ctx).apply {
-            text = "New chat"; isAllCaps = false; textSize = 13f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18)
-            setOnClickListener { if (!busy) { while (messages.length() > 0) messages.remove(0); save(); render() } }
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)).apply { leftMargin = dp(8) })
+            text = "☰"; textSize = 16f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18); contentDescription = "Chats"
+            setOnClickListener { if (!busy) showChats() }
+        }, LinearLayout.LayoutParams(dp(44), dp(38)).apply { leftMargin = dp(8) })
+        bar.addView(Button(ctx).apply {
+            text = "＋"; textSize = 16f; setTextColor(Color.parseColor("#D4D4D8")); background = round("#18181B", 18); contentDescription = "New chat"
+            setOnClickListener { if (!busy && messages.length() > 0) { current = newChat(); save(); render() } }
+        }, LinearLayout.LayoutParams(dp(44), dp(38)).apply { leftMargin = dp(8) })
         speakBtn = Button(ctx).apply {
             textSize = 15f; background = round("#18181B", 18); contentDescription = "Speak replies"
             setOnClickListener { speak = !speak; prefs.edit().putBoolean("chat_speak", speak).apply(); if (!speak) { tts?.stop(); setStatus("") }; render() }
@@ -144,7 +164,10 @@ class NativeChat(
     }
 
     private fun save() {
-        prefs.edit().putString("chat_messages", messages.toString())
+        model?.let { current.put("model", JSONObject().put("id", it.id).put("name", it.name).put("onPhone", it.onPhone)) }
+        // Empty chats other than the open one are not kept.
+        for (i in chats.length() - 1 downTo 0) { val c = chats.getJSONObject(i); if (c !== current && c.getJSONArray("messages").length() == 0) chats.remove(i) }
+        prefs.edit().putString("chats", chats.toString()).putString("chat_current", current.optString("id")).remove("chat_messages")
             .putString("chat_model", model?.let { JSONObject().put("id", it.id).put("name", it.name).put("onPhone", it.onPhone).toString() }).apply()
     }
 
@@ -181,6 +204,32 @@ class NativeChat(
             gravity = if (mine) Gravity.END else Gravity.START; setPadding(if (mine) dp(48) else 0, dp(6), if (mine) 0 else dp(48), 0)
             addView(t, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
+    }
+
+    /** The saved chats, newest first: tap one to open it; Delete... removes chosen ones. */
+    private fun showChats() {
+        save()
+        val list = (0 until chats.length()).map { chats.getJSONObject(it) }.filter { it.getJSONArray("messages").length() > 0 }.sortedByDescending { it.optLong("updated") }
+        if (list.isEmpty()) { AlertDialog.Builder(ctx).setMessage("No saved chats yet. Each conversation is kept here once you send a message.").setPositiveButton("OK", null).show(); return }
+        val when_ = { t: Long -> android.text.format.DateUtils.getRelativeTimeSpanString(t, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString() }
+        val labels = list.map { c -> "${titleOf(c)}\n   ${when_(c.optLong("updated"))}${c.optJSONObject("model")?.optString("name")?.let { "  ·  $it" } ?: ""}" }
+        AlertDialog.Builder(ctx).setTitle("Chats").setItems(labels.toTypedArray()) { _, i -> openChat(list[i]) }
+            .setNeutralButton("Delete...") { _, _ ->
+                val pick = BooleanArray(list.size)
+                AlertDialog.Builder(ctx).setTitle("Delete which chats?").setMultiChoiceItems(list.map { titleOf(it) }.toTypedArray(), pick) { _, i, on -> pick[i] = on }
+                    .setPositiveButton("Delete") { _, _ ->
+                        val gone = list.filterIndexed { i, _ -> pick[i] }.map { it.optString("id") }.toSet()
+                        for (i in chats.length() - 1 downTo 0) if (chats.getJSONObject(i).optString("id") in gone) chats.remove(i)
+                        if (current.optString("id") in gone) current = newChat()
+                        save(); render()
+                    }.setNegativeButton("Cancel", null).show()
+            }.setNegativeButton("Close", null).show()
+    }
+
+    private fun openChat(c: JSONObject) {
+        current = c
+        c.optJSONObject("model")?.let { model = ChatModel(it.getString("id"), it.getString("name"), it.getBoolean("onPhone")) }
+        save(); render()
     }
 
     /** Lists the PC's models and the phone's, then lets the person pick one. */
@@ -265,6 +314,7 @@ class NativeChat(
         if (m == null) { pickModel(); return }
         input.setText("")
         messages.put(JSONObject().put("role", "user").put("content", text))
+        current.put("updated", System.currentTimeMillis())
         val answer = JSONObject().put("role", "assistant").put("content", "")
         messages.put(answer)
         busy = true; save(); render()
@@ -294,7 +344,7 @@ class NativeChat(
             } catch (e: Exception) {
                 if (busy) ui.post { if (answer.getString("content").isEmpty()) answer.put("content", e.message ?: "Something went wrong.").put("error", true) }
             } finally {
-                ui.post { busy = false; live = null; save(); render(); setStatus(""); if (!answer.optBoolean("error")) say(answer.getString("content")) }
+                ui.post { if (answer.getString("content").isEmpty()) answer.put("content", "(stopped)"); busy = false; live = null; save(); render(); setStatus(""); if (!answer.optBoolean("error")) say(answer.getString("content")) }
             }
         }
     }
@@ -302,6 +352,9 @@ class NativeChat(
     private fun post(c: HttpURLConnection, body: JSONObject): HttpURLConnection = c.apply {
         requestMethod = "POST"; doOutput = true; connectTimeout = 5000; readTimeout = 0
         setRequestProperty("Content-Type", "application/json")
+        // A fresh connection every time: reusing one the engine closed (after Stop, or a takeover) fails with
+        // "unexpected end of stream".
+        setRequestProperty("Connection", "close")
         outputStream.use { it.write(body.toString().toByteArray()) }
     }
 

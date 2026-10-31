@@ -157,6 +157,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Android reuses idle connections; one the phone's engine (or the PC) has already closed then fails with
+        // "unexpected end of stream". Every request opens its own connection instead.
+        System.setProperty("http.keepAlive", "false")
         webView = buildWebView()
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
         pendingShare = ShareIn.urisOf(intent)

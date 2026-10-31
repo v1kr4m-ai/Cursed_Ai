@@ -143,7 +143,8 @@ class ApiServer(private val context: Context, private val port: Int = 11434) {
     }
 
     private fun startInternal() {
-        engine = embeddedServer(Netty, port = port, host = "127.0.0.1") {
+        // Long answers stream for minutes on a phone; the defaults would cut a slow write off after 10 seconds.
+        engine = embeddedServer(Netty, port = port, host = "127.0.0.1", configure = { responseWriteTimeoutSeconds = 0; requestReadTimeoutSeconds = 0 }) {
             install(ContentNegotiation) {
                 json(Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true })
             }
@@ -246,7 +247,14 @@ class ApiServer(private val context: Context, private val port: Int = 11434) {
 
                     call.respondTextWriter(contentType = io.ktor.http.ContentType.Text.EventStream) {
                         try {
-                            for (item in channel) {
+                            // Answer at once and keep the line alive while the model reads the prompt: a silent
+                            // connection is dropped after a few seconds, which the phone reported as "unexpected end
+                            // of stream" whenever the first word took long (longer chats, slower phones).
+                            write(": started\n\n"); flush()
+                            while (true) {
+                                val next = kotlinx.coroutines.withTimeoutOrNull(3000) { channel.receiveCatching() }
+                                if (next == null) { write(": thinking\n\n"); flush(); continue }
+                                val item = next.getOrNull() ?: break
                                 if (item == "[DONE]") {
                                     write("data: [DONE]\n\n")
                                 } else {
