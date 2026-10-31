@@ -84,20 +84,18 @@ class MainActivity : AppCompatActivity() {
 
     /** The phone's own file picker, for Phone settings > Add a model. */
     private var onPicked: ((Uri?) -> Unit)? = null
-    /** The phone's speech recognizer for the chat's 🎤 (it shows its own listening screen; offline where the phone has the language). */
-    private var onHeard: ((String?) -> Unit)? = null
-    private val recognize = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        val heard = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        onHeard?.invoke(if (r.resultCode == RESULT_OK) heard else null); onHeard = null
+    /** The chat's 📎: several photos or documents at once. */
+    private var onFiles: ((List<Uri>) -> Unit)? = null
+    private val pickMany = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> onFiles?.invoke(uris); onFiles = null }
+
+    /** The chat's 🎤 and 🎧 listen with the microphone; asked for once. */
+    private var onMic: ((Boolean) -> Unit)? = null
+    private val askMicForChat = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> onMic?.invoke(ok); onMic = null }
+    private fun withMic(cb: (Boolean) -> Unit) {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) cb(true)
+        else { onMic = cb; askMicForChat.launch(Manifest.permission.RECORD_AUDIO) }
     }
-    private fun listen(cb: (String?) -> Unit) {
-        onHeard = cb
-        val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to Cursed_Ai")
-        try { recognize.launch(i) } catch (e: Exception) { onHeard = null; cb(null); android.widget.Toast.makeText(this, "This phone has no speech recognizer (install or enable Google voice typing).", android.widget.Toast.LENGTH_LONG).show() }
-    }
+    private var chat: NativeChat? = null
 
     private val pickDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> onPicked?.invoke(uri); onPicked = null }
     private var tabBar: LinearLayout? = null
@@ -436,10 +434,13 @@ class MainActivity : AppCompatActivity() {
         (webView.parent as? android.view.ViewGroup)?.removeView(webView)
         content.addView(webView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         if (webUrl != null) webView.loadUrl(webUrl)
-        val chat = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }, { selectTab("settings") }, { listen(it) }).view()
-        chatView = chat
-        content.addView(chat, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        val ps = PhoneSettings(this, prefs, { cb -> onPicked = cb; pickDocument.launch(arrayOf("*/*")) }, { selectTab("chat") }, { pcMode = false; showChooser() })
+        val nc = NativeChat(this, prefs, { pcUsed }, { openPc(it) }, { phoneEngine() }, { selectTab("settings") },
+            { cb -> onFiles = cb; pickMany.launch(arrayOf("*/*")) }, { withMic(it) })
+        chat = nc
+        val chatV = nc.view()
+        chatView = chatV
+        content.addView(chatV, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        val ps = PhoneSettings(this, prefs, { cb -> onPicked = cb; pickDocument.launch(arrayOf("*/*")) }, { selectTab("chat") }, { pcMode = false; showChooser() }, { m -> chat?.useModel(m); selectTab("chat") })
         settings = ps
         settingsView = ps.view().also { content.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)) }
 
@@ -496,6 +497,7 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
+            tab == "chat" && chat?.back() == true -> Unit
             tab == "settings" -> selectTab("chat")
             tab != null && tab != "chat" && webView.canGoBack() -> webView.goBack()
             tab != null && tab != "chat" -> selectTab("chat")
