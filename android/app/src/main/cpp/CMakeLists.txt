@@ -24,6 +24,13 @@ set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(llama.cpp)
 
+# Picture reading for vision models (a model's "mmproj" companion file): llama.cpp's mtmd library, taken from the
+# same llama.cpp version as the rest (2026-07-14, 2969d6d) with the stb_image / miniaudio / subprocess headers it
+# includes, under llama.cpp/tools/mtmd and llama.cpp/vendor. Video needs an ffmpeg binary, so it stays off.
+set(MTMD_VIDEO OFF CACHE BOOL "" FORCE)
+set(LLAMA_INSTALL_VERSION 0.0.0) # set by llama.cpp in its own scope only; mtmd needs it for its library version
+add_subdirectory(llama.cpp/tools/mtmd)
+
 add_library(${PROJECT_NAME} SHARED
     cursed-local-engine.cpp
 )
@@ -31,6 +38,7 @@ add_library(${PROJECT_NAME} SHARED
 target_include_directories(${PROJECT_NAME} PRIVATE
     llama.cpp/include
     llama.cpp/ggml/include
+    llama.cpp/tools/mtmd
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -38,6 +46,7 @@ target_link_libraries(${PROJECT_NAME}
     log
     llama
     ggml
+    mtmd
 )
 
 # Support 16 KB page sizes

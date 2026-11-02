@@ -164,4 +164,13 @@ object ModelManager {
     }
 
     fun getActiveModel(): String? = activeModelPath
+
+    /** A model's picture reader sits next to it as "<name>.mmproj.gguf" (downloaded with it from Phone settings). */
+    fun visionFile(modelName: String) = File("$modelsDir/$modelName.mmproj.gguf")
+
+    /** Loads the picture reader for the loaded model; false when it has none (a text-only model). */
+    fun loadVision(modelName: String): Boolean {
+        val f = visionFile(modelName)
+        return f.exists() && modelHandler != 0L && LlamaNative.loadVision(modelHandler, f.absolutePath)
+    }
 }

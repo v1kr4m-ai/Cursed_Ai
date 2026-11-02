@@ -44,7 +44,15 @@ import java.util.Calendar
 import kotlin.concurrent.thread
 
 /** A model the chat can use: on the PC (by its id there, e.g. "ollama:qwen3:8b") or on this phone (a GGUF file name). */
-data class ChatModel(val id: String, val name: String, val onPhone: Boolean, val note: String = "")
+data class ChatModel(val id: String, val name: String, val onPhone: Boolean, val note: String = "", val vision: Boolean = false) {
+    fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("onPhone", onPhone).put("vision", vision)
+    companion object {
+        fun of(j: JSONObject) = ChatModel(j.getString("id"), j.getString("name"), j.getBoolean("onPhone"), vision = j.optBoolean("vision"))
+        /** PC models that can see pictures, by name - the same rule as the desktop's Vision tag. */
+        private val visionName = Regex("llava|vision|[-_:]vl\\b|vl[-_]|moondream|pixtral|minicpm-v|internvl|gemma3|gemma-3|multimodal|vlm|qwen[\\d.]*-?vl|gemini|gpt-4o|claude", RegexOption.IGNORE_CASE)
+        fun seesByName(name: String) = visionName.containsMatchIn(name)
+    }
+}
 
 /**
  * The native chat screen. Answers come from a model on the PC (the studio's own engine, Ollama, LM Studio or an online
@@ -92,7 +100,10 @@ class NativeChat(
         val first = (0 until ms.length()).map { ms.getJSONObject(it) }.firstOrNull { it.optString("role") == "user" }?.optString("content")?.trim()
         return first?.replace(Regex("\\s+"), " ")?.take(48)?.ifEmpty { null } ?: "New chat"
     }
-    private var model: ChatModel? = prefs.getString("chat_model", null)?.let { JSONObject(it) }?.let { ChatModel(it.getString("id"), it.getString("name"), it.getBoolean("onPhone")) }
+    private var model: ChatModel? = prefs.getString("chat_model", null)?.let { JSONObject(it) }?.let { ChatModel.of(it) }
+    private val modelsDir get() = ctx.getExternalFilesDir("models") ?: File(ctx.filesDir, "models")
+    /** Whether a model can see pictures: on the phone, when its picture reader was downloaded with it. */
+    private fun canSee(m: ChatModel?) = m != null && (if (m.onPhone) File(modelsDir, m.id + ".mmproj.gguf").exists() else m.vision || ChatModel.seesByName(m.id + " " + m.name))
     private var live: HttpURLConnection? = null
     private var busy = false
 
@@ -201,13 +212,13 @@ class NativeChat(
     }
 
     private fun save() {
-        model?.let { current.put("model", JSONObject().put("id", it.id).put("name", it.name).put("onPhone", it.onPhone)) }
+        model?.let { current.put("model", it.json()) }
         // Empty chats other than the open one are not kept.
         for (i in chats.length() - 1 downTo 0) { val c = chats.getJSONObject(i); if (c !== current && c.getJSONArray("messages").length() == 0) chats.remove(i) }
         val text = chats.toString()
         thread { runCatching { File(store.path + ".tmp").apply { writeText(text) }.renameTo(store) } }
         prefs.edit().putString("chat_current", current.optString("id")).remove("chats").remove("chat_messages")
-            .putString("chat_model", model?.let { JSONObject().put("id", it.id).put("name", it.name).put("onPhone", it.onPhone).toString() }).apply()
+            .putString("chat_model", model?.json()?.toString()).apply()
     }
 
     /** Called by Phone settings after a model is downloaded: answer with it from now on. */
@@ -353,7 +364,7 @@ class NativeChat(
 
     private fun openChat(c: JSONObject) {
         current = c
-        c.optJSONObject("model")?.let { model = ChatModel(it.getString("id"), it.getString("name"), it.getBoolean("onPhone")) }
+        c.optJSONObject("model")?.let { model = ChatModel.of(it) }
         pending.clear(); save(); render()
     }
 
@@ -403,7 +414,10 @@ class NativeChat(
                     }
                 } catch (e: Exception) { notes.add("$name: ${e.message}") }
             }
-            ui.post { setStatus(""); renderChips(); if (notes.isNotEmpty()) toast(notes.joinToString("\n")) }
+            ui.post {
+                setStatus(""); renderChips(); if (notes.isNotEmpty()) toast(notes.joinToString("\n"))
+                if (pending.any { it.optString("kind") == "image" } && !canSee(model)) suggestVision()
+            }
         }
     }
 
@@ -419,6 +433,36 @@ class NativeChat(
 
     // ------------------------------------------------------------- models
 
+    /**
+     * The open model cannot see the attached picture: offers the phone's models that can, the PC's that can, a
+     * download of a small one that can, or sending without the picture.
+     */
+    private fun suggestVision() {
+        setStatus("Looking for models that can see pictures...")
+        thread {
+            val phone = (modelsDir.listFiles { f -> f.name.endsWith(".mmproj.gguf") } ?: emptyArray())
+                .map { it.name.removeSuffix(".mmproj.gguf") }.filter { File(modelsDir, "$it.gguf").exists() }
+                .map { ChatModel(it, PhoneCatalog.nameFor(it), true, vision = true) }
+            val pc = try { pcModels()?.filter { canSee(it) } ?: emptyList() } catch (e: Exception) { emptyList() }
+            ui.post {
+                setStatus("")
+                val labels = mutableListOf<String>(); val acts = mutableListOf<() -> Unit>()
+                phone.forEach { m -> labels.add("Use ${m.name} (on this phone)"); acts.add { useModel(m) } }
+                pc.forEach { m -> labels.add("Use ${m.name} (on your PC${if (m.note.isNotEmpty()) ", ${m.note}" else ""})"); acts.add { useModel(m) } }
+                if (phone.isEmpty()) {
+                    val s = PhoneCatalog.suggestedVision
+                    labels.add("Download ${s.name} (${"%.1f".format(s.bytes / 1e9)} GB) to see pictures on the phone"); acts.add { openSettings() }
+                }
+                if (pc.isEmpty() && pcBase() != null) { labels.add("(No PC model can see pictures - add one such as llava or gemma3 in Ollama)"); acts.add { } }
+                if (pcBase() == null) { labels.add("(Connect to your PC to use its picture models)"); acts.add { } }
+                labels.add("Send without the picture"); acts.add { pending.removeAll { it.optString("kind") == "image" }; renderChips() }
+                AlertDialog.Builder(ctx).setTitle("${model?.name ?: "This model"} cannot see pictures")
+                    .setItems(labels.toTypedArray()) { _, i -> acts[i]() }
+                    .setNegativeButton("Cancel", null).show()
+            }
+        }
+    }
+
     /** Lists the PC's models and the phone's, then lets the person pick one. */
     private fun pickModel() {
         modelBtn.text = "Looking for models..."
@@ -432,7 +476,7 @@ class NativeChat(
                 fun group(title: String, ms: List<ChatModel>, empty: String) {
                     items.add(null); labels.add(title)
                     if (ms.isEmpty()) { items.add(null); labels.add("    $empty") }
-                    ms.forEach { items.add(it); labels.add("    ${it.name}${if (it.note.isNotEmpty()) "  (${it.note})" else ""}") }
+                    ms.forEach { items.add(it); labels.add("    ${it.name}${if (it.note.isNotEmpty()) "  (${it.note})" else ""}${if (canSee(it)) "  · sees pictures" else ""}") }
                 }
                 group("ON YOUR PC", pc ?: emptyList(), if (pcBase() == null) "not connected to a PC" else if (pc == null) "the PC did not answer" else "no models found on the PC")
                 group("ON THIS PHONE", phone, "none yet - download one in Settings")
@@ -464,11 +508,11 @@ class NativeChat(
         }
         for ((key, label) in listOf("ollama" to "Ollama", "lmstudio" to "LM Studio")) {
             val ms = ext.optJSONObject(key)?.optJSONArray("models") ?: continue
-            for (i in 0 until ms.length()) out.add(ChatModel("$key:${ms.getString(i)}", ms.getString(i), false, label))
+            for (i in 0 until ms.length()) out.add(ChatModel("$key:${ms.getString(i)}", ms.getString(i), false, label, vision = ChatModel.seesByName(ms.getString(i))))
         }
         try {
             if (JSONObject(readJson(openPc("/api/gemini-key"))).optBoolean("set"))
-                listOf("gemini-2.5-flash" to "Gemini 2.5 Flash", "gemini-2.5-pro" to "Gemini 2.5 Pro").forEach { (id, n) -> out.add(ChatModel("gemini:$id", n, false, "online")) }
+                listOf("gemini-2.5-flash" to "Gemini 2.5 Flash", "gemini-2.5-pro" to "Gemini 2.5 Pro").forEach { (id, n) -> out.add(ChatModel("gemini:$id", n, false, "online", vision = true)) }
             val provs = JSONObject(readJson(openPc("/api/online/providers"))).optJSONArray("providers") ?: JSONArray()
             for (i in 0 until provs.length()) {
                 val p = provs.getJSONObject(i)
@@ -485,7 +529,7 @@ class NativeChat(
         ui.post { startPhoneEngine() }
         val body = retry { readJson((URL("http://127.0.0.1:11434/api/models").openConnection() as HttpURLConnection).apply { connectTimeout = 2000; readTimeout = 5000 }) }
         val avail = JSONObject(body).optJSONArray("available") ?: JSONArray()
-        return (0 until avail.length()).map { val f = avail.getString(it).removeSuffix(".gguf"); ChatModel(f, PhoneCatalog.nameFor(f), true) }
+        return (0 until avail.length()).map { val f = avail.getString(it).removeSuffix(".gguf"); ChatModel(f, PhoneCatalog.nameFor(f), true, vision = File(modelsDir, "$f.mmproj.gguf").exists()) }
     }
 
     /** The phone's engine takes a few seconds to start; try again for a while. */
@@ -504,7 +548,9 @@ class NativeChat(
         if (m == null) { pickModel(); return }
         val files = pending.toList(); pending.clear()
         val images = files.filter { it.optString("kind") == "image" }
-        if (images.isNotEmpty() && m.onPhone) toast("The phone's model reads text only; the picture is not sent. Pick a PC model that can see pictures (e.g. llava, gemma3, qwen-vl).")
+        // A picture for a model that cannot see: offer one that can instead of sending it nowhere.
+        if (images.isNotEmpty() && !canSee(m)) { pending.addAll(files); suggestVision(); return }
+        if (images.size > 1 && m.onPhone) toast("The phone's model looks at one picture per message; the first one is sent.")
         if (spoken == null) input.setText("")
         // What the model reads: the message plus the text of attached documents. Pictures are kept out of the saved chat.
         val docText = files.filter { it.optString("kind") == "doc" }.joinToString("") { "\n\n[Attached file: ${it.optString("name")}]\n${it.optString("text")}" }
@@ -524,7 +570,9 @@ class NativeChat(
                     ui.post { startPhoneEngine() }
                     // The phone's engine reads one prompt; the conversation is written out as a transcript.
                     val prompt = (0 until history.length()).joinToString("\n") { val h = history.getJSONObject(it); (if (h.getString("role") == "user") "User: " else "Assistant: ") + h.getString("content") } + "\nAssistant:"
-                    retry { post(URL("http://127.0.0.1:11434/api/chat").openConnection() as HttpURLConnection, JSONObject().put("prompt", prompt).put("model", m.id)) }
+                    val req = JSONObject().put("prompt", prompt).put("model", m.id)
+                    images.firstOrNull()?.let { req.put("images", JSONArray().put(it.optString("data"))) }
+                    retry { post(URL("http://127.0.0.1:11434/api/chat").openConnection() as HttpURLConnection, req) }
                 } else post(openPc("/api/chat"), JSONObject().put("messages", history).put("model", m.id).put("options", JSONObject()))
                 live = c
                 if (c.responseCode >= 400) throw Exception(c.errorStream?.bufferedReader()?.readText()?.let { runCatching { JSONObject(it).optString("error") }.getOrNull() ?: it } ?: "Error ${c.responseCode}")

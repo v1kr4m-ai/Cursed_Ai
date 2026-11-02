@@ -30,6 +30,12 @@ object LlamaNative {
      */
     external fun stopGeneration(modelHandler: Long)
 
+    /** Loads a model's picture reader (its "mmproj" GGUF); true when the model can now see pictures. */
+    external fun loadVision(modelHandler: Long, mmprojPath: String): Boolean
+
+    /** Like generate(), with one picture (JPEG/PNG bytes) shown to the model before the prompt. */
+    external fun generateWithImage(modelHandler: Long, prompt: String, image: ByteArray, temperature: Float, topP: Float, maxTokens: Int, callback: ModelCallback)
+
     /**
      * Unloads the model and frees resources.
      */

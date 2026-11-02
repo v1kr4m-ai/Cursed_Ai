@@ -70,7 +70,7 @@ data class MemoryEntry(val text: String, val timestamp: Long)
 // with no serializer found, which Ktor turns into an empty-body 500. Same
 // response shape as the desktop server's /api/models and /api/stats.
 @Serializable
-data class ModelsResponse(val storage: String, val active: String?, val available: List<String>)
+data class ModelsResponse(val storage: String, val active: String?, val available: List<String>, val vision: List<String> = emptyList())
 
 @Serializable
 data class RamStats(val heapUsed: String)
@@ -200,12 +200,14 @@ class ApiServer(private val context: Context, private val port: Int = 11434) {
                     ModelManager.setBusy(true)
 
                     // Report the real vision result instead of always claiming success -
-                    // there's no CLIP model vendored yet, so this currently always reports
-                    // "not implemented" rather than silently pretending it worked.
-                    request.images?.firstOrNull()?.let { b64 ->
-                        val result = MultimodalManager.processVisionInput(handler, b64)
-                        val status = if (result.contains("\"error\"")) result else "Image embedded into context"
-                        channel.trySend(Json.encodeToString(TokenResponse(vision_status = status)))
+                    // A picture goes to models that have a picture reader ("<name>.mmproj.gguf"); one per message.
+                    val picture: ByteArray? = request.images?.firstOrNull()?.let { b64 ->
+                        if (!ModelManager.loadVision(request.model ?: "")) {
+                            ModelManager.setBusy(false)
+                            call.respond(io.ktor.http.HttpStatusCode.BadRequest, mapOf("error" to "This phone model cannot see pictures. Pick a model tagged Vision (Phone settings > Download models), or a PC model that can."))
+                            return@post
+                        }
+                        android.util.Base64.decode(b64.substringAfter("base64,"), android.util.Base64.DEFAULT)
                     }
 
                     // Register cancellation
@@ -232,7 +234,15 @@ class ApiServer(private val context: Context, private val port: Int = 11434) {
 
                     Thread {
                         try {
-                            LlamaNative.generate(
+                            if (picture != null) LlamaNative.generateWithImage(
+                                handler,
+                                request.prompt,
+                                picture,
+                                request.options?.temperature ?: 0f,
+                                request.options?.topP ?: 0f,
+                                request.options?.maxTokens ?: 0,
+                                callback
+                            ) else LlamaNative.generate(
                                 handler,
                                 request.prompt,
                                 request.options?.temperature ?: 0f,
@@ -317,12 +327,14 @@ class ApiServer(private val context: Context, private val port: Int = 11434) {
                 get("/api/models") {
                     try {
                         val dir = File(modelsDir)
-                        val available = if (dir.exists()) dir.listFiles { f -> f.extension == "gguf" }?.map { it.name } ?: emptyList()
+                        // Picture readers ("<name>.mmproj.gguf") are not models of their own; they mark the model as Vision.
+                        val available = if (dir.exists()) dir.listFiles { f -> f.extension == "gguf" && !f.name.endsWith(".mmproj.gguf") }?.map { it.name } ?: emptyList()
                                         else emptyList()
                         call.respond(ModelsResponse(
                             storage = modelsDir,
                             active = ModelManager.getActiveModel(),
-                            available = available
+                            available = available,
+                            vision = available.filter { ModelManager.visionFile(it.removeSuffix(".gguf")).exists() }
                         ))
                     } catch (e: Throwable) {
                         android.util.Log.e("ApiServer", "/api/models failed", e)

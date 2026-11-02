@@ -88,20 +88,21 @@ class PhoneSettings(
         live.clear()
         body.addView(text("Models on this phone", 15f, "#FFFFFF", bold = true, top = 8))
         body.addView(text("The engine on this phone answers with these (Chat > model > On this phone). Small models (1-4 GB, e.g. Q4) run best.", 12f, "#A1A1AA", top = 4))
-        val files = dir.listFiles { f -> f.extension.equals("gguf", true) }?.sortedBy { it.name.lowercase() } ?: emptyList()
+        val files = dir.listFiles { f -> f.extension.equals("gguf", true) && !f.name.endsWith(".mmproj.gguf", true) }?.sortedBy { it.name.lowercase() } ?: emptyList()
         if (files.isEmpty()) body.addView(text("No model yet. Add one below.", 13f, "#71717A", top = 12))
         for (f in files) {
             val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; background = round("#18181B", 12); setPadding(dp(12), dp(8), dp(8), dp(8)) }
             row.addView(LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(text(PhoneCatalog.nameFor(f.nameWithoutExtension), 14f, "#F4F4F5"))
-                addView(text(gb(f.length()), 11f, "#71717A"))
+                val sees = File(dir, f.nameWithoutExtension + ".mmproj.gguf").exists()
+                addView(text(gb(f.length()) + if (sees) "  ·  sees pictures" else "", 11f, if (sees) "#7DD3FC" else "#71717A"))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            row.addView(button("Use", "#5B21B6") { onUse(ChatModel(f.nameWithoutExtension, PhoneCatalog.nameFor(f.nameWithoutExtension), true)) },
+            row.addView(button("Use", "#5B21B6") { onUse(ChatModel(f.nameWithoutExtension, PhoneCatalog.nameFor(f.nameWithoutExtension), true, vision = File(dir, f.nameWithoutExtension + ".mmproj.gguf").exists())) },
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36)).apply { rightMargin = dp(6) })
             row.addView(button("Delete", "#7F1D1D") {
                 AlertDialog.Builder(ctx).setTitle("Delete ${f.nameWithoutExtension}?").setMessage("The file (${gb(f.length())}) is removed from the phone.")
-                    .setPositiveButton("Delete") { _, _ -> f.delete(); render() }.setNegativeButton("Cancel", null).show()
+                    .setPositiveButton("Delete") { _, _ -> f.delete(); File(dir, f.nameWithoutExtension + ".mmproj.gguf").delete(); render() }.setNegativeButton("Cancel", null).show()
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36)))
             body.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
         }
@@ -139,8 +140,14 @@ class PhoneSettings(
 
     // ------------------------------------------------------------ downloads
 
-    private fun partOf(e: PhoneCatalog.Entry) = File(dir, e.file + ".gguf.part")
-    private fun fileOf(e: PhoneCatalog.Entry) = File(dir, e.file + ".gguf")
+    /** One file to download: the model, or a vision model's picture reader saved next to it. */
+    private data class Part(val key: String, val url: String, val file: File) { val part get() = File(file.path + ".part") }
+    private fun parts(e: PhoneCatalog.Entry) = listOfNotNull(
+        Part("dl_" + e.file, e.url, File(dir, e.file + ".gguf")),
+        e.mmprojUrl?.let { Part("dl_" + e.file + ".mmproj", it, File(dir, e.file + ".mmproj.gguf")) },
+    )
+    private fun ready(e: PhoneCatalog.Entry) = parts(e).all { it.file.exists() }
+    private fun downloading(e: PhoneCatalog.Entry) = parts(e).any { prefs.getLong(it.key, -1L) >= 0 }
 
     /** Small models for phones with their tags; Download, then Use in chat. */
     private fun catalog() {
@@ -154,10 +161,10 @@ class PhoneSettings(
                 addView(text(e.name, 14f, "#F4F4F5", bold = true))
                 addView(text("${gb(e.bytes)}  ·  ${e.about}", 11f, "#A1A1AA"))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            val have = fileOf(e).exists()
-            val running = prefs.getLong("dl_" + e.file, -1L) >= 0
+            val have = ready(e)
+            val running = downloading(e)
             head.addView(when {
-                have -> button("Use in chat", "#16A34A") { onUse(ChatModel(e.file, e.name, true)) }
+                have -> button("Use in chat", "#16A34A") { onUse(ChatModel(e.file, e.name, true, vision = e.vision)) }
                 running -> button("Cancel", "#3F3F46") { cancel(e) }
                 else -> button("Download", "#7C3AED") { download(e) }
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36)).apply { leftMargin = dp(8) })
@@ -166,7 +173,7 @@ class PhoneSettings(
             val tags = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, 0) }
             for (t in e.tags) tags.addView(TextView(ctx).apply {
                 text = t; textSize = 10f; setTypeface(typeface, Typeface.BOLD)
-                val c = when (t) { "Recommended" -> "#16A34A"; "Fast", "Tiny" -> "#0EA5E9"; "Reasoning" -> "#F59E0B"; "Coding" -> "#EC4899"; "Smarter" -> "#8B5CF6"; else -> "#52525B" }
+                val c = when (t) { "Vision" -> "#0284C7"; "Recommended" -> "#16A34A"; "Fast", "Tiny" -> "#0EA5E9"; "Reasoning" -> "#F59E0B"; "Coding" -> "#EC4899"; "Smarter" -> "#8B5CF6"; else -> "#52525B" }
                 setTextColor(Color.WHITE); background = round(c, 8); setPadding(dp(7), dp(2), dp(7), dp(2))
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(5) })
             card.addView(tags)
@@ -183,20 +190,26 @@ class PhoneSettings(
 
     private fun download(e: PhoneCatalog.Entry) {
         if (e.bytes > StatFs(dir.absolutePath).availableBytes - (300L shl 20)) { showResult("Not enough free space for ${e.name} (${gb(e.bytes)}). Delete a model or other files first."); return }
-        partOf(e).delete()
-        val id = dm.enqueue(DownloadManager.Request(Uri.parse(e.url))
-            .setTitle("${e.name} for Cursed_Ai").setDescription("Model for the phone's chat")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(partOf(e))))
-        prefs.edit().putLong("dl_" + e.file, id).apply()
+        for (p in parts(e)) {
+            if (p.file.exists()) continue
+            p.part.delete()
+            val id = dm.enqueue(DownloadManager.Request(Uri.parse(p.url))
+                .setTitle("${e.name}${if (p.key.endsWith(".mmproj")) " picture reader" else ""} for Cursed_Ai").setDescription("Model for the phone's chat")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationUri(Uri.fromFile(p.part)))
+            prefs.edit().putLong(p.key, id).apply()
+        }
         render()
     }
 
     private fun cancel(e: PhoneCatalog.Entry) {
-        val id = prefs.getLong("dl_" + e.file, -1L)
-        if (id >= 0) dm.remove(id)
-        prefs.edit().remove("dl_" + e.file).apply()
-        partOf(e).delete(); render()
+        for (p in parts(e)) {
+            val id = prefs.getLong(p.key, -1L)
+            if (id >= 0) dm.remove(id)
+            prefs.edit().remove(p.key).apply()
+            p.part.delete()
+        }
+        render()
     }
 
     /**
@@ -207,30 +220,31 @@ class PhoneSettings(
     private fun tick(): Boolean {
         var running = false; var changed = false
         for (e in PhoneCatalog.models) {
-            val id = prefs.getLong("dl_" + e.file, -1L)
-            if (id < 0) continue
-            dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
-                if (!c.moveToFirst()) { prefs.edit().remove("dl_" + e.file).apply(); changed = true; return@use }
-                val st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                val got = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                val total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)).takeIf { it > 0 } ?: e.bytes
-                when (st) {
-                    DownloadManager.STATUS_SUCCESSFUL -> {
-                        partOf(e).renameTo(fileOf(e)); prefs.edit().remove("dl_" + e.file).apply(); changed = true
-                        if (::body.isInitialized) Toast.makeText(ctx, "${e.name} is ready. Tap Use in chat.", Toast.LENGTH_LONG).show()
-                    }
-                    DownloadManager.STATUS_FAILED -> {
-                        prefs.edit().remove("dl_" + e.file).apply(); partOf(e).delete(); changed = true
-                        Toast.makeText(ctx, "${e.name} could not be downloaded (check the connection and free space).", Toast.LENGTH_LONG).show()
-                    }
-                    else -> {
-                        running = true
-                        live[e.file]?.let { (bar, note) ->
-                            bar.progress = (got * 1000 / total).toInt()
-                            note.text = if (st == DownloadManager.STATUS_PAUSED) "Paused (waiting for a connection)... ${gb(got)} of ${gb(total)}" else "Downloading... ${gb(got)} of ${gb(total)}"
-                        }
+            if (!downloading(e)) continue
+            var got = 0L; var paused = false; var failed = false
+            for (p in parts(e)) {
+                if (p.file.exists()) { got += p.file.length(); continue }
+                val id = prefs.getLong(p.key, -1L)
+                if (id < 0) continue
+                dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
+                    if (!c.moveToFirst()) { prefs.edit().remove(p.key).apply(); changed = true; return@use }
+                    when (c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
+                        DownloadManager.STATUS_SUCCESSFUL -> { p.part.renameTo(p.file); prefs.edit().remove(p.key).apply(); changed = true; got += p.file.length() }
+                        DownloadManager.STATUS_FAILED -> { prefs.edit().remove(p.key).apply(); p.part.delete(); changed = true; failed = true }
+                        DownloadManager.STATUS_PAUSED -> { running = true; paused = true; got += c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)) }
+                        else -> { running = true; got += c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)) }
                     }
                 }
+            }
+            if (failed) {
+                cancel(e)
+                Toast.makeText(ctx, "${e.name} could not be downloaded (check the connection and free space).", Toast.LENGTH_LONG).show()
+            } else if (ready(e) && changed) {
+                if (::body.isInitialized) Toast.makeText(ctx, "${e.name} is ready. Tap Use in chat.", Toast.LENGTH_LONG).show()
+            }
+            live[e.file]?.let { (bar, note) ->
+                bar.progress = (got.coerceAtMost(e.bytes) * 1000 / e.bytes).toInt()
+                note.text = "${if (paused) "Paused (waiting for a connection)" else "Downloading"}... ${gb(got)} of ${gb(e.bytes)}"
             }
         }
         if (changed && ::body.isInitialized && !copying) render()

@@ -9,6 +9,8 @@
 #include <sys/time.h>
 
 #include "llama.h"
+#include "mtmd.h"
+#include "mtmd-helper.h"
 
 // Tokens are pieces of UTF-8 that can end in the middle of a character (accents, Hindi, emoji). JNI's NewStringUTF
 // wants complete "modified UTF-8" and aborts the app on anything else (and on 4-byte characters such as emoji), so
@@ -65,6 +67,10 @@ struct model_instance {
     long total_tokens_generated = 0;
     int n_threads = 4;
     int n_batch = 512;
+
+    // Picture reading (a model's companion "mmproj" file), loaded on first use.
+    mtmd_context* vision = nullptr;
+    std::string vision_path;
 };
 
 static long current_time_ms() {
@@ -139,6 +145,70 @@ Java_com_cursed_runtime_jni_LlamaNative_loadModel(JNIEnv *env, jobject, jstring 
     return reinterpret_cast<jlong>(inst);
 }
 
+// Samples and streams the answer once the prompt (text, or text and pictures) is in the context: `n_cur` is the
+// next position. Calls onToken for each piece of text and onComplete at the end; throws on a decode error.
+// `smpl` is the caller's, so the caller can free it if this throws.
+static void stream_answer(JNIEnv *env, model_instance *inst, jobject callback, float temperature, float top_p,
+                          int max_tokens, uint32_t n_cur, uint32_t n_ctx, llama_sampler *&smpl) {
+    jclass callbackClass = env->GetObjectClass(callback);
+    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
+    jmethodID onCompleteMethod = env->GetMethodID(callbackClass, "onComplete", "()V");
+    llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
+    smpl = llama_sampler_chain_init(sparams);
+    llama_sampler_chain_add(smpl, llama_sampler_init_top_k(40));
+    llama_sampler_chain_add(smpl, llama_sampler_init_top_p(top_p > 0.0f ? top_p : 0.95f, 1));
+    llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature > 0.0f ? temperature : 0.8f));
+    llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+    const long start_time = current_time_ms();
+    int tokens_generated = 0;
+    const int max_new_tokens = max_tokens > 0 ? max_tokens : 512;
+    std::string pending;
+
+
+    while (tokens_generated < max_new_tokens) {
+        if (inst->stop_flag) {
+            LOGI("Generation cancelled by client");
+            break;
+        }
+
+        llama_token new_token = llama_sampler_sample(smpl, inst->ctx, -1);
+        llama_sampler_accept(smpl, new_token);
+
+        if (llama_vocab_is_eog(inst->vocab, new_token)) break;
+
+        char piece_buf[256];
+        int32_t piece_len = llama_token_to_piece(inst->vocab, new_token, piece_buf, sizeof(piece_buf), 0, true);
+        if (piece_len > 0) {
+            pending.append(piece_buf, piece_len);
+            if (jstring tokenStr = take_utf16(env, pending)) {
+                env->CallVoidMethod(callback, onTokenMethod, tokenStr);
+                env->DeleteLocalRef(tokenStr);
+            }
+        }
+        tokens_generated++;
+
+        llama_token next[1] = {new_token};
+        llama_batch next_batch = llama_batch_get_one(next, 1);
+        if (llama_decode(inst->ctx, next_batch) != 0) {
+            throw std::runtime_error("llama_decode failed during generation");
+        }
+        n_cur++;
+        if (n_cur >= n_ctx) {
+            LOGI("Context window exhausted, stopping generation");
+            break;
+        }
+    }
+
+    const double elapsed_sec = (current_time_ms() - start_time) / 1000.0;
+    inst->last_generation_tps = elapsed_sec > 0 ? tokens_generated / elapsed_sec : 0.0;
+    inst->total_tokens_generated += tokens_generated;
+
+    llama_sampler_free(smpl);
+    smpl = nullptr;
+    env->CallVoidMethod(callback, onCompleteMethod);
+}
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_cursed_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong model_handler, jstring prompt,
@@ -196,64 +266,11 @@ Java_com_cursed_runtime_jni_LlamaNative_generate(JNIEnv *env, jobject, jlong mod
             throw std::runtime_error("Prompt is too long for this model's context window");
         }
 
-        llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
-        smpl = llama_sampler_chain_init(sparams);
-        llama_sampler_chain_add(smpl, llama_sampler_init_top_k(40));
-        llama_sampler_chain_add(smpl, llama_sampler_init_top_p(top_p > 0.0f ? top_p : 0.95f, 1));
-        llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature > 0.0f ? temperature : 0.8f));
-        llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-
-        const long start_time = current_time_ms();
-        int tokens_generated = 0;
-        const int max_new_tokens = max_tokens > 0 ? max_tokens : 512;
-        uint32_t n_cur = (uint32_t) n_tokens;
-        std::string pending;
-
         llama_batch batch = llama_batch_get_one(tokens.data(), (int32_t) tokens.size());
         if (llama_decode(inst->ctx, batch) != 0) {
             throw std::runtime_error("llama_decode failed while processing the prompt");
         }
-
-        while (tokens_generated < max_new_tokens) {
-            if (inst->stop_flag) {
-                LOGI("Generation cancelled by client");
-                break;
-            }
-
-            llama_token new_token = llama_sampler_sample(smpl, inst->ctx, -1);
-            llama_sampler_accept(smpl, new_token);
-
-            if (llama_vocab_is_eog(inst->vocab, new_token)) break;
-
-            char piece_buf[256];
-            int32_t piece_len = llama_token_to_piece(inst->vocab, new_token, piece_buf, sizeof(piece_buf), 0, true);
-            if (piece_len > 0) {
-                pending.append(piece_buf, piece_len);
-                if (jstring tokenStr = take_utf16(env, pending)) {
-                    env->CallVoidMethod(callback, onTokenMethod, tokenStr);
-                    env->DeleteLocalRef(tokenStr);
-                }
-            }
-            tokens_generated++;
-
-            llama_token next[1] = {new_token};
-            llama_batch next_batch = llama_batch_get_one(next, 1);
-            if (llama_decode(inst->ctx, next_batch) != 0) {
-                throw std::runtime_error("llama_decode failed during generation");
-            }
-            n_cur++;
-            if (n_cur >= n_ctx) {
-                LOGI("Context window exhausted, stopping generation");
-                break;
-            }
-        }
-
-        const double elapsed_sec = (current_time_ms() - start_time) / 1000.0;
-        inst->last_generation_tps = elapsed_sec > 0 ? tokens_generated / elapsed_sec : 0.0;
-        inst->total_tokens_generated += tokens_generated;
-
-        llama_sampler_free(smpl);
-        env->CallVoidMethod(callback, onCompleteMethod);
+        stream_answer(env, inst, callback, temperature, top_p, max_tokens, (uint32_t) n_tokens, n_ctx, smpl);
     } catch (const std::exception &e) {
         if (smpl) llama_sampler_free(smpl);
         LOGE("generate() failed: %s", e.what());
@@ -293,6 +310,7 @@ Java_com_cursed_runtime_jni_LlamaNative_releaseModel(JNIEnv *, jobject, jlong mo
     auto *inst = reinterpret_cast<model_instance *>(model_handler);
     if (inst) {
         LOGI("Releasing model resources");
+        if (inst->vision) mtmd_free(inst->vision);
         if (inst->ctx) llama_free(inst->ctx);
         if (inst->model) llama_model_free(inst->model);
         delete inst;
@@ -343,4 +361,94 @@ Java_com_cursed_runtime_jni_LlamaNative_getStats(JNIEnv *env, jobject, jlong mod
              model_mb, gpu_available ? "true" : "false", tps, total_tokens, state, threads, batch);
 
     return env->NewStringUTF(buffer);
+}
+
+// Loads the model's picture reader (its "mmproj" GGUF); true when the model can now see pictures.
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_cursed_runtime_jni_LlamaNative_loadVision(JNIEnv *env, jobject, jlong model_handler, jstring mmproj) {
+    auto *inst = reinterpret_cast<model_instance *>(model_handler);
+    if (!inst || !inst->model) return JNI_FALSE;
+    const char *c_path = env->GetStringUTFChars(mmproj, nullptr);
+    std::string path(c_path);
+    env->ReleaseStringUTFChars(mmproj, c_path);
+    std::lock_guard<std::mutex> lock(inst->gen_mutex);
+    if (inst->vision && inst->vision_path == path) return JNI_TRUE;
+    if (inst->vision) { mtmd_free(inst->vision); inst->vision = nullptr; }
+    mtmd_context_params p = mtmd_context_params_default();
+    p.use_gpu = false;
+    p.print_timings = false;
+    p.n_threads = inst->n_threads;
+    p.warmup = false;
+    inst->vision = mtmd_init_from_file(path.c_str(), inst->model, p);
+    if (!inst->vision || !mtmd_support_vision(inst->vision)) {
+        LOGE("Could not load the picture reader %s", path.c_str());
+        if (inst->vision) { mtmd_free(inst->vision); inst->vision = nullptr; }
+        return JNI_FALSE;
+    }
+    inst->vision_path = path;
+    LOGI("Picture reader ready: %s", path.c_str());
+    return JNI_TRUE;
+}
+
+// Like generate(), with one picture (JPEG/PNG bytes) shown to the model before the question.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_cursed_runtime_jni_LlamaNative_generateWithImage(JNIEnv *env, jobject, jlong model_handler, jstring prompt, jbyteArray image,
+                                                            jfloat temperature, jfloat top_p, jint max_tokens, jobject callback) {
+    auto *inst = reinterpret_cast<model_instance *>(model_handler);
+    jclass callbackClass = env->GetObjectClass(callback);
+    jmethodID onErrorMethod = env->GetMethodID(callbackClass, "onError", "(Ljava/lang/String;)V");
+    if (!inst || !inst->ctx || !inst->model || !inst->vision) {
+        env->CallVoidMethod(callback, onErrorMethod, env->NewStringUTF("This model cannot read pictures (its picture reader is not loaded)"));
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(inst->gen_mutex);
+    inst->stop_flag = false;
+
+    const char *c_prompt = env->GetStringUTFChars(prompt, nullptr);
+    std::string prompt_str(c_prompt);
+    env->ReleaseStringUTFChars(prompt, c_prompt);
+    std::vector<unsigned char> bytes(env->GetArrayLength(image));
+    env->GetByteArrayRegion(image, 0, (jsize) bytes.size(), reinterpret_cast<jbyte *>(bytes.data()));
+
+    llama_sampler *smpl = nullptr;
+    mtmd_bitmap *bmp = nullptr;
+    mtmd_input_chunks *chunks = nullptr;
+    try {
+        llama_memory_clear(llama_get_memory(inst->ctx), true);
+
+        // The picture goes where the marker is: first, then the question, inside the model's chat template.
+        std::string content = std::string(mtmd_default_marker()) + "\n" + prompt_str;
+        llama_chat_message msg{"user", content.c_str()};
+        const char *tmpl = llama_model_chat_template(inst->model, nullptr);
+        std::vector<char> buf(content.size() * 2 + 256);
+        int32_t len = llama_chat_apply_template(tmpl, &msg, 1, true, buf.data(), (int32_t) buf.size());
+        if (len > (int32_t) buf.size()) { buf.resize(len); len = llama_chat_apply_template(tmpl, &msg, 1, true, buf.data(), (int32_t) buf.size()); }
+        std::string formatted = len > 0 ? std::string(buf.data(), len) : content;
+
+        bmp = mtmd_helper_bitmap_init_from_buf(inst->vision, bytes.data(), bytes.size(), false).bitmap;
+        if (!bmp) throw std::runtime_error("Could not read the picture");
+        chunks = mtmd_input_chunks_init();
+        mtmd_input_text text{formatted.c_str(), formatted.size(), true, true};
+        const mtmd_bitmap *bitmaps[] = {bmp};
+        if (mtmd_tokenize(inst->vision, chunks, &text, bitmaps, 1) != 0) throw std::runtime_error("Could not prepare the picture for the model");
+
+        llama_pos n_past = 0;
+        if (mtmd_helper_eval_chunks(inst->vision, inst->ctx, chunks, 0, 0, inst->n_batch, true, &n_past) != 0)
+            throw std::runtime_error("The model could not take in the picture");
+        mtmd_input_chunks_free(chunks); chunks = nullptr;
+        mtmd_bitmap_free(bmp); bmp = nullptr;
+
+        const uint32_t n_ctx = llama_n_ctx(inst->ctx);
+        if ((uint32_t) n_past >= n_ctx) throw std::runtime_error("The picture and question are too long for this model's context window");
+        stream_answer(env, inst, callback, temperature, top_p, max_tokens, (uint32_t) n_past, n_ctx, smpl);
+    } catch (const std::exception &e) {
+        if (smpl) llama_sampler_free(smpl);
+        if (chunks) mtmd_input_chunks_free(chunks);
+        if (bmp) mtmd_bitmap_free(bmp);
+        LOGE("generateWithImage() failed: %s", e.what());
+        env->CallVoidMethod(callback, onErrorMethod, env->NewStringUTF(e.what()));
+    }
 }
