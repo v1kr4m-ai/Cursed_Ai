@@ -73,7 +73,20 @@ export function TrainLoraView() {
   React.useEffect(() => { refreshFiles(); }, [refreshFiles, lora.running]);
 
   const guard = async (fn: () => Promise<any>) => { try { return await fn(); } catch (e: any) { notifyError(e?.message || String(e), "trainlora"); } };
-  const start = (kind: "lora" | "sketch" | "caption", url: string, body: unknown) => guard(async () => { setConsoleKind(kind); await api(url, body); reload(); });
+  const start = (kind: "lora" | "sketch" | "caption", url: string, body: unknown) => guard(async () => {
+    setConsoleKind(kind);
+    try { await api(url, body); }
+    catch (e: any) {
+      // A crashed earlier run still holds the graphics card: offer to end it, then start.
+      if (kind !== "lora" || !/still running in the background/.test(String(e?.message)) || !window.confirm(`${e.message}
+
+End it now?`)) throw e;
+      await api("/api/train/lora/end-leftovers", {});
+      await new Promise(r => setTimeout(r, 3000));
+      await api(url, body);
+    }
+    reload();
+  });
 
   const createDataset = () => guard(async () => { const r = await api<{ path: string }>("/api/train/dataset/create", { name: newName }); set({ datasetDir: r.path }); setNewName(""); reload(); });
   const upload = async (list: FileList | null) => {

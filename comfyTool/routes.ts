@@ -97,7 +97,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
       return saved;
     }
   }
-  const comfyReachable = async () => { try { return (await fetch(`${opts.getComfyUrl()}/system_stats`, { signal: AbortSignal.timeout(2000) })).ok; } catch { return false; } };
+  const comfyReachable = async () => { try { return (await fetch(`${opts.getComfyUrl()}/system_stats`, { signal: AbortSignal.timeout(6000) })).ok; } catch { return false; } }; // a busy ComfyUI can take seconds to answer
 
   const defaultWorkflowFolder = () => {
     const root = opts.getComfyRoot();
@@ -538,7 +538,7 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     const kind = isKind(req.query.kind) ? req.query.kind : null;
     let runningIds = new Set<string>(), pendingIds: string[] = [], reachable = true;
     try {
-      const q: any = await (await fetch(`${opts.getComfyUrl()}/queue`, { signal: AbortSignal.timeout(3000) })).json();
+      const q: any = await (await fetch(`${opts.getComfyUrl()}/queue`, { signal: AbortSignal.timeout(6000) })).json();
       runningIds = new Set((q.queue_running || []).map((i: any) => i[1]));
       pendingIds = (q.queue_pending || []).map((i: any) => i[1]);
     } catch { reachable = false; }

@@ -8,7 +8,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { buildLlmArgs, buildLoraArgs, cleanLlm, cleanLora, writeLoraToml } from "./builders";
-import { freeVram, isRunning, jobState, startProcess, startTask, stopJob, subscribeAll, type JobKind } from "./jobs";
+import { endProcesses, freeVram, isRunning, jobState, leftoverTrainers, startProcess, startTask, stopJob, subscribeAll, type JobKind } from "./jobs";
 import { exists, listDirs, listFiles, listHfModels, resolvePaths, type TrainConfig } from "./paths";
 import { buildDataset, triggerFor } from "./personDataset";
 import { createSeriesStore } from "../seriesTool/store";
@@ -105,11 +105,25 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     if (!cfg.outputDir) cfg.outputDir = path.join(p.fluxOutputDir, cfg.triggerWord);
     for (const [label, f] of [["FluxGym's accelerate", p.fluxAccelerate], ["kohya sd-scripts", p.sdScripts]] as const) if (!exists(f)) return bad(res, 400, `${label} was not found at ${f}. Set the FluxGym folder in the page.`);
     fs.mkdirSync(cfg.outputDir, { recursive: true });
+    // A crashed earlier run can leave its workers hung on the graphics card; starting into that only runs out of memory.
+    const left = await leftoverTrainers("flux_train_network.py");
+    if (left.length) return res.status(409).json({ error: `A previous LoRA training is still running in the background (${left.length} process${left.length === 1 ? "" : "es"}, probably stuck after an error) and is holding the graphics card. End it, then start again.`, leftovers: left });
     const toml = writeLoraToml(cfg);
+    // Free the GPU first and give it a moment: freeing it while training starts raced the first CUDA allocations
+    // (8 GB cards then ran out of memory while preparing the captions).
+    await freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {});
+    await new Promise(r => setTimeout(r, 2500));
+    if (isRunning("lora")) return bad(res, 409, "A LoRA training run is already active.");
     const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.epochs} epochs, ${cfg.vramPreset})`, p.fluxAccelerate, buildLoraArgs(cfg, p, toml), { cwd: p.sdScripts });
-    // ComfyUI and Ollama keep models in VRAM until told otherwise, which starves training.
-    freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {});
     res.json(state);
+  });
+
+  /** Ends the leftover trainer processes reported by a refused start (the person pressed End them). */
+  app.post("/api/train/lora/end-leftovers", async (_req, res) => {
+    if (isRunning("lora")) return bad(res, 409, "A LoRA run started from here is active - stop it instead.");
+    const left = await leftoverTrainers("flux_train_network.py");
+    endProcesses(left);
+    res.json({ ended: left.length });
   });
 
   app.get("/api/train/images", (req, res) => {
@@ -279,8 +293,9 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     }
     if (!cfg.outputDir) cfg.outputDir = path.join(p.llmOutputDir, `${path.basename(cfg.baseModelDir)}-${new Date().toISOString().slice(0, 10)}`);
     fs.mkdirSync(cfg.outputDir, { recursive: true });
+    await freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {}); // before, not while, the trainer claims the GPU
+    await new Promise(r => setTimeout(r, 2500));
     const state = startProcess("llm", `Fine-tuning ${path.basename(cfg.baseModelDir)} on ${path.basename(cfg.datasetFile)}`, p.llmPython, buildLlmArgs(cfg, `${p.scriptsDir}/train_llm.py`), { cwd: p.llmRoot });
-    freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {});
     res.json(state);
   });
 

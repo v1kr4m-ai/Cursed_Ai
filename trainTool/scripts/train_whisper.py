@@ -15,7 +15,7 @@ import sys
 import time
 
 import numpy as np
-from speech_common import error_rate, load_audio, read_dataset, say, split_rows
+from speech_common import error_rate, load_audio, read_dataset, say, split_long, split_rows
 
 MAX_SECONDS = 30.0   # Whisper listens to 30 s at a time
 MIN_SECONDS = 0.3
@@ -75,12 +75,19 @@ def main():
             skipped += 1
             continue
         sec = len(audio) / 16000
-        if sec < MIN_SECONDS or sec > MAX_SECONDS:
+        if sec < MIN_SECONDS:
             skipped += 1
+            continue
+        if sec > MAX_SECONDS:
+            # Longer than Whisper hears at once: cut into pieces at pauses, each with its share of the transcript.
+            parts = split_long(audio, text, 16000)
+            say(f"[speech] {os.path.basename(path)} is {sec:.0f} s long - cut into {len(parts)} pieces of under 30 s")
+            for k, (a, t) in enumerate(parts):
+                items.append((a, t, f"{os.path.basename(path)}#{k + 1}"))
             continue
         items.append((audio, text, os.path.basename(path)))
     if skipped:
-        say(f"[speech] {skipped} clip(s) skipped (unreadable, under {MIN_SECONDS} s or over {MAX_SECONDS:.0f} s).")
+        say(f"[speech] {skipped} clip(s) skipped (unreadable, or under {MIN_SECONDS} s).")
     train_items, eval_items = split_rows(items, args.eval_percent)
     if not train_items:
         say("[speech] ERROR: nothing left to train on.")

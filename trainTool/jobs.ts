@@ -27,6 +27,8 @@ interface Job {
   proc?: ChildProcess;
   abort?: AbortController;
   lastTqdmLog: number;
+  /** Ran out of GPU memory (the run was ended because of it). */
+  oom?: boolean;
 }
 
 const jobs = new Map<JobKind, Job>();
@@ -61,6 +63,18 @@ function readLine(job: Job, raw: string) {
     return;
   }
   addLine(job, line);
+  // Out of GPU memory: CUDA leaves the Python workers hung rather than exiting, so the run would sit "running"
+  // forever with no message. End the whole process tree and say what happened instead.
+  if (/CUDA error: out of memory|CUDA out of memory|OutOfMemoryError/i.test(line) && job.state.running && !job.oom) {
+    job.oom = true;
+    addLine(job, "[error] The graphics card ran out of memory. Close other programs that use it (games, browsers with many tabs, a second ComfyUI or emulator), then start again - ComfyUI and Ollama models are freed automatically before training.");
+    const p = job.proc;
+    if (p?.pid) {
+      if (process.platform === "win32") execFile("taskkill", ["/pid", String(p.pid), "/T", "/F"], { windowsHide: true }, () => {});
+      else p.kill("SIGKILL");
+    }
+    finish(job, { failed: true });
+  }
 }
 
 function finish(job: Job, over: Partial<JobState>) {
@@ -151,4 +165,20 @@ export async function freeVram(opts: { comfyUrl: string; ollamaUrl: string }, lo
       log(`[setup] unloaded ${m.name} from Ollama.`);
     }
   } catch { /* not running */ }
+}
+
+/**
+ * Trainer processes left behind by an earlier run that crashed (CUDA "out of memory" leaves Python workers hung, and
+ * they keep holding the graphics card). Windows only; elsewhere none are reported.
+ */
+export function leftoverTrainers(script: string): Promise<number[]> {
+  if (process.platform !== "win32") return Promise.resolve([]);
+  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*${script.replace(/'/g, "")}*' } | ForEach-Object { $_.ProcessId }`;
+  return new Promise(ok => execFile("powershell.exe", ["-NoProfile", "-Command", ps], { windowsHide: true, timeout: 15000 }, (_e, out) =>
+    ok(String(out || "").split(/\s+/).map(Number).filter(n => n > 0 && n !== process.pid))));
+}
+
+/** Ends those leftovers - only when the person asks (the page's End them button). */
+export function endProcesses(pids: number[]) {
+  for (const pid of pids) execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true }, () => {});
 }

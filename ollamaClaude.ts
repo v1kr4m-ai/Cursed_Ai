@@ -185,6 +185,9 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
       ...process.env,
       ANTHROPIC_BASE_URL: opts.ollamaUrl,
       ANTHROPIC_AUTH_TOKEN: "ollama",
+      // No time cap: Claude Code gives up on a model request after 10 minutes by default, which a local model working
+      // through a long task can need. 24 hours is as good as none (it also bounds the Bash tool's own default).
+      API_TIMEOUT_MS: "86400000", BASH_DEFAULT_TIMEOUT_MS: "86400000", BASH_MAX_TIMEOUT_MS: "86400000", MCP_TOOL_TIMEOUT: "86400000",
       ANTHROPIC_API_KEY: "",
       // Claude Code also calls "small/fast" and subagent models; point every role at the chosen model so nothing asks Ollama for a Claude name.
       ANTHROPIC_MODEL: model, ANTHROPIC_SMALL_FAST_MODEL: model, ANTHROPIC_DEFAULT_HAIKU_MODEL: model, ANTHROPIC_DEFAULT_SONNET_MODEL: model, ANTHROPIC_DEFAULT_OPUS_MODEL: model, CLAUDE_CODE_SUBAGENT_MODEL: model,

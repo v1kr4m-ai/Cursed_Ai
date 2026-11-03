@@ -82,3 +82,55 @@ def error_rate(refs, hyps, unit):
         errors += _edit_distance(r, h)
         total += max(1, len(r))
     return errors / max(1, total)
+
+
+def split_long(audio, text, sr=16000, max_sec=28.0, target_sec=20.0):
+    """Cuts a recording longer than Whisper's 30 s window into pieces, each cut at the quietest moment near every
+    `target_sec`, and gives each piece the share of the transcript that matches its share of the time (cut at a word,
+    preferably after a full stop or comma). A rough alignment, but spoken text is spread evenly enough for training.
+    Returns [(audio_piece, text_piece)]."""
+    import numpy as np
+    n = len(audio)
+    if n <= max_sec * sr:
+        return [(audio, text)]
+    win = int(0.05 * sr)
+    energy = np.convolve(np.abs(audio), np.ones(win) / win, mode="same")
+    cuts, start = [], 0
+    while n - start > max_sec * sr:
+        lo, hi = start + int((target_sec - 4) * sr), min(n, start + int((target_sec + 4) * sr))
+        cut = lo + int(np.argmin(energy[lo:hi]))
+        cuts.append(cut)
+        start = cut
+    bounds = [0] + cuts + [n]
+    words = text.split()
+    total = max(1, len(text))
+    pieces, w0 = [], 0
+    for i in range(len(bounds) - 1):
+        if i == len(bounds) - 2:
+            w1 = len(words)
+        else:
+            goal = total * bounds[i + 1] / n  # characters that should have been spoken by this cut
+            pos, w1, best = 0, w0, None
+            for k in range(w0, len(words)):
+                pos = len(" ".join(words[:k + 1]))
+                if pos >= goal * 0.85 and words[k][-1:] in ".,!?;:|।" and best is None:
+                    best = k + 1
+                if pos >= goal:
+                    w1 = k + 1
+                    break
+            w1 = best if best is not None and best <= w1 + 2 else w1
+            w1 = max(w1, w0 + 1)
+        pieces.append((audio[bounds[i]:bounds[i + 1]], " ".join(words[w0:w1])))
+        w0 = w1
+    return [(a, t) for a, t in pieces if t.strip() and len(a) >= 0.3 * sr]
+
+
+if __name__ == "__main__":
+    import numpy as np
+    sr = 16000
+    tone = np.concatenate([np.ones(sr * 9) * 0.5, np.zeros(sr // 2)] * 8)  # 76 s: 9.5 s phrases with pauses
+    text = " ".join(f"word{i}." if i % 10 == 9 else f"word{i}" for i in range(200))
+    parts = split_long(tone, text, sr)
+    assert len(parts) >= 3 and all(len(a) <= 28 * sr for a, _ in parts), [len(a) / sr for a, _ in parts]
+    assert " ".join(t for _, t in parts).split() == text.split()
+    print("split_long ok:", [round(len(a) / sr, 1) for a, _ in parts])

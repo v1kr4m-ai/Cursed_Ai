@@ -218,7 +218,9 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   // Jobs waiting / running in ComfyUI (also ones from a previous page load); a popup for every one that finishes or fails.
   const seenFinished = React.useRef<Set<string> | null>(null);
   React.useEffect(() => {
-    const poll = () => api<{ active: RunRow[]; finished: RunRow[] }>(`/api/tool/runs?kind=${kind}`).then(d => {
+    const poll = () => api<{ active: RunRow[]; finished: RunRow[]; comfyReachable?: boolean }>(`/api/tool/runs?kind=${kind}`).then(d => {
+      // ComfyUI may be started (or stopped) after this studio opened: keep the "not reachable" note current.
+      if (typeof d.comfyReachable === "boolean") setSt(s => (s && s.comfyReachable !== d.comfyReachable ? { ...s, comfyReachable: d.comfyReachable! } : s));
       setActive(d.active);
       if (seenFinished.current === null) { seenFinished.current = new Set(d.finished.map(r => r.runId)); return; }
       for (const r of d.finished) {
