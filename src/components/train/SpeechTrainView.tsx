@@ -208,6 +208,42 @@ export function SpeechTrainView() {
   const saveText = (c: Clip, text: string) => { if (text === c.text) return; guard(async () => { await api("/api/speech/transcript", { path: c.path, text }, "PUT"); setClips(l => l.map(x => (x.path === c.path ? { ...x, text } : x))); reload(); }); };
   const removeClip = (c: Clip) => { if (window.confirm(`Delete ${c.name} (and its transcript)?`)) guard(async () => { await api(`/api/speech/clip?path=${encodeURIComponent(c.path)}`, undefined, "DELETE"); refreshClips(); reload(); }); };
 
+  // ---- record a clip right here: record, Whisper writes a draft, correct it, add it to the clips
+  const [take, setTake] = React.useState<{ blob: Blob; url: string; text: string; writing: boolean } | null>(null);
+  const [takeRec, setTakeRec] = React.useState<MediaRecorder | null>(null);
+  const recordTake = () => guard(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(stream);
+    const parts: Blob[] = [];
+    rec.ondataavailable = e => parts.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      setTakeRec(null);
+      const blob = new Blob(parts, { type: rec.mimeType || "audio/webm" });
+      setTake({ blob, url: URL.createObjectURL(blob), text: "", writing: !!f.draftModel });
+      if (!f.draftModel) return;
+      try {
+        const res = await fetch(`/api/speech/stt/transcribe?model=${encodeURIComponent(f.draftModel)}&language=${f.language}&name=recording.webm`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: blob });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || "Could not write a draft");
+        setTake(t => (t && t.blob === blob ? { ...t, text: t.text || d.text || "", writing: false } : t));
+      } catch (e: any) { setTake(t => (t && t.blob === blob ? { ...t, writing: false } : t)); notifyError(e?.message || String(e), "trainspeech"); }
+    };
+    rec.start();
+    setTakeRec(rec);
+  });
+  const addTake = () => guard(async () => {
+    if (!take || !f.datasetDir) return;
+    const ext = take.blob.type.includes("ogg") ? "ogg" : take.blob.type.includes("mp4") ? "m4a" : "webm";
+    const name = `rec-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.${ext}`;
+    const res = await fetch(`/api/speech/clips/upload?dir=${encodeURIComponent(f.datasetDir)}&name=${encodeURIComponent(name)}`, { method: "POST", headers: { "Content-Type": take.blob.type || "application/octet-stream" }, body: take.blob });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not add the recording");
+    if (take.text.trim()) await api("/api/speech/transcript", { path: `${f.datasetDir.replace(/[\\/]+$/, "")}\\${name}`, text: take.text.trim() }, "PUT");
+    URL.revokeObjectURL(take.url); setTake(null);
+    notify({ message: `Added ${name} to the clips`, tab: "trainspeech" });
+    refreshClips(); reload();
+  });
+
   // ---- try it
   const startRecording = () => guard(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -270,7 +306,20 @@ export function SpeechTrainView() {
           <div className="flex flex-wrap gap-2">
             <button onClick={() => fileRef.current?.click()} disabled={busy || !f.datasetDir} className={btn}><Upload size={14} />Add recordings...</button>
             <button onClick={() => sheetRef.current?.click()} disabled={!f.datasetDir} className={btn}><FileText size={14} />Import transcripts (.tsv / .txt)...</button>
+            {takeRec
+              ? <button onClick={() => takeRec.stop()} className={btn + " !bg-rose-600/80 !text-white"}><Square size={14} />Stop recording</button>
+              : <button onClick={recordTake} disabled={!f.datasetDir || !!take} title="Record a clip with the microphone; Whisper writes its text, you correct it and add it" className={btn}><Mic size={14} />Record a clip</button>}
           </div>
+          {take && (
+            <div className="space-y-2 rounded-xl border border-white/10 p-2.5">
+              <audio controls src={take.url} className="h-8 w-full" />
+              <textarea dir="auto" value={take.text} onChange={e => setTake({ ...take, text: e.target.value })} rows={2} placeholder={take.writing ? "Whisper is writing a draft..." : f.draftModel ? "What is said in the recording" : "Type what is said (choose a Whisper model below to get a draft)"} className={inputCls + " resize-none text-sm"} />
+              <div className="flex gap-2">
+                <button onClick={addTake} disabled={take.writing} className={btnPrimary}>{take.writing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}Add to clips</button>
+                <button onClick={() => { URL.revokeObjectURL(take.url); setTake(null); }} className={btn}><Trash2 size={14} />Discard</button>
+              </div>
+            </div>
+          )}
           <SelectField label="Whisper model that writes drafts" value={f.draftModel} onChange={v => set({ draftModel: v })} options={sttBaseOptions} empty="Download a Whisper model in the Train step first" hint="Bigger models write better drafts. They are a first guess - read and correct them." />
           <CheckBox label="Also replace transcripts that already exist" checked={redo} onChange={setRedo} />
           <button onClick={() => start("speechprep", "/api/speech/draft/start", { datasetDir: f.datasetDir, model: f.draftModel, language: f.language, redo })} disabled={!f.datasetDir || !f.draftModel || prep.running || !status.ready.stt} className={btnPrimary + " self-start"}>{prep.running ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}Write draft transcripts</button>
