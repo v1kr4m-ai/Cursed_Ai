@@ -274,6 +274,15 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     res.json({ folder, item: { name: path.basename(dest), path: dest, type: VIDEO_EXT.has(ext) ? "video" : AUDIO_EXT.has(ext) ? "audio" : "image" } });
   });
 
+  /**
+   * PowerShell 7 (on .NET 8) shows Windows' modern Explorer-style folder window; the built-in Windows PowerShell only
+   * has the old "Browse For Folder" tree. Use 7 when it is installed.
+   */
+  const dialogShell = () => {
+    const pwsh = path.join(process.env.ProgramFiles || "C:\Program Files", "PowerShell", "7", "pwsh.exe");
+    return fs.existsSync(pwsh) ? pwsh : "powershell.exe";
+  };
+
   // Windows' own file / folder dialogs (the app and the browser run on the same PC). Picked locations become readable for thumbnails.
   const pickedDirs = new Set<string>();
   app.post("/api/tool/native-pick", (req, res) => {
@@ -287,11 +296,11 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
       "[System.Windows.Forms.Application]::EnableVisualStyles()",
       "$o = New-Object System.Windows.Forms.Form; $o.TopMost = $true; $o.ShowInTaskbar = $false; $o.StartPosition = 'CenterScreen'; $o.Size = New-Object System.Drawing.Size(0,0); $o.Show()",
       mode === "folder"
-        ? "$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.ShowNewFolderButton = $true; if ($env:PICK_INITIAL) { $d.SelectedPath = $env:PICK_INITIAL }; if ($d.ShowDialog($o) -eq 'OK') { [Console]::Out.Write($d.SelectedPath) }"
-        : "$d = New-Object System.Windows.Forms.OpenFileDialog; $d.Multiselect = $true; $d.Filter = 'Images, video and audio|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.flac;*.ogg;*.m4a|All files|*.*'; if ($env:PICK_INITIAL) { $d.InitialDirectory = $env:PICK_INITIAL }; if ($d.ShowDialog($o) -eq 'OK') { [Console]::Out.Write(($d.FileNames -join [char]10)) }",
+        ? "$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.ShowNewFolderButton = $true; $d.Description = 'Choose a folder'; try { $d.UseDescriptionForTitle = $true } catch {}; if ($env:PICK_INITIAL) { $d.SelectedPath = $env:PICK_INITIAL }; if ($d.ShowDialog($o) -eq 'OK') { [Console]::Out.Write($d.SelectedPath) }"
+        : "$d = New-Object System.Windows.Forms.OpenFileDialog; $d.Multiselect = $true; $d.Filter = $(if ($env:PICK_FILTER) { $env:PICK_FILTER } else { 'Images, video and audio|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.mp4;*.webm;*.mov;*.mkv;*.mp3;*.wav;*.flac;*.ogg;*.m4a|All files|*.*' }); if ($env:PICK_INITIAL) { $d.InitialDirectory = $env:PICK_INITIAL }; if ($d.ShowDialog($o) -eq 'OK') { [Console]::Out.Write(($d.FileNames -join [char]10)) }",
       "$o.Close()",
     ].join("; ");
-    const ps = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", script], { env: { ...process.env, PICK_INITIAL: initial }, windowsHide: false });
+    const ps = spawn(dialogShell(), ["-NoProfile", "-STA", "-Command", script], { env: { ...process.env, PICK_INITIAL: initial, PICK_FILTER: typeof req.body?.filter === "string" && /^[\w ,.*;|()-]{1,200}$/.test(req.body.filter) ? req.body.filter : "" }, windowsHide: false });
     let out = "";
     ps.stdout.on("data", d => { out += d.toString("utf8"); });
     ps.on("error", e => res.status(500).json({ error: e.message }));

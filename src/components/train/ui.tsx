@@ -157,6 +157,25 @@ export function FolderField({ label, value, onChange, hint, placeholder }: { lab
   );
 }
 
+/** A file: type it, or browse with Windows' own (modern) file window, showing the given kinds of file. */
+export function FileField({ label, value, onChange, hint, placeholder, filter = "Data files|*.jsonl;*.json;*.csv;*.txt|All files|*.*" }: { label: string; value: string; onChange: (v: string) => void; hint?: string; placeholder?: string; filter?: string }) {
+  const browse = async () => {
+    try {
+      const r = await fetch("/api/tool/native-pick", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "files", filter, initial: value ? value.replace(/[\/][^\/]*$/, "") : undefined }) });
+      const d = await r.json();
+      if (d.paths?.[0]) onChange(d.paths[0]);
+    } catch { /* no dialog here (a phone): type the path */ }
+  };
+  return (
+    <Field label={label} hint={hint}>
+      <div className="flex gap-2">
+        <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={inputCls + " font-mono text-xs"} />
+        <button type="button" onClick={browse} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white/5 px-3 text-xs font-bold text-zinc-300 hover:bg-white/10"><FolderOpen size={14} />Browse</button>
+      </div>
+    </Field>
+  );
+}
+
 export function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="accent-violet-500" />{label}</label>;
 }

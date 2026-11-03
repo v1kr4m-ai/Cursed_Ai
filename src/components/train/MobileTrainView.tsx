@@ -2,7 +2,7 @@ import React from "react";
 import { Check, Cloud, Copy, Database, Download, FileText, Loader2, Play, Settings2, Smartphone, Upload } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, useJob } from "./trainApi";
-import { Badge, btn, btnDanger, btnPrimary, Card, type CardInfo, inputCls, JobConsole, NumberField, SelectField, TextField, TrainProgress } from "./ui";
+import { Badge, btn, btnDanger, btnPrimary, Card, type CardInfo, inputCls, JobConsole, NumberField, SelectField, TextField, FileField, TrainProgress } from "./ui";
 
 interface Preset { id: string; label: string; suggest: string[]; quant: string; maxLength: number; note: string }
 interface MobileStatus {
@@ -157,8 +157,8 @@ export function MobileTrainView() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card title="Training data" info={INFO.data} icon={<FileText size={15} />} note="Chat-format rows in exactly the layout the phone app sends, ending with the reply to learn.">
               <SelectField label="Files in the training folder" value={st.datasets.find(d => d.path === f.trainFile)?.path || ""} onChange={v => set({ trainFile: v })} options={st.datasets.map(d => ({ value: d.path, label: `${d.name} (${d.rows} rows)` }))} empty="No .jsonl files there yet" />
-              <TextField label="Training file (or paste any path)" value={f.trainFile} onChange={v => set({ trainFile: v })} placeholder="C:\\path\\to\\train.jsonl" mono />
-              <TextField label="Test file (optional)" value={f.testFile} onChange={v => set({ testFile: v })} placeholder="C:\\path\\to\\test.jsonl" hint="Leave empty to keep part of the training file back for testing." mono />
+              <FileField label="Training file (or paste any path)" value={f.trainFile} onChange={v => set({ trainFile: v })} placeholder="C:\\path\\to\\train.jsonl" />
+              <FileField label="Test file (optional)" value={f.testFile} onChange={v => set({ testFile: v })} placeholder="C:\\path\\to\\test.jsonl" hint="Leave empty to keep part of the training file back for testing." />
               <div className="flex flex-wrap items-center gap-3">
                 <button onClick={runCheck} disabled={!f.trainFile || busy} className={btn}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}Check the file</button>
                 {check && <span className="text-[11px] text-zinc-400">{check.usable} of {check.rows} rows usable; average {check.avgChars} characters, longest {check.longestChars}</span>}
