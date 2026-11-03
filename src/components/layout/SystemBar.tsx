@@ -1,4 +1,6 @@
 import React from "react";
+import { Eraser, Loader2 } from "lucide-react";
+import { notify, notifyError } from "../../lib/notify";
 
 interface Live {
   cpu: number;
@@ -24,6 +26,14 @@ function Pill({ label, value, text, color, hint }: { label: string; value: numbe
 export function SystemBar({ lead }: { lead?: React.ReactNode }) {
   const [live, setLive] = React.useState<Live | null>(null);
   const [offline, setOffline] = React.useState(false);
+  const [freeing, setFreeing] = React.useState(false);
+  /** ComfyUI and Ollama unload their models, so the next job gets the whole graphics card. */
+  const freeGpu = async () => {
+    setFreeing(true);
+    try { const r = await fetch("/api/gpu/free", { method: "POST" }); if (!r.ok) throw new Error("Could not free the GPU memory."); notify({ message: "GPU memory freed - ComfyUI and Ollama unloaded their models" }); }
+    catch (e: any) { notifyError(e?.message || String(e)); }
+    finally { setFreeing(false); }
+  };
 
   React.useEffect(() => {
     let alive = true;
@@ -50,6 +60,10 @@ export function SystemBar({ lead }: { lead?: React.ReactNode }) {
       <Pill label="RAM" value={live.ram} text={`${live.ram}%`} color={level(live.ram, 80, 92, "bg-emerald-500")} hint={`${live.ramUsedGB.toFixed(1)} of ${live.ramTotalGB.toFixed(1)} GB in use`} />
       <Pill label="GPU" value={g ? g.util : null} text={g ? `${g.util}%` : "n/a"} color={level(g?.util ?? 0, 70, 90, "bg-violet-500")} hint={g ? g.detail : "No GPU reading available"} />
       <Pill label="VRAM" value={vramPct} text={vramPct === null ? "n/a" : `${vramPct}%`} color={level(vramPct ?? 0, 80, 92, "bg-sky-500")} hint={g ? `${(g.vramUsedMB / 1024).toFixed(1)} of ${(g.vramTotalMB / 1024).toFixed(1)} GB ${g.memory === "shared" ? "shared GPU memory (borrowed from RAM)" : "video memory"} in use` : undefined} />
+      {g && <button onClick={freeGpu} disabled={freeing} title="Free GPU memory: ComfyUI and Ollama unload their models (both keep running)" aria-label="Free GPU memory"
+        className="h-6 w-6 shrink-0 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-50">
+        {freeing ? <Loader2 size={11} className="animate-spin" /> : <Eraser size={11} />}
+      </button>}
       <Pill label="TEMP" value={g?.tempC != null ? Math.min(100, g.tempC) : null} text={g?.tempC != null ? `${g.tempC}°` : "n/a"} color={level(g?.tempC ?? 0, 75, 85, "bg-yellow-500")} hint="NVIDIA GPU temperature" />
     </div>
   );

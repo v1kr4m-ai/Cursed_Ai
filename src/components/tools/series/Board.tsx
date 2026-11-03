@@ -64,6 +64,7 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState(ref_);
   React.useEffect(() => setDraft(ref_), [ref_.id, ref_.status, ref_.file]);
+  const videoSlots = useWorkflowInfo("video", project.settings.videoWorkflow)?.refImageCount;
   const isRunning = running?.targetId === ref_.id;
 
   const save = async (changes: Partial<Ref>) => {
@@ -79,7 +80,7 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
   /** Swaps this generated picture for a real one in every scene (and every episode), under the same name. */
   const finishSwap = async (episodes: Episode[]) => {
     const patched = await api.patch(project.id, { episodes });
-    const synced = await syncPhotos(patched);
+    const synced = await syncPhotos(patched, [], videoSlots || Infinity);
     onChanged(await api.patch(project.id, { episodes: ensureCast({ ...synced.project, episodes: adoptPlannedPeople(synced.project) }) }));
   };
   const useMyImage = async (file: File) => {

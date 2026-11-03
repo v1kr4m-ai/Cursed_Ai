@@ -10,7 +10,7 @@ import { registerBackup } from "./seriesTool/backup";
 import { registerMerge } from "./seriesTool/merge";
 import { registerComfyLogs } from "./comfyLogs";
 import { directLaunch, tailLines } from "./comfyLaunch";
-import { freeComfyForLLM, handoffEnabled, setHandoff } from "./gpuHandoff";
+import { freeAllGpu, freeComfyForLLM, handoffEnabled, setHandoff } from "./gpuHandoff";
 import { nodeList, registerWorkflowHub, workflowFolder } from "./workflowHub";
 import { registerComfyNodes } from "./comfyNodes";
 import { registerPhoneAccess, type PhoneConfig } from "./phoneAccess";
@@ -573,6 +573,8 @@ async function startServer() {
   // API Route: Real Local LLM Inference with Streaming
   /** Automatic GPU hand-off between ComfyUI and the offline language models (on by default). */
   app.get("/api/gpu-handoff", (_req, res) => res.json({ on: handoffEnabled }));
+  /** The status bar's free-GPU button: ComfyUI and Ollama unload their models. */
+  app.post("/api/gpu/free", async (_req, res) => { await freeAllGpu(COMFYUI_URL, OLLAMA_URL); res.json({ ok: true }); });
   app.post("/api/gpu-handoff", (req, res) => { setHandoff(req.body?.on !== false); serverConfig.gpuHandoff = req.body?.on !== false; saveConfig(); res.json({ on: handoffEnabled }); });
 
   app.post("/api/chat", async (req, res) => {

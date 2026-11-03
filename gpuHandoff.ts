@@ -34,3 +34,11 @@ export async function freeOllamaForComfy(ollamaUrl = OLLAMA()) {
     }
   } catch { /* Ollama is not running */ }
 }
+
+/** The status bar's free-GPU button: ComfyUI and Ollama both let go of their models now (whatever the hand-off setting). */
+export async function freeAllGpu(comfyUrl = COMFY(), ollamaUrl = OLLAMA()) {
+  const was = handoffEnabled;
+  handoffEnabled = true; comfyFreedAt = 0; ollamaFreedAt = 0;
+  try { await freeComfyForLLM(comfyUrl); await freeOllamaForComfy(ollamaUrl); } // the first clears the second's 30 s guard
+  finally { handoffEnabled = was; comfyFreedAt = 0; ollamaFreedAt = 0; }
+}

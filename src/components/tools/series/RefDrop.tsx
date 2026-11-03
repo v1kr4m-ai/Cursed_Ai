@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { ImagePlus, Loader2, UploadCloud, X } from "lucide-react";
 import { api, type Project } from "./api";
 import { REF_KINDS, type RefKind } from "../../../../seriesTool/refKinds";
+import { syncPhotos } from "./photos";
+import { useWorkflowInfo } from "./workflows";
 
 /**
  * Attach reference images by dropping them, pasting them, or picking a file: a character's face,
@@ -24,6 +26,7 @@ export function RefDrop({ project, episodeId, onChanged, compact, people }: {
   const kindInfo = REF_KINDS.find(k => k.id === kind)!;
   const [person, setPerson] = React.useState("");
   const picker = React.useRef<HTMLInputElement>(null);
+  const videoWf = useWorkflowInfo("video", project.settings.videoWorkflow);
 
   async function take(files: FileList | File[] | null) {
     const images = Array.from(files || []).filter(f => f.type.startsWith("image/"));
@@ -35,7 +38,8 @@ export function RefDrop({ project, episodeId, onChanged, compact, people }: {
         const label = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60);
         await api.uploadRef(project.id, episodeId, file, label, kindInfo.role, kind, kind === "person" ? person.trim() : undefined);
       }
-      onChanged(await api.get(project.id));
+      // Into every episode, in place of a ComfyUI picture of the same person, and ticked in the scenes it belongs to.
+      onChanged((await syncPhotos(await api.get(project.id), [], videoWf?.refImageCount || Infinity)).project);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {
