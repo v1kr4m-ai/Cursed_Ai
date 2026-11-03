@@ -120,10 +120,35 @@ export const isUiFormat = (data: any) => !!data && typeof data === "object" && !
  */
 export function loadApiWorkflow(file: string, objectInfo: Json | null): { graph: Json; droppedTypes: Record<string, string> } {
   const data = loadWorkflowJson(file);
-  if (!isUiFormat(data)) return { graph: data, droppedTypes: {} };
+  if (!isUiFormat(data)) return { graph: matchModelFiles(data, objectInfo), droppedTypes: {} };
   if (!objectInfo) throw new Error('UI-format workflow - start ComfyUI so this app can read it (or re-save via "Save (API Format)")');
   const converted = convertUiWorkflow(data, objectInfo);
-  return { graph: converted.apiWorkflow, droppedTypes: Object.fromEntries(converted.unknownTypes) };
+  return { graph: matchModelFiles(converted.apiWorkflow, objectInfo), droppedTypes: Object.fromEntries(converted.unknownTypes) };
+}
+
+const MODEL_FILE = /\.(safetensors|sft|gguf|ckpt|pt|pth|bin|onnx)$/i;
+/**
+ * A workflow names a model file the way its author stored it ("flux1-dev.safetensors"); here it may sit in a
+ * subfolder ("3D Modelling\hunyuan_3d_v2.1.safetensors"). A model name ComfyUI does not list is swapped for the
+ * listed file of the same name in a subfolder, so the run is not rejected as "not installed". Left alone when there
+ * is no single such file. Returns the same graph object.
+ */
+export function matchModelFiles(graph: Json, objectInfo: Json | null): Json {
+  if (!objectInfo || !graph || typeof graph !== "object") return graph;
+  const base = (v: string) => v.split(/[\\/]/).pop()!.toLowerCase();
+  for (const node of Object.values<any>(graph)) {
+    const spec = objectInfo[node?.class_type]?.input;
+    if (!spec || !node.inputs) continue;
+    for (const [key, value] of Object.entries<any>(node.inputs)) {
+      if (typeof value !== "string" || !MODEL_FILE.test(value)) continue;
+      const options = (spec.required?.[key] || spec.optional?.[key])?.[0];
+      const list: string[] | undefined = Array.isArray(options) ? options : Array.isArray(options?.[1]?.options) ? options[1].options : undefined;
+      if (!list || list.includes(value)) continue;
+      const same = list.filter(o => typeof o === "string" && base(o) === base(value));
+      if (same.length === 1) node.inputs[key] = same[0];
+    }
+  }
+  return graph;
 }
 
 export interface Overrides { prompt_in?: string; output?: string }

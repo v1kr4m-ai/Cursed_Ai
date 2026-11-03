@@ -21,6 +21,15 @@ const label = "text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-
 const input = "w-full bg-white/5 border-none rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 placeholder:text-zinc-700";
 const isVideo = (p: string) => /\.(mp4|webm|mov|mkv)$/i.test(p);
 const isImage = (p: string) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(p);
+const isModel3d = (p: string) => /\.(glb|gltf)$/i.test(p);
+
+/** A 3D model (.glb) to turn and zoom: Google's model-viewer, loaded only when one is shown. */
+function Model3d({ src, className }: { src: string; className?: string }) {
+  const [ready, setReady] = React.useState(!!customElements.get("model-viewer"));
+  React.useEffect(() => { if (!ready) import("@google/model-viewer").then(() => setReady(true)).catch(() => {}); }, [ready]);
+  if (!ready) return <div className={className + " flex items-center justify-center text-xs text-zinc-500"}>Loading the 3D viewer...</div>;
+  return React.createElement("model-viewer", { src, "camera-controls": true, "auto-rotate": true, "shadow-intensity": "1", exposure: "1", style: { width: "100%", height: "100%", minHeight: 320, background: "transparent" }, class: className });
+}
 
 const MAX_INSTANCES = 20;
 
@@ -111,6 +120,7 @@ interface ToolState { workflowFolder: string; refFolder: string; destination: st
 function Media({ path, className }: { path: string; className?: string }) {
   if (isVideo(path)) return <video src={fileUrl(path)} controls loop muted className={className} />;
   if (isImage(path)) return <img src={fileUrl(path)} alt="" className={className} />;
+  if (isModel3d(path)) return <Model3d src={fileUrl(path)} className={className} />;
   return <audio src={fileUrl(path)} controls className="w-full" />;
 }
 

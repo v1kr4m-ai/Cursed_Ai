@@ -22,7 +22,7 @@ type Json = Record<string, any>;
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov", ".mkv", ".avi"]);
 const AUDIO_EXT = new Set([".mp3", ".wav", ".flac", ".ogg", ".m4a"]);
-const MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif", ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".mkv": "video/x-matroska", ".avi": "video/x-msvideo", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac", ".ogg": "audio/ogg", ".m4a": "audio/mp4" };
+const MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".bmp": "image/bmp", ".gif": "image/gif", ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".mkv": "video/x-matroska", ".avi": "video/x-msvideo", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".flac": "audio/flac", ".ogg": "audio/ogg", ".m4a": "audio/mp4", ".glb": "model/gltf-binary", ".gltf": "model/gltf+json" };
 
 export interface ToolOptions {
   /** Where this app's own config files live. */
@@ -154,7 +154,8 @@ export function registerComfyTool(app: express.Express, opts: ToolOptions) {
     const all = listWorkflows(folder, c.workflowRoles, oi);
     const others: Record<string, number> = { image: 0, video: 0, audio: 0, "3d": 0 };
     for (const w of all) others[w.outputKind]++;
-    res.json({ workflows: all.filter(w => w.outputKind === kind).map(workflowDict), counts: others, comfyNodeListAvailable: !!oi, folder, synced });
+    // 3D-model workflows (image to 3D) live in the Image studio.
+    res.json({ workflows: all.filter(w => w.outputKind === kind || (kind === "image" && w.outputKind === "3d")).map(workflowDict), counts: others, comfyNodeListAvailable: !!oi, folder, synced });
   });
 
   /** Rebuild one workflow's API copy from the version ComfyUI's editor saved. */
