@@ -3,9 +3,43 @@ import { Clapperboard, Loader2, Mic, Play, RefreshCw, X, AlertTriangle, FolderOp
 import { useJob } from "../../train/trainApi";
 import { api, fileUrl, type Episode, type Project } from "./api";
 import { planEpisode, voiceStamp } from "../../../../seriesTool/voiceTrack";
-import { usesAiVoice } from "../../../../seriesTool/voices";
+import { inferGender, usesAiVoice, type Gender } from "../../../../seriesTool/voices";
+import { XTTS_VOICES } from "../../../../seriesTool/xttsPlan";
 import { notifyError } from "../../../lib/notify";
 import { MINUTES_PER_RENDER, isMultiSpeaker, isTalking, pickTalkingPicture, pickTurnPicture, planTurnRenders, talkingStale } from "../../../../seriesTool/talking";
+
+/** Develop (XTTS only): the person's gender and an optional built-in voice, used only when they have no voice sample. */
+export function XttsVoiceChoice({ project, name, onSaved }: { project: Project; name: string; onSaved: (p: Project) => void }) {
+  const key = Object.keys(project.people || {}).find(k => k.toLowerCase() === name.toLowerCase()) || name;
+  const cur = project.people?.[key] || {};
+  const save = async (change: { gender?: Gender | ""; builtinVoice?: string }) => {
+    const entry: any = { ...cur, ...change };
+    for (const k of ["gender", "builtinVoice"]) if (!entry[k]) delete entry[k];
+    const people = { ...(project.people || {}), [key]: entry };
+    if (!Object.keys(entry).length) delete people[key];
+    onSaved(await api.patch(project.id, { people }));
+  };
+  const sel = "rounded-md border border-neutral-700 bg-neutral-900 px-1.5 py-0.5 text-[10px] text-neutral-300 focus:outline-none focus:border-sky-600";
+  const inferred = !cur.gender ? inferGender(cur.voice) : undefined;
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2 text-[10px] text-neutral-500">
+        <label className="flex items-center gap-1">Gender
+          <select value={cur.gender || ""} onChange={e => save({ gender: e.target.value as Gender | "" })} className={sel}>
+            <option value="">Not set{inferred ? ` (reads as ${inferred})` : ""}</option><option value="female">Female</option><option value="male">Male</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-1">Built-in voice
+          <select value={cur.builtinVoice || ""} onChange={e => save({ builtinVoice: e.target.value })} className={sel}>
+            <option value="">Automatic (by gender)</option>
+            {(["female", "male"] as const).map(g => <optgroup key={g} label={g === "female" ? "Female" : "Male"}>{XTTS_VOICES.filter(v => v.gender === g && !v.ambiguous).map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</optgroup>)}
+          </select>
+        </label>
+      </div>
+      <p className="text-[10px] leading-relaxed text-neutral-600">Used only when you give no voice sample. A real 10-30 s recording of the voice you want sounds far more natural than a built-in voice.</p>
+    </div>
+  );
+}
 
 /** Develop: one person's voice sample to copy. Dia uses it for [S1] only (one sample per scene); XTTS uses every person's own. */
 export function VoiceSample({ project, name, onSaved }: { project: Project; name: string; onSaved: (p: Project) => void }) {

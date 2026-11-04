@@ -4,7 +4,7 @@ import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNot
 import { SERIES_FORMATS, VOICE_TAGS, projectFormat, setVoiceMode, tagList, toggleTag, voiceParts, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { goProduceBlockedWhy } from "./developSteps";
-import { VoiceEnginePicker, VoiceSample } from "./VoicesCard";
+import { VoiceEnginePicker, VoiceSample, XttsVoiceChoice } from "./VoicesCard";
 import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
@@ -1023,6 +1023,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                     {VOICE_TAGS.map(t => <button key={t} onClick={() => setPersonVoice(person.name, toggleVoiceWord(personVoice(project.people, person.name), t))} className={"rounded-full border px-2 py-0.5 text-[10px] transition " + ((personVoice(project.people, person.name) || "").split(/,\s*/).includes(t) ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-500 hover:text-neutral-200 hover:border-neutral-500")}>{t}</button>)}
                   </div>
                   {usesAiVoice(project) && <VoiceSample project={project} name={person.name} onSaved={onSaved} />}
+                  {project.voiceEngine === "xtts" && <XttsVoiceChoice project={project} name={person.name} onSaved={onSaved} />}
                 </div>
                 </React.Fragment>
               ))}

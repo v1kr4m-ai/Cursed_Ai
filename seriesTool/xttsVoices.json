@@ -1,0 +1,296 @@
+[
+ {
+  "name": "Asya Anara",
+  "gender": "female",
+  "f0": 167.8,
+  "ambiguous": true
+ },
+ {
+  "name": "Sofia Hellen",
+  "gender": "female",
+  "f0": 169.2,
+  "ambiguous": true
+ },
+ {
+  "name": "Nova Hogarth",
+  "gender": "female",
+  "f0": 171.2,
+  "ambiguous": true
+ },
+ {
+  "name": "Vjollca Johnnie",
+  "gender": "female",
+  "f0": 187.2
+ },
+ {
+  "name": "Suad Qasim",
+  "gender": "female",
+  "f0": 187.2
+ },
+ {
+  "name": "Tammie Ema",
+  "gender": "female",
+  "f0": 191.0
+ },
+ {
+  "name": "Tanja Adelina",
+  "gender": "female",
+  "f0": 192.7
+ },
+ {
+  "name": "Henriette Usha",
+  "gender": "female",
+  "f0": 193.8
+ },
+ {
+  "name": "Lilya Stainthorpe",
+  "gender": "female",
+  "f0": 198.9
+ },
+ {
+  "name": "Alexandra Hisakawa",
+  "gender": "female",
+  "f0": 200.7
+ },
+ {
+  "name": "Annmarie Nele",
+  "gender": "female",
+  "f0": 201.8
+ },
+ {
+  "name": "Gracie Wise",
+  "gender": "female",
+  "f0": 204.8
+ },
+ {
+  "name": "Barbora MacLean",
+  "gender": "female",
+  "f0": 205.3
+ },
+ {
+  "name": "Gitta Nikolina",
+  "gender": "female",
+  "f0": 207.7
+ },
+ {
+  "name": "Rosemary Okafor",
+  "gender": "female",
+  "f0": 208.3
+ },
+ {
+  "name": "Maja Ruoho",
+  "gender": "female",
+  "f0": 211.4
+ },
+ {
+  "name": "Lidiya Szekeres",
+  "gender": "female",
+  "f0": 211.4
+ },
+ {
+  "name": "Chandra MacFarland",
+  "gender": "female",
+  "f0": 212.6
+ },
+ {
+  "name": "Narelle Moon",
+  "gender": "female",
+  "f0": 213.8
+ },
+ {
+  "name": "Zofija Kendrick",
+  "gender": "female",
+  "f0": 215.1
+ },
+ {
+  "name": "Camilla Holmstr\u00f6m",
+  "gender": "female",
+  "f0": 220.1
+ },
+ {
+  "name": "Brenda Stern",
+  "gender": "female",
+  "f0": 221.4
+ },
+ {
+  "name": "Alma Mar\u00eda",
+  "gender": "female",
+  "f0": 223.3
+ },
+ {
+  "name": "Badr Odhiambo",
+  "gender": "female",
+  "f0": 229.2
+ },
+ {
+  "name": "Alison Dietlinde",
+  "gender": "female",
+  "f0": 237.2
+ },
+ {
+  "name": "Andrew Chipper",
+  "gender": "female",
+  "f0": 238.6
+ },
+ {
+  "name": "Uta Obando",
+  "gender": "female",
+  "f0": 240.7
+ },
+ {
+  "name": "Szofi Granger",
+  "gender": "female",
+  "f0": 242.8
+ },
+ {
+  "name": "Daisy Studious",
+  "gender": "female",
+  "f0": 245.6
+ },
+ {
+  "name": "Damien Black",
+  "gender": "male",
+  "f0": 84.9
+ },
+ {
+  "name": "Baldur Sanjin",
+  "gender": "male",
+  "f0": 89.4
+ },
+ {
+  "name": "Adde Michal",
+  "gender": "male",
+  "f0": 94.7
+ },
+ {
+  "name": "Aaron Dreschner",
+  "gender": "male",
+  "f0": 95.2
+ },
+ {
+  "name": "Royston Min",
+  "gender": "male",
+  "f0": 95.8
+ },
+ {
+  "name": "Luis Moray",
+  "gender": "male",
+  "f0": 97.5
+ },
+ {
+  "name": "Abrahan Mack",
+  "gender": "male",
+  "f0": 98.0
+ },
+ {
+  "name": "Dionisio Schuyler",
+  "gender": "male",
+  "f0": 98.6
+ },
+ {
+  "name": "Torcull Diarmuid",
+  "gender": "male",
+  "f0": 98.9
+ },
+ {
+  "name": "Damjan Chapman",
+  "gender": "male",
+  "f0": 100.9
+ },
+ {
+  "name": "Kumar Dahl",
+  "gender": "male",
+  "f0": 101.2
+ },
+ {
+  "name": "Filip Traverse",
+  "gender": "male",
+  "f0": 104.5
+ },
+ {
+  "name": "Kazuhiko Atallah",
+  "gender": "male",
+  "f0": 105.1
+ },
+ {
+  "name": "Ige Behringer",
+  "gender": "male",
+  "f0": 106.0
+ },
+ {
+  "name": "Ilkin Urbano",
+  "gender": "male",
+  "f0": 106.3
+ },
+ {
+  "name": "Ludvig Milivoj",
+  "gender": "male",
+  "f0": 106.3
+ },
+ {
+  "name": "Zacharie Aimilios",
+  "gender": "male",
+  "f0": 106.3
+ },
+ {
+  "name": "Wulf Carlevaro",
+  "gender": "male",
+  "f0": 110.0
+ },
+ {
+  "name": "Ferran Simen",
+  "gender": "male",
+  "f0": 111.3
+ },
+ {
+  "name": "Viktor Menelaos",
+  "gender": "male",
+  "f0": 113.9
+ },
+ {
+  "name": "Eugenio Matarac\u0131",
+  "gender": "male",
+  "f0": 114.9
+ },
+ {
+  "name": "Gilberto Mathias",
+  "gender": "male",
+  "f0": 117.3
+ },
+ {
+  "name": "Xavier Hayasaka",
+  "gender": "male",
+  "f0": 117.3
+ },
+ {
+  "name": "Marcos Rudaski",
+  "gender": "male",
+  "f0": 127.1
+ },
+ {
+  "name": "Claribel Dervla",
+  "gender": "male",
+  "f0": 132.0
+ },
+ {
+  "name": "Ana Florence",
+  "gender": "male",
+  "f0": 137.8
+ },
+ {
+  "name": "Viktor Eka",
+  "gender": "male",
+  "f0": 141.1
+ },
+ {
+  "name": "Tammy Grit",
+  "gender": "male",
+  "f0": 142.7
+ },
+ {
+  "name": "Craig Gutsy",
+  "gender": "male",
+  "f0": 156.5,
+  "ambiguous": true
+ }
+]

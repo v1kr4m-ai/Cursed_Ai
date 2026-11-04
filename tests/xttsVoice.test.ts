@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_SPEAKERS, cleanForXtts, detectLanguage, maxChars, splitForXtts } from "../seriesTool/xttsPlan";
-import { planEpisode, planScene, stampOf, voiceStamp } from "../seriesTool/voiceTrack";
-import { usesAiVoice } from "../seriesTool/voices";
+import { BUILTIN_SPEAKERS, XTTS_VOICES, cleanForXtts, detectLanguage, maxChars, planTurns, splitForXtts } from "../seriesTool/xttsPlan";
+import { planEpisode, planScene, sampleOf, stampOf, voiceStamp } from "../seriesTool/voiceTrack";
+import { inferGender, usesAiVoice } from "../seriesTool/voices";
 import { buildScenePrompt, type Episode, type Project, type Scene } from "../seriesTool/model";
 import { buildJoinArgs } from "../seriesTool/ffmpeg";
 import { buildXttsJob } from "../trainTool/voice";
@@ -191,5 +191,39 @@ describe("video prompt with a local voice", () => {
     const s2 = { ...sc, lines: [{ speaker: "Meera", text: "Hi Raj." }, { speaker: "Raj", text: "Hi Meera." }] };
     expect(buildScenePrompt(project, episode, s2)).toContain("<d>[English] Hi Raj.</d>");
     expect(buildScenePrompt({ ...project, voiceEngine: "xtts" }, episode, s2)).not.toContain("Hi Raj");
+  });
+});
+
+describe("gendered built-in voices", () => {
+  const people = { Meera: { voice: "a bright young woman" }, Daniel: { voice: "a calm man" }, Zed: {} };
+  const speakerOf = (p: any, lines: { speaker?: string; text: string }[], pv?: string) => Object.fromEntries(planTurns(lines, p, sampleOf, pv).turns.map(t => [t.who, t.speaker]));
+  const gender = (n?: string) => XTTS_VOICES.find(v => v.name === n)?.gender;
+  const L = (a: string, b: string) => [{ speaker: a, text: "Hello there." }, { speaker: b, text: "Hi, how are you?" }];
+  it("female voice for a woman, male for a man, in any speaking order", () => {
+    for (const lines of [L("Meera", "Daniel"), L("Daniel", "Meera")]) {
+      const s = speakerOf(people, lines);
+      expect(gender(s.Meera)).toBe("female"); expect(gender(s.Daniel)).toBe("male");
+    }
+  });
+  it("stable across scenes", () => expect(speakerOf(people, L("Meera", "Daniel"))).toEqual(speakerOf(people, [{ speaker: "Daniel", text: "Ok." }, { speaker: "Meera", text: "Yes." }])));
+  it("two women get different voices", () => {
+    const s = speakerOf({ A: { gender: "female" }, B: { gender: "female" } }, L("A", "B"));
+    expect(s.A).not.toBe(s.B);
+  });
+  it("an explicit builtinVoice and gender win", () => {
+    expect(speakerOf({ Meera: { voice: "woman", builtinVoice: "Luis Moray" } }, L("Meera", "Meera")).Meera).toBe("Luis Moray");
+    expect(gender(speakerOf({ Daniel: { voice: "a woman", gender: "male" } }, L("Daniel", "Daniel")).Daniel)).toBe("male");
+  });
+  it("gender unknown or old projects keep the old slot rule", () => {
+    expect(speakerOf({ Zed: {} }, L("Zed", "Zed")).Zed).toBe(BUILTIN_SPEAKERS[1]);
+    expect(speakerOf(undefined, L("", ""))[""]).toBe(BUILTIN_SPEAKERS[0]);
+  });
+  it("the narrator follows the project voice only when it says a gender", () => {
+    expect(gender(speakerOf(undefined, [{ text: "Once." }], "a deep baritone")[""])).toBe("male");
+    expect(speakerOf(undefined, [{ text: "Once." }], "warm")[""]).toBe(BUILTIN_SPEAKERS[0]);
+  });
+  it("inferGender reads words only", () => {
+    expect(inferGender("A Gentleman, low")).toBe("male"); expect(inferGender("young girl")).toBe("female");
+    expect(inferGender("woman and man")).toBeUndefined(); expect(inferGender("Maria")).toBeUndefined();
   });
 });

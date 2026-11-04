@@ -63,7 +63,7 @@ export interface Project {
   allowTextCards?: boolean;
   stillPeople?: string[];
   /** Optional own voice per person, keyed by name (seriesTool/voices.ts). */
-  people?: Record<string, { voice?: string; refAudio?: string; refText?: string }>;
+  people?: Record<string, { voice?: string; refAudio?: string; refText?: string; gender?: "female" | "male"; builtinVoice?: string }>;
   /** "model" (default): the video model speaks. "dia" (English) or "xtts" (Hindi and more): the local voice is made in Produce and mixed in when joining. */
   voiceEngine?: "model" | "dia" | "xtts";
   episodeSeconds?: number;

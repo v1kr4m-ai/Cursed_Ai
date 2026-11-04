@@ -3,7 +3,9 @@
  * model reads well, and planning a scene as one turn per speaker. Used by the Voice tab's job (trainTool/voice.ts) and the
  * series voice (voiceTrack.ts). No Node imports: the browser uses planScene too.
  */
-import type { PeopleVoices, SceneLine } from "./voices";
+import type { Gender, PeopleVoices, SceneLine } from "./voices";
+import { inferGender } from "./voices";
+import voiceTable from "./xttsVoices.json";
 
 export const XTTS_LANGUAGES: { id: string; label: string }[] = [
   { id: "hi", label: "Hindi" }, { id: "en", label: "English" }, { id: "ar", label: "Arabic" }, { id: "zh-cn", label: "Chinese" },
@@ -57,6 +59,27 @@ export function splitForXtts(text: string, lang: string, max = maxChars(lang)): 
 /** Voices XTTS ships with, given to different speakers (in order of appearance) when they have no sample of their own. Unknown names fall back to the first speaker in the script. */
 export const BUILTIN_SPEAKERS = ["Claribel Dervla", "Andrew Chipper", "Daisy Studious", "Badr Odhiambo", "Dionisio Schuyler", "Torcull Diarmuid"];
 
+/** Every built-in speaker with the gender and median F0 measured from the real model (trainTool/scripts/xtts_classify.py); "ambiguous" ones are never auto-picked. */
+export const XTTS_VOICES = voiceTable as { name: string; gender: Gender; f0: number; ambiguous?: boolean }[];
+const pool = (g: Gender) => XTTS_VOICES.filter(v => v.gender === g && !v.ambiguous);
+
+/**
+ * The built-in voice for someone without a sample: their explicit `builtinVoice`; else a voice of their gender (their own `gender`, or
+ * inferred from their voice text), stable by position among the people of that gender; the narrator takes the last voice of the
+ * project voice's gender. Gender unknown: undefined (the caller keeps the old slot rule).
+ */
+export function genderedVoice(who: string, people: PeopleVoices | undefined, projectVoice?: string): string | undefined {
+  const entry = (n: string) => { const k = Object.keys(people || {}).find(x => key(x) === key(n)); return k ? people![k] : undefined; };
+  const genderOf = (n: string) => entry(n)?.gender || inferGender(entry(n)?.voice);
+  if (!who) { const g = inferGender(projectVoice); return g ? pool(g).slice(-1)[0]?.name : undefined; }
+  const e = entry(who);
+  if (e?.builtinVoice?.trim()) return e.builtinVoice.trim();
+  const g = genderOf(who);
+  if (!g) return undefined;
+  const same = Object.keys(people || {}).filter(n => genderOf(n) === g);
+  return pool(g)[Math.max(0, same.findIndex(n => key(n) === key(who))) % pool(g).length]?.name;
+}
+
 export interface XttsTurn { /** "" = narrator */ who: string; text: string; language: string; referenceAudio?: string; speaker?: string }
 const key = (s?: string) => (s || "").trim().toLowerCase();
 
@@ -77,9 +100,9 @@ export function cleanForXtts(text: string): string {
 
 /**
  * One turn per speaker change (consecutive lines of one speaker are joined). Each turn gets its language from its own text and
- * that speaker's voice sample, or else a built-in voice (a different one per speaker). A turn in a script XTTS cannot speak is left out with a note; the scene is skipped only when nothing is left.
+ * that speaker's voice sample, or else a built-in voice (a different one per speaker, of the speaker's gender when known). A turn in a script XTTS cannot speak is left out with a note; the scene is skipped only when nothing is left.
  */
-export function planTurns(lines: SceneLine[], people: PeopleVoices | undefined, sampleOf: (p: PeopleVoices | undefined, n?: string) => { audio: string } | undefined): { turns: XttsTurn[]; skipped?: string; notes: string[] } {
+export function planTurns(lines: SceneLine[], people: PeopleVoices | undefined, sampleOf: (p: PeopleVoices | undefined, n?: string) => { audio: string } | undefined, projectVoice?: string): { turns: XttsTurn[]; skipped?: string; notes: string[] } {
   const turns: XttsTurn[] = [];
   const order: string[] = [];
   for (const l of lines) {
@@ -101,7 +124,7 @@ export function planTurns(lines: SceneLine[], people: PeopleVoices | undefined, 
     if (lang === null) { notes.push(`${t.who || "The narrator"}: a line in a script XTTS cannot speak was left out: ${t.text.slice(0, 30)}...`); continue; }
     t.language = lang || "en"; // digits only: nothing to tell, English reads them
     const sample = sampleOf(people, t.who);
-    if (sample) t.referenceAudio = sample.audio; else t.speaker = BUILTIN_SPEAKERS[slot(t.who) % BUILTIN_SPEAKERS.length];
+    if (sample) t.referenceAudio = sample.audio; else t.speaker = genderedVoice(t.who, people, projectVoice) ?? BUILTIN_SPEAKERS[slot(t.who) % BUILTIN_SPEAKERS.length];
     kept.push(t);
   }
   if (!kept.length) return { turns: [], skipped: `XTTS cannot speak this script: ${turns[0].text.slice(0, 30)}...`, notes: [] };

@@ -4,7 +4,16 @@
  */
 export interface SceneLine { speaker?: string; text: string }
 /** `refAudio`/`refText`: an optional voice sample (and what it says) the local Dia voice copies. */
-export type PeopleVoices = Record<string, { voice?: string; refAudio?: string; refText?: string }>;
+export type PeopleVoices = Record<string, { voice?: string; refAudio?: string; refText?: string; gender?: Gender; builtinVoice?: string }>;
+/** `gender` / `builtinVoice`: only used by XTTS to pick a built-in voice when the person has no sample. */
+export type Gender = "female" | "male";
+
+/** Gender a voice description implies ("a bright young woman", "deep baritone"), from simple word matches only; undefined when it says neither or both. */
+export function inferGender(text?: string): Gender | undefined {
+  const f = /\b(woman|women|girl|female|lady|she|her|soprano)\b/i.test(text || "");
+  const m = /\b(man|men|boy|male|gentleman|he|his|deep|baritone|bass)\b/i.test(text || "");
+  return f === m ? undefined : f ? "female" : "male";
+}
 
 /** True when the spoken voice is made locally (Dia or XTTS, in Produce) instead of by the video model. */
 export const usesAiVoice = (p: { voiceEngine?: string }): boolean => p.voiceEngine === "dia" || p.voiceEngine === "xtts";

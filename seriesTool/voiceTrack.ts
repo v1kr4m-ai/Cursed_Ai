@@ -108,7 +108,7 @@ export function planScene(p: Pick<Project, "format" | "voice" | "people" | "voic
   if (speech === "sung") return { ...base, skipped: "Singing is not something Dia can do." };
   if (p.voiceEngine === "xtts") {
     if (!sceneSpeech(s).length) return { ...base, skipped: "No spoken line." };
-    const t = planTurns(sceneSpeech(s), p.people, sampleOf);
+    const t = planTurns(sceneSpeech(s), p.people, sampleOf, p.voice);
     if (t.skipped) return { ...base, skipped: t.skipped };
     // the script is what the voice file is stamped with: speaker, language, sample and words of every turn
     const script = t.turns.map(x => `${x.who}|${x.language}|${x.referenceAudio || x.speaker}: ${x.text}`).join("\n");
