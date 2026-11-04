@@ -25,7 +25,8 @@ import {
   ChevronDown,
   Bot,
   Palette,
-  GraduationCap
+  GraduationCap,
+  ScanFace,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -105,6 +106,7 @@ export function Sidebar({
     { id: "video", label: "Video", icon: Clapperboard },
     { id: "audio", label: "Audio", icon: AudioLines },
     { id: "series", label: "Series", icon: Clapperboard },
+    { id: "faceswap", label: "Face Swap", icon: ScanFace },
     { id: "trainlora", label: "Train LoRA", icon: Palette },
     { id: "finetune", label: "FineTune LLM", icon: GraduationCap },
     { id: "trainspeech", label: "Train Speech", icon: Mic },
@@ -324,7 +326,7 @@ export function MobileHeader({ setActiveTab, activeTab, voiceEnabled = true }: {
                <h2 className="text-xl font-bold text-white tracking-tight">Cursed_Ai</h2>
              </div>
              <div className="space-y-2">
-               {["chat", "ollamaclaude", "vision", "image", "video", "audio", "series", "trainlora", "finetune", "trainspeech", "models", "memory", "engine", "console", "settings"].map((tab) => (
+               {["chat", "ollamaclaude", "vision", "image", "video", "audio", "series", "faceswap", "trainlora", "finetune", "trainspeech", "models", "memory", "engine", "console", "settings"].map((tab) => (
                  <Button 
                    key={tab}
                    variant="ghost"

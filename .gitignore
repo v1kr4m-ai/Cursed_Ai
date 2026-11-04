@@ -73,3 +73,6 @@ comfy-object-info.json
 
 # HTTPS certificate for phones (holds a private key)
 /https/
+
+# Face swap engine (FaceFusion + its Python environment and models), set up locally
+/faceswap/

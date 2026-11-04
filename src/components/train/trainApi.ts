@@ -1,7 +1,7 @@
 import React from "react";
 import { notify } from "../../lib/notify";
 
-export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv" | "mobile";
+export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv" | "mobile" | "faceswap";
 
 export interface JobState {
   kind: JobKind; label: string; running: boolean; startedAt: number | null; endedAt: number | null; code: number | null;
@@ -58,6 +58,7 @@ const JOB_INFO: Record<JobKind, { name: string; tab: string }> = {
   speechprep: { name: "Clip preparation", tab: "trainspeech" },
   mobile: { name: "Phone model training", tab: "finetune" },
   speechenv: { name: "Speech setup, download or conversion", tab: "trainspeech" },
+  faceswap: { name: "Face swap", tab: "faceswap" },
 };
 const took = (ms: number) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
 /** The line that best explains a failure: the last error-looking line of the log. */

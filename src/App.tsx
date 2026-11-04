@@ -30,6 +30,7 @@ import { OllamaClaudeView } from "./components/oclaude/OllamaClaudeView";
 import { TrainLoraView } from "./components/train/TrainLoraView";
 import { FineTuneSwitch } from "./components/train/FineTuneSwitch";
 import { SpeechTrainView } from "./components/train/SpeechTrainView";
+import { FaceSwapView } from "./components/tools/FaceSwapView";
 import { ThemeQuick } from "./components/tools/ThemeSettings";
 import { effectiveTheme, themeById } from "./lib/themes";
 import { Chat, AIModel, AppSettings, MessageRole } from "./types";
@@ -513,6 +514,7 @@ export default function App() {
             <div className={activeTab === "trainlora" ? "contents" : "hidden"}><TrainLoraView /></div>
             <div className={activeTab === "finetune" ? "contents" : "hidden"}><FineTuneSwitch /></div>
             <div className={activeTab === "trainspeech" ? "contents" : "hidden"}><SpeechTrainView /></div>
+            <div className={activeTab === "faceswap" ? "contents" : "hidden"}><FaceSwapView /></div>
             <div className={activeTab === "series" ? "contents" : "hidden"}><SeriesStudioView modelId={selectedModelId} models={models} look={moduleTheme === "classic" ? undefined : themeById(moduleTheme).mode} /></div>
             {activeTab === "settings" && (
               <SettingsView
