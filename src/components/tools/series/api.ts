@@ -64,8 +64,8 @@ export interface Project {
   stillPeople?: string[];
   /** Optional own voice per person, keyed by name (seriesTool/voices.ts). */
   people?: Record<string, { voice?: string; refAudio?: string; refText?: string }>;
-  /** "model" (default): the video model speaks. "dia": the local Dia voice is made in Produce and mixed in when joining. */
-  voiceEngine?: "model" | "dia";
+  /** "model" (default): the video model speaks. "dia" (English) or "xtts" (Hindi and more): the local voice is made in Produce and mixed in when joining. */
+  voiceEngine?: "model" | "dia" | "xtts";
   episodeSeconds?: number;
   bible?: { characters: string; places: string; rules: string; extra: string };
   creativity?: number;

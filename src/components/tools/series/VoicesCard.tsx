@@ -3,9 +3,10 @@ import { Loader2, Mic, Play, RefreshCw, X, AlertTriangle, FolderOpen } from "luc
 import { useJob } from "../../train/trainApi";
 import { api, fileUrl, type Episode, type Project } from "./api";
 import { planEpisode, voiceStamp } from "../../../../seriesTool/voiceTrack";
+import { usesAiVoice } from "../../../../seriesTool/voices";
 import { notifyError } from "../../../lib/notify";
 
-/** Develop: one person's voice sample for Dia to copy. Used for [S1] only; one sample per scene. */
+/** Develop: one person's voice sample to copy. Dia uses it for [S1] only (one sample per scene); XTTS uses every person's own. */
 export function VoiceSample({ project, name, onSaved }: { project: Project; name: string; onSaved: (p: Project) => void }) {
   const key = Object.keys(project.people || {}).find(k => k.toLowerCase() === name.toLowerCase()) || name;
   const cur = project.people?.[key] || {};
@@ -27,31 +28,32 @@ export function VoiceSample({ project, name, onSaved }: { project: Project; name
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={pick} className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-0.5 text-[10px] text-neutral-300 hover:bg-neutral-800" title="A short clip (5-15 s) of the voice to copy, in English"><FolderOpen size={11} /> {cur.refAudio ? "Change voice sample" : "Voice sample to copy (optional)"}</button>
+        <button onClick={pick} className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-0.5 text-[10px] text-neutral-300 hover:bg-neutral-800" title={project.voiceEngine === "xtts" ? "A clean clip (6-30 s) of the voice to copy, in any language" : "A short clip (5-15 s) of the voice to copy, in English"}><FolderOpen size={11} /> {cur.refAudio ? "Change voice sample" : "Voice sample to copy (optional)"}</button>
         {cur.refAudio && <>
           <span className="max-w-[10rem] truncate text-[10px] text-neutral-500" title={cur.refAudio}>{cur.refAudio.split(/[\\/]/).pop()}</span>
           <audio controls preload="none" src={`/api/voice/media?path=${encodeURIComponent(cur.refAudio)}`} className="h-6" />
           <button onClick={() => save({ refAudio: "" })} className="text-neutral-500 hover:text-neutral-200" title="Remove the sample"><X size={12} /></button>
         </>}
       </div>
-      {cur.refAudio && <input key={cur.refText || ""} defaultValue={cur.refText || ""} placeholder="Exactly what the sample says (needed for a good copy)" onBlur={e => e.target.value.trim() !== (cur.refText || "") && save({ refText: e.target.value.trim() })} className="w-full rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-[11px] focus:outline-none focus:border-sky-600" />}
+      {cur.refAudio && project.voiceEngine !== "xtts" && <input key={cur.refText || ""} defaultValue={cur.refText || ""} placeholder="Exactly what the sample says (needed for a good copy)" onBlur={e => e.target.value.trim() !== (cur.refText || "") && save({ refText: e.target.value.trim() })} className="w-full rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-[11px] focus:outline-none focus:border-sky-600" />}
     </div>
   );
 }
 
 /** Develop, Look and voice: who speaks. */
 export function VoiceEnginePicker({ project, onSaved }: { project: Project; onSaved: (p: Project) => void }) {
-  const dia = project.voiceEngine === "dia";
+  const engine = project.voiceEngine === "dia" || project.voiceEngine === "xtts" ? project.voiceEngine : "model";
   return (
     <div className="space-y-1">
       <div className="text-[10px] uppercase tracking-wider text-neutral-500">Who speaks</div>
       <div className="flex flex-wrap gap-1.5">
-        {([["model", "The video model's own voice"], ["dia", "Dia (local voice, made in Produce)"]] as const).map(([v, label]) => (
-          <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voiceEngine: v === "dia" ? "dia" : undefined }))}
-            className={"rounded-full border px-3 py-1 text-xs transition " + ((v === "dia") === dia ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>{label}</button>
+        {([["model", "The video model's own voice"], ["dia", "Dia (English, made in Produce)"], ["xtts", "XTTS (Hindi + more, made in Produce)"]] as const).map(([v, label]) => (
+          <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voiceEngine: v === "model" ? undefined : v }))}
+            className={"rounded-full border px-3 py-1 text-xs transition " + (v === engine ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>{label}</button>
         ))}
       </div>
-      {dia && <p className="text-[11px] leading-relaxed text-neutral-500">Dia speaks English only, uses the graphics card, and takes about a minute for every 10 seconds of speech (plus a model load for each scene). Voices are made per episode in Produce and mixed in when you join in Assemble; the model's own speech in the clip is turned down to 20%. Without a voice sample a person sounds a little different in every scene; with one, the copy is used for the first speaker of a scene only.</p>}
+      {engine === "xtts" && <p className="text-[11px] leading-relaxed text-neutral-500">XTTS speaks Hindi, English, Arabic, Chinese and 13 more languages, picked per line from its script (Devanagari is Hindi; Hindi in Latin letters is read as English, so write Hindi in Devanagari). Every person can have a voice sample (6-30 s, any language) and speaks in their own copied voice, otherwise a built-in voice; each speaker's turn is made separately and joined, so any number of speakers works. It uses the graphics card and loads the model once per episode. Voices are made in Produce and mixed in when you join in Assemble; the model's own speech in the clip is turned down to 20% and it is no longer asked to speak. A copied voice is a likeness, not exact; nobody has listened to it for you, so check each scene.</p>}
+      {engine === "dia" && <p className="text-[11px] leading-relaxed text-neutral-500">Dia speaks English only, uses the graphics card, and takes about a minute for every 10 seconds of speech (plus a model load for each scene). Voices are made per episode in Produce and mixed in when you join in Assemble; the model's own speech in the clip is turned down to 20%. Without a voice sample a person sounds a little different in every scene; with one, the copy is used for the first speaker of a scene only.</p>}
     </div>
   );
 }
@@ -59,10 +61,13 @@ export function VoiceEnginePicker({ project, onSaved }: { project: Project; onSa
 /** Produce: make, hear and redo the Dia voice of one episode. */
 export function VoicesCard({ project, episode, onChanged }: { project: Project; episode: Episode; onChanged: (p: Project) => void }) {
   const job = useJob("seriesvoice");
-  const [status, setStatus] = React.useState<{ dia: { ready: boolean; missing: string[] }; running: boolean } | null>(null);
+  const [status, setStatus] = React.useState<{ dia: { ready: boolean; missing: string[] }; xtts?: { ready: boolean; missing: string[] }; running: boolean } | null>(null);
   const [busy, setBusy] = React.useState(false);
   const plans = React.useMemo(() => planEpisode(project, episode), [project, episode]);
   const running = job.running;
+  const xt = project.voiceEngine === "xtts";
+  const eng = xt ? status?.xtts : status?.dia;
+  const label = xt ? "XTTS" : "Dia";
   const wasRunning = React.useRef(false);
   React.useEffect(() => { fetch("/api/voice/status").then(r => r.json()).then(setStatus).catch(() => setStatus(null)); }, [running]);
   React.useEffect(() => {
@@ -83,23 +88,23 @@ export function VoicesCard({ project, episode, onChanged }: { project: Project; 
   const speakable = plans.filter(x => !x.skipped);
   const missing = speakable.filter(x => !sceneOf(x.sceneId).voiceFile).length;
   const stale = (id: string) => { const s = sceneOf(id); return !!s.voiceFile && s.voiceText !== voiceStamp(project, episode, s); };
-  const tail = job.lines.filter(l => l.startsWith("[voice]") || l.startsWith("[dia]")).slice(-5);
+  const tail = job.lines.filter(l => l.startsWith("[voice]") || l.startsWith("[dia]") || l.startsWith("[xtts]")).slice(-5);
   const mine = running && job.state?.label.includes(`episode ${episode.number}`);
 
   return (
     <div className="space-y-2 rounded-lg border border-neutral-800 bg-neutral-900/40 p-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <Mic size={13} className="text-emerald-400" />
-        <h4 className="text-[11px] uppercase tracking-wide text-neutral-400">Voices (Dia)</h4>
+        <h4 className="text-[11px] uppercase tracking-wide text-neutral-400">Voices ({label})</h4>
         <span className="text-[11px] text-neutral-500">{speakable.filter(x => sceneOf(x.sceneId).voiceFile).length} of {speakable.length} scenes voiced</span>
         <div className="flex-1" />
         {running
           ? <button onClick={() => job.stop()} className="flex items-center gap-1 rounded-md border border-neutral-700 px-2 py-1 text-[11px] text-neutral-300 hover:bg-neutral-800"><X size={12} /> Stop</button>
-          : <button disabled={busy || !speakable.length || (status ? !status.dia.ready : false)} onClick={() => start()} className="flex items-center gap-1 rounded-md bg-emerald-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40">
+          : <button disabled={busy || !speakable.length || (status ? !eng?.ready : false)} onClick={() => start()} className="flex items-center gap-1 rounded-md bg-emerald-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40">
             {busy ? <Loader2 size={12} className="animate-spin" /> : <Mic size={12} />} {missing === 0 && speakable.length ? "Make all voices again" : "Make voices"}
           </button>}
       </div>
-      {status && !status.dia.ready && <div className="flex items-start gap-1.5 text-[11px] text-amber-300"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> Dia is not set up: missing {status.dia.missing.join(", ")}.</div>}
+      {status && !eng?.ready && <div className="flex items-start gap-1.5 text-[11px] text-amber-300"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {label} is not set up: missing {(eng?.missing || ["the engine (restart the app)"]).join(", ")}.</div>}
       {running && (
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-[11px] text-sky-200"><Loader2 size={12} className="animate-spin" /> {job.state?.label}{job.progress?.text ? ` - ${job.progress.text}` : ""}{!mine && " (another episode)"}</div>

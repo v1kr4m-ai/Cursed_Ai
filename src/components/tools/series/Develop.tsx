@@ -17,7 +17,7 @@ import { applyPreset, CHAT_PRESETS, LENGTH_PRESETS, type SeriesTemplate, api, as
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
 import { isChatModel, loadRecords, noteOutcome, rateModel, recommend, TIER_LABEL, tierRank } from "./modelRating";
-import { personVoice, rekeyPeople, toggleVoiceWord, voiceCastInstruction } from "../../../../seriesTool/voices";
+import { personVoice, rekeyPeople, toggleVoiceWord, usesAiVoice, voiceCastInstruction } from "../../../../seriesTool/voices";
 import { adoptPlannedPeople, castInstruction, ensureCast, peopleOf, renamePerson, setSkip, wantsStill, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
@@ -1022,7 +1022,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                   <div className="flex flex-wrap gap-1">
                     {VOICE_TAGS.map(t => <button key={t} onClick={() => setPersonVoice(person.name, toggleVoiceWord(personVoice(project.people, person.name), t))} className={"rounded-full border px-2 py-0.5 text-[10px] transition " + ((personVoice(project.people, person.name) || "").split(/,\s*/).includes(t) ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-500 hover:text-neutral-200 hover:border-neutral-500")}>{t}</button>)}
                   </div>
-                  {project.voiceEngine === "dia" && <VoiceSample project={project} name={person.name} onSaved={onSaved} />}
+                  {usesAiVoice(project) && <VoiceSample project={project} name={person.name} onSaved={onSaved} />}
                 </div>
                 </React.Fragment>
               ))}

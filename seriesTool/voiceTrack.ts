@@ -6,6 +6,7 @@
  */
 import { cleanLines, type PeopleVoices, type SceneLine } from "./voices";
 import { projectFormat } from "./formats";
+import { planTurns, type XttsTurn } from "./xttsPlan";
 import type { Episode, Project, Scene } from "./model";
 
 export type Tag = "[S1]" | "[S2]";
@@ -91,6 +92,8 @@ export interface ScenePlan {
   /** Voice sample (used for [S1]) and its transcript tagged for Dia, when one applies. */
   referenceAudio?: string; referenceText?: string;
   seconds: number;
+  /** voiceEngine "xtts" only: one turn per speaker change, each with its language and voice (sample or built-in). */
+  turns?: XttsTurn[];
   /** Cap on what Dia generates (about 86 tokens a second): short lines otherwise tend to run on for a long time. */
   maxTokens?: number;
 }
@@ -98,11 +101,19 @@ export interface ScenePlan {
 /** Output name inside the project folder, by scene id so inserting or moving scenes never makes one overwrite another: voice/<sceneId>.wav. (Older files voice/ep02_s03.wav stay valid through scene.voiceFile.) */
 export const voiceFileName = (sceneId: string) => `voice/${sceneId.replace(/[^A-Za-z0-9_-]/g, "_")}.wav`;
 
-export function planScene(p: Pick<Project, "format" | "voice" | "people">, ep: Pick<Episode, "number">, s: Scene): ScenePlan {
+export function planScene(p: Pick<Project, "format" | "voice" | "people" | "voiceEngine">, ep: Pick<Episode, "number">, s: Scene): ScenePlan {
   const base: ScenePlan = { sceneId: s.id, number: s.number, file: voiceFileName(s.id), script: "", notes: [], seconds: 0 };
   const speech = projectFormat(p).speech;
   if (speech === "none") return { ...base, skipped: "This style has no spoken voice." };
   if (speech === "sung") return { ...base, skipped: "Singing is not something Dia can do." };
+  if (p.voiceEngine === "xtts") {
+    if (!sceneSpeech(s).length) return { ...base, skipped: "No spoken line." };
+    const t = planTurns(sceneSpeech(s), p.people, sampleOf);
+    if (t.skipped) return { ...base, skipped: t.skipped };
+    // the script is what the voice file is stamped with: speaker, language, sample and words of every turn
+    const script = t.turns.map(x => `${x.who}|${x.language}|${x.referenceAudio || x.speaker}: ${x.text}`).join("\n");
+    return { ...base, script, turns: t.turns, notes: t.notes, seconds: estimateSeconds(t.turns.map(x => x.text).join(" ")) };
+  }
   const lines = sceneSpeech(s).map(l => ({ ...l, text: cleanForDia(l.text) })).filter(l => l.text);
   const raw = sceneSpeech(s).map(l => l.text).join(" ");
   if (!raw) return { ...base, skipped: "No spoken line." };
@@ -127,12 +138,12 @@ export function planScene(p: Pick<Project, "format" | "voice" | "people">, ep: P
   return out;
 }
 
-export const planEpisode = (p: Pick<Project, "format" | "voice" | "people">, ep: Pick<Episode, "number" | "scenes">, onlySceneId?: string): ScenePlan[] =>
+export const planEpisode = (p: Pick<Project, "format" | "voice" | "people" | "voiceEngine">, ep: Pick<Episode, "number" | "scenes">, onlySceneId?: string): ScenePlan[] =>
   [...ep.scenes].sort((a, b) => a.number - b.number).filter(s => !onlySceneId || s.id === onlySceneId).map(s => planScene(p, ep, s));
 
 /** The words a voice file was made from; compared with the scene now to tell when it is out of date. */
 export const stampOf = (x: ScenePlan): string => x.script + (x.referenceAudio ? `|${x.referenceAudio}|${x.referenceText || ""}` : "");
-export const voiceStamp = (p: Pick<Project, "format" | "voice" | "people">, ep: Pick<Episode, "number">, s: Scene): string => stampOf(planScene(p, ep, s));
+export const voiceStamp = (p: Pick<Project, "format" | "voice" | "people" | "voiceEngine">, ep: Pick<Episode, "number">, s: Scene): string => stampOf(planScene(p, ep, s));
 
 /** Token cap with a voice sample: Dia prefills the sample (about 86 tokens a second) inside the same budget. Undefined (no cap) when its length is unknown. */
 export const tokenCapWithSample = (seconds: number, sampleSeconds: number | null): number | undefined =>

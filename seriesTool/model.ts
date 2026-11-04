@@ -60,7 +60,8 @@ export interface Scene {
   error: string | null;
 }
 
-import { personVoice, type PeopleVoices, type SceneLine } from "./voices";
+import { planScene } from "./voiceTrack";
+import { personVoice, usesAiVoice, type PeopleVoices, type SceneLine } from "./voices";
 import type { Subtitles } from "./subtitlesCore";
 import { projectFormat, sceneFields } from "./formats";
 import { kindOf, refKindInfo, REF_KINDS } from "./refKinds";
@@ -149,8 +150,8 @@ export interface Project {
   voice?: string;
   /** Optional own voice per person of the series, keyed by name; a person without one speaks with `voice`. */
   people?: PeopleVoices;
-  /** Who speaks: the video model's own voice ("model", the default) or the local Dia voice, made in Produce and mixed in at the join. */
-  voiceEngine?: "model" | "dia";
+  /** Who speaks: the video model's own voice ("model", the default) or a local voice (Dia: English; XTTS: Hindi and more), made in Produce and mixed in at the join. */
+  voiceEngine?: "model" | "dia" | "xtts";
   /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
   allowTextCards?: boolean;
   /** People who get a picture generated from their photos. Everyone else appears as their own photo, used as it is. */
@@ -213,7 +214,7 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
   const format = projectFormat(project);
   // The default narrator is for narration; an on-camera format needs a person's voice instead.
   const voice = format.voice && project.voiceLock === DEFAULT_VOICE_LOCK ? format.voice : project.voiceLock;
-  const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, lines: scene.lines, voiceOf: n => personVoice(project.people, n), shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });
+  const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, lines: scene.lines, voiceOf: n => personVoice(project.people, n), aiVoice: usesAiVoice(project) && !planScene(project, episode, scene).skipped, shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });
 
   // With several people in the shot, say who is who and that they must stay different.
   const people = refs.map((r, i) => ({ r, i })).filter(({ r }) => kindOf(r) === "person" && r.person);

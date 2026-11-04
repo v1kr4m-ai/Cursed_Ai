@@ -233,7 +233,7 @@ export const NO_TEXT = "No subtitles, captions, lyrics text, watermarks, logos o
  * The three prompt fields the video model expects for one scene.
  * `voice` is the project's own voice description; the format's default replaces the narrator default.
  */
-export function sceneFields(opts: { format: SeriesFormat; look: string; voice: string; line: string; shot: string; card: string; allowCard: boolean; lines?: SceneLine[]; voiceOf?: (speaker: string) => string | undefined }) {
+export function sceneFields(opts: { format: SeriesFormat; look: string; voice: string; line: string; shot: string; card: string; allowCard: boolean; lines?: SceneLine[]; voiceOf?: (speaker: string) => string | undefined; /** a local voice (Dia/XTTS) speaks: the video model is not asked to say the line */ aiVoice?: boolean }) {
   const { format, line, shot } = opts;
   const look = [cleanLook(opts.look), format.look].filter(Boolean).join(" ");
   const card = opts.allowCard && opts.card.trim() ? ` Plain white text reading "${opts.card.trim()}" appears low in the frame.` : "";
@@ -243,7 +243,8 @@ export function sceneFields(opts: { format: SeriesFormat; look: string; voice: s
   // Several speakers: each line carries its speaker's own voice (the project voice when they have none).
   const lines = cleanLines(opts.lines); // blanks and malformed entries dropped first, so an empty added line changes nothing
   const multi = isMultiSpeaker(lines) && format.speech !== "none" ? lines : [];
-  if (multi.length) {
+  if (opts.aiVoice && (multi.length || text) && ["voiceover", "oncamera", "dialogue"].includes(format.speech)) spoken = " Nobody speaks in this clip.";
+  else if (multi.length) {
     const say = (l: SceneLine) => {
       const v = (l.speaker && opts.voiceOf?.(l.speaker)) || opts.voice;
       const who = l.speaker ? (v ? `${l.speaker} (${v})` : l.speaker) : format.speech === "voiceover" ? `A ${v}` : `The person in the shot, ${v},`;

@@ -22,7 +22,7 @@ import { fillSlots, refSourceFiles } from "./refSources";
 import { refKindInfo } from "./refKinds";
 import { buildScenePrompt, newId, snapFrames, type Episode, type Project, type Ref, type Scene, type Source, type Status } from "./model";
 import { createSeriesStore } from "./store";
-import { importLines, joinLines } from "./voices";
+import { importLines, joinLines, usesAiVoice } from "./voices";
 
 type Json = Record<string, any>;
 
@@ -731,8 +731,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     try {
       await stitch({
         clips: ordered.map(s => s.clipPath!),
-        // Made voices (voiceEngine "dia") go over their clips, which are turned down so the model's own speech does not double them.
-        voices: p.voiceEngine === "dia" ? ordered.map(s => s.voiceFile) : undefined,
+        // Made voices (Dia or XTTS) go over their clips, which are turned down so the model's own speech does not double them.
+        voices: usesAiVoice(p) ? ordered.map(s => s.voiceFile) : undefined,
         outFile,
         width: p.settings.width,
         height: p.settings.height,

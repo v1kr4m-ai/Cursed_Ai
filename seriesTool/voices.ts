@@ -6,6 +6,9 @@ export interface SceneLine { speaker?: string; text: string }
 /** `refAudio`/`refText`: an optional voice sample (and what it says) the local Dia voice copies. */
 export type PeopleVoices = Record<string, { voice?: string; refAudio?: string; refText?: string }>;
 
+/** True when the spoken voice is made locally (Dia or XTTS, in Produce) instead of by the video model. */
+export const usesAiVoice = (p: { voiceEngine?: string }): boolean => p.voiceEngine === "dia" || p.voiceEngine === "xtts";
+
 const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** A person's own voice description, or undefined (then the project voice applies). */

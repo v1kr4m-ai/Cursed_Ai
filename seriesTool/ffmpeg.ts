@@ -106,3 +106,10 @@ export function probeDuration(file: string): Promise<number | null> {
     });
   });
 }
+
+/** ffmpeg arguments that join spoken turns (wav files) into one 24 kHz mono wav, `gap` seconds of silence after each turn but the last. */
+export function buildJoinArgs(inputs: string[], out: string, gap = 0.35): string[] {
+  const pads = inputs.map((_, i) => `[${i}:a]${i < inputs.length - 1 ? `apad=pad_dur=${gap}` : "anull"}[a${i}]`).join(";");
+  const filter = `${pads};${inputs.map((_, i) => `[a${i}]`).join("")}concat=n=${inputs.length}:v=0:a=1[out]`;
+  return ["-y", "-v", "error", ...inputs.flatMap(f => ["-i", f]), "-filter_complex", filter, "-map", "[out]", "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", out];
+}

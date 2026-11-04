@@ -8,7 +8,7 @@ import { RenderQueue } from "./RenderQueue";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
-import { cleanLines, joinLines, rekeyPeople } from "../../../../seriesTool/voices";
+import { cleanLines, joinLines, rekeyPeople, usesAiVoice } from "../../../../seriesTool/voices";
 import { projectFormat } from "../../../../seriesTool/formats";
 import { kindOf, refKindInfo, REF_KINDS } from "../../../../seriesTool/refKinds";
 import { motion, AnimatePresence } from "motion/react";
@@ -623,7 +623,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                     </div>
                     <div className="space-y-2">
                       <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">Scenes{onlyTodo ? " that need work" : ""}</h4>
-                      {project.voiceEngine === "dia" && <VoicesCard project={project} episode={ep} onChanged={onChanged} />}
+                      {usesAiVoice(project) && <VoicesCard project={project} episode={ep} onChanged={onChanged} />}
                       {onlyTodo && !ep.scenes.some(s => s.status !== "done") && <p className="text-xs text-emerald-300">All clips of this episode are done.</p>}
                       <SceneList project={project} episode={ep} scenes={[...ep.scenes].sort((a, b) => a.number - b.number).filter(s => !onlyTodo || s.status !== "done")} running={running} onChanged={onChanged} />
                     </div>
