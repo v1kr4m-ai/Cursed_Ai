@@ -18,7 +18,7 @@ export interface Ref {
 
 export interface Scene {
   id: string; number: number; vo: string; lines?: { speaker?: string; text: string }[]; shot: string; textCard: string;
-  refIds: string[]; cast?: string[]; voiceFile?: string; voiceText?: string; talking?: boolean; talkingClip?: string; talkingVoice?: string; clipBeforeTalking?: string | null; seed: number; promptText: string; promptEdited: boolean;
+  refIds: string[]; cast?: string[]; voiceFile?: string; voiceText?: string; voiceTurns?: { speaker: string; file: string; seconds: number }[]; talking?: boolean; talkingClip?: string; talkingVoice?: string; clipBeforeTalking?: string | null; seed: number; promptText: string; promptEdited: boolean;
   status: Status; clipPath: string | null; durationS: number | null;
   promptId: string | null; error: string | null;
 }
@@ -152,7 +152,7 @@ export const api = {
   unusedTakes: (id: string) => call<{ count: number; bytes: number }>(`/api/series/projects/${id}/unused-takes`),
   deleteUnusedTakes: (id: string) => call<{ count: number; bytes: number }>(`/api/series/projects/${id}/unused-takes/delete`, { method: "POST" }),
   talkingStatus: () => call<{ ready: boolean; reason: string; comfyUp: boolean; workflow: string | null; maxSeconds: number; warning: string }>(`/api/series/talking/status`),
-  makeTalking: (id: string, sceneId: string) => call<{ ok: true; chunks: number; voiceSeconds: number; picture: string }>(`/api/series/projects/${id}/scenes/${sceneId}/talking`, { method: "POST" }),
+  makeTalking: (id: string, sceneId: string) => call<{ ok: true; chunks: number; voiceSeconds: number; picture: string; renders?: number }>(`/api/series/projects/${id}/scenes/${sceneId}/talking`, { method: "POST" }),
   revertTalking: (id: string, sceneId: string) => call<{ ok: true }>(`/api/series/projects/${id}/scenes/${sceneId}/talking/revert`, { method: "POST" }),
   generateScene: (id: string, sceneId: string) => call(`/api/series/projects/${id}/scenes/${sceneId}/generate`, { method: "POST" }),
   generateEpisode: (id: string, episodeId: string, redo = false) =>

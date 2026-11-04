@@ -159,7 +159,7 @@ export function keepVoices<E extends { id: string; scenes: any[] }>(stored: E[] 
       const o = old.scenes.find((x: any) => x.id === s?.id);
       if (!o || !s || typeof s !== "object") return s;
       const add: any = {};
-      for (const k of ["voiceFile", "voiceText", "talking", "talkingClip", "talkingVoice", "clipBeforeTalking"]) if (!(k in s) && o[k] !== undefined) add[k] = o[k];
+      for (const k of ["voiceFile", "voiceText", "voiceTurns", "talking", "talkingClip", "talkingVoice", "clipBeforeTalking"]) if (!(k in s) && o[k] !== undefined) add[k] = o[k];
       return Object.keys(add).length ? { ...s, ...add } : s;
     }) };
   });

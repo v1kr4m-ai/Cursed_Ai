@@ -49,6 +49,8 @@ export interface Scene {
   /** The scene's spoken voice made by the local Dia voice (voiceEngine "dia"), and the script it was made from. */
   voiceFile?: string;
   voiceText?: string;
+  /** XTTS only: each speaker turn of the voice as its own file, so a talking video can use each speaker's picture. Cleared with the voice. */
+  voiceTurns?: { speaker: string; file: string; seconds: number }[];
   /** Talking video (talking.ts): the clip is made from the voice + a picture of the speaker, so it carries the voice itself. `talkingClip` is that clip; `clipBeforeTalking` the normal clip to go back to. */
   talking?: boolean;
   talkingClip?: string;

@@ -113,6 +113,19 @@ export function buildTalkingTrimArgs(input: string, out: string, seconds: number
     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out];
 }
 
+/** One speaker's piece of a multi-speaker talking scene: cut to exactly `seconds` (the video holds its last frame and the sound is padded with silence if the render is a hair short), sound levelled. */
+export function buildTalkingPieceArgs(input: string, out: string, seconds: number): string[] {
+  return ["-y", "-v", "error", "-i", input, "-t", String(Math.round(seconds * 1000) / 1000), "-vf", "tpad=stop_mode=clone:stop_duration=2", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,apad",
+    "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-r", "16", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "192k", "-movflags", "+faststart", out];
+}
+
+/** The pieces one after another into one clip (all made by buildTalkingPieceArgs, same size and settings). */
+export function buildTalkingConcatArgs(inputs: string[], out: string): string[] {
+  const filter = `${inputs.map((_, i) => `[${i}:v][${i}:a]`).join("")}concat=n=${inputs.length}:v=1:a=1[v][a]`;
+  return ["-y", "-v", "error", ...inputs.flatMap(f => ["-i", f]), "-filter_complex", filter, "-map", "[v]", "-map", "[a]",
+    "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out];
+}
+
 /** Runs ffmpeg with these arguments; rejects with the tail of its error. */
 export function runFfmpeg(args: string[], signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {

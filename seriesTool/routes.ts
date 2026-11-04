@@ -14,8 +14,8 @@ import fs from "fs";
 import path from "path";
 import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTool/registry";
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
-import { probeDuration, stitch, buildTalkingTrimArgs, runFfmpeg } from "./ffmpeg";
-import { MAX_CHUNKS, TALK_TAIL, TALK_WARNING, TALK_WORKFLOW, MAX_TALK_SECONDS, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingPrompt, talkingSize } from "./talking";
+import { probeDuration, stitch, buildTalkingTrimArgs, buildTalkingPieceArgs, buildTalkingConcatArgs, buildJoinArgs, runFfmpeg } from "./ffmpeg";
+import { MAX_CHUNKS, TALK_TAIL, TALK_WARNING, TALK_WORKFLOW, MAX_TALK_SECONDS, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingPrompt, talkingSize, isMultiSpeaker, turnsMatchVoice, pieceLengths, planTurnRenders, pickTurnPicture, TURN_GAP, type TurnRender } from "./talking";
 import { takesIn, unusedTakes } from "./takes";
 import { upsertOutput } from "./finishCore";
 import { extractUpload } from "../comfyTool/extract";
@@ -26,6 +26,7 @@ import { createSeriesStore } from "./store";
 import { isRunning } from "../trainTool/jobs";
 import { voiceStarting } from "../trainTool/voice";
 import { importLines, joinLines, usesAiVoice } from "./voices";
+import { voiceStamp } from "./voiceTrack";
 
 type Json = Record<string, any>;
 
@@ -582,18 +583,36 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     const { ep, scene } = found;
     if (scene.status === "running" || scene.status === "queued") return bad(res, 409, "This scene is rendering right now. Cancel it first.");
     if (!scene.voiceFile || !fs.existsSync(scene.voiceFile)) return bad(res, 400, "Make this scene's voice first (the Voices card).");
+    // XTTS voice with turns by 2+ speakers: one render per turn, each with that speaker's picture (everything else below is the one-picture path)
+    let multi: (TurnRender & { picture: string })[] | undefined;
+    const voiceNow = scene.voiceFile ? await probeDuration(scene.voiceFile) : null;
+    // turns that no longer belong to the voice file (a Dia redo, a copied project) are ignored: the one-picture path
+    const turnsOk = isMultiSpeaker(scene.voiceTurns) && !!voiceNow && turnsMatchVoice(scene.voiceTurns!, voiceNow);
+    if (turnsOk && scene.voiceText !== voiceStamp(p, ep, scene)) return bad(res, 400, "The speakers or words of this scene changed since its voice was made. Make the voice again first.");
+    if (turnsOk) {
+      const tp = planTurnRenders(scene.voiceTurns!);
+      if ("reason" in tp) return bad(res, 400, tp.reason);
+      const gone = scene.voiceTurns!.find(t => !fs.existsSync(t.file));
+      if (gone) return bad(res, 400, "A speaker's turn file of this scene's voice is gone. Make the voice again (Redo).");
+      multi = [];
+      for (const r of tp.renders) {
+        const pic = pickTurnPicture(ep.refs, scene, r.speaker, f => fs.existsSync(f));
+        if ("reason" in pic) return bad(res, 400, pic.reason);
+        multi.push({ ...r, picture: pic.ref.file! });
+      }
+    }
     const voiceS = await probeDuration(scene.voiceFile);
     if (!voiceS) return bad(res, 400, "Could not read the length of this scene's voice file.");
     const plan = planTalking(voiceS);
-    if (plan.tooLong) return bad(res, 400, `This voice is ${voiceS.toFixed(1)} s but a talking video can carry at most ${plan.maxSeconds.toFixed(1)} s. Nothing is cut: split the scene or shorten its words, then make the voice again.`);
-    const pic = pickTalkingPicture(ep.refs, scene, f => fs.existsSync(f));
+    if (!multi && plan.tooLong) return bad(res, 400, `This voice is ${voiceS.toFixed(1)} s but a talking video can carry at most ${plan.maxSeconds.toFixed(1)} s. Nothing is cut: split the scene or shorten its words, then make the voice again.`);
+    const pic = multi ? { ref: { name: [...new Set(multi.map(m => m.speaker || "narrator"))].join(", "), file: multi[0].picture } } : pickTalkingPicture(ep.refs, scene, f => fs.existsSync(f));
     if ("reason" in pic) return bad(res, 400, pic.reason);
     const wf = talkingWorkflowFile();
     if (!wf) return bad(res, 400, `The workflow "${TALK_WORKFLOW}" was not found in ComfyUI's workflows folder.`);
     if (!(await comfyIsUp())) return bad(res, 503, "ComfyUI is not running. Start it, then try again.");
     if (voiceStarting() || isRunning("dia") || isRunning("xtts") || isRunning("seriesvoice")) return bad(res, 409, "A voice is being made right now and needs the graphics card. Wait for it to finish, then try again.");
-    generateTalking(p, ep, scene, { workflow: wf, picture: pic.ref.file! });
-    res.json({ ok: true, chunks: plan.chunks, voiceSeconds: voiceS, picture: pic.ref.name });
+    generateTalking(p, ep, scene, { workflow: wf, picture: pic.ref.file!, renders: multi });
+    res.json({ ok: true, chunks: multi ? multi.reduce((n, m) => n + planTalking(m.seconds).chunks, 0) : plan.chunks, voiceSeconds: voiceS, picture: pic.ref.name, renders: multi?.length ?? 1 });
   });
 
   /** Go back to the normal clip the scene had before its talking video. The talking clip stays on disk as a take. */
@@ -610,8 +629,59 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     res.json({ ok: true, clipPath: s.clipBeforeTalking });
   });
 
-  function generateTalking(p: Project, ep: Episode, scene: Scene, a: { workflow: string; picture: string }) {
-    return enqueue(p.id, { projectId: p.id, targetId: scene.id, kind: "scene", label: `${ep.title}: scene ${scene.number} (talking)` }, async job => {
+  /** One S2V render of `audio` (`seconds` long) with `picture`: returns the raw ComfyUI clip in the clips folder (the caller trims it and removes it). */
+  async function renderTalkRaw(job: Job, p: Project, liveEp: Episode, live: Scene, a: { workflow: string; picture: string; audio: string; seconds: number; seed: number }): Promise<string> {
+    const fresh = store.get(p.id)!;
+    const plan = planTalking(a.seconds);
+    if (plan.tooLong) throw new Error(`This voice is ${a.seconds.toFixed(1)} s but a talking video can carry at most ${plan.maxSeconds.toFixed(1)} s. Nothing is cut.`);
+    const oi = await objectInfo();
+    const info = loadWorkflowInfo(a.workflow, {}, oi);
+    if (!info.isRunnable) throw new Error(`The talking-video workflow cannot run: ${info.missing.join(", ") || "unknown reason"}`);
+    if (info.refImageNodeIds.length !== 1 || info.refAudioNodeIds.length !== 1) throw new Error("The talking-video workflow was changed: it needs exactly one picture and one audio input.");
+    const { graph } = loadApiWorkflow(a.workflow, oi);
+    const size = talkingSize(fresh.settings.width, fresh.settings.height);
+    forceSizeAndLength(graph, size); // sets the width/height of the S2V node only; its length and 16 fps stay
+    // Fewer chunks = far less GPU time for a short voice. If the graph cannot be shortened, stop rather than silently run all three (about 3x the GPU time).
+    if (plan.chunks < MAX_CHUNKS && !limitChunks(graph, plan.chunks)) throw new Error("The talking-video workflow was changed, so it cannot be shortened for a short voice (it would run 3 times longer). Re-export it with the same nodes, or use a longer voice.");
+
+    // The picture on the video's shape (cropped round the face, not stretched), so the model gets what it will draw.
+    const sharp = (await import("sharp")).default;
+    const cropped = path.join(fresh.dir, "talking", `${live.id.replace(/[^A-Za-z0-9_-]/g, "_")}.png`);
+    fs.mkdirSync(path.dirname(cropped), { recursive: true });
+    await sharp(a.picture).rotate().resize(size.width, size.height, { fit: "cover", position: sharp.strategy.attention }).png().toFile(cropped);
+
+    mark(p.id, live.id, "scene", { status: "running", error: null, seed: a.seed });
+    const clips = store.clipsDir(fresh);
+    const base = `ep${String(liveEp.number).padStart(2, "0")}_scene${String(live.number).padStart(2, "0")}`;
+    const raw = path.join(clips, `${base}_talkraw.mp4`);
+    fs.mkdirSync(clips, { recursive: true });
+    fs.rmSync(raw, { force: true });
+    await runWorkflow({
+      baseUrl: opts.getComfyUrl(),
+      workflow: graph,
+      info,
+      promptText: talkingPrompt(live.shot, fresh.styleLock),
+      refImagePaths: [cropped],
+      refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
+      refAudioPaths: [a.audio],
+      fieldValues: {},
+      seed: a.seed,
+      destFolder: clips,
+      destFilename: path.basename(raw),
+      onEvent: runEventSink(p.id, job),
+      signal: job.abort.signal,
+      onSubmitted: id => { job.promptId = id; mark(p.id, live.id, "scene", { promptId: id }); },
+    });
+    if (job.abort.signal.aborted || !fs.existsSync(raw)) {
+      // The runner may have saved the file under another extension; only this feature's own _talkraw files are removed.
+      for (const f of fs.readdirSync(clips)) if (f.startsWith(`${base}_talkraw.`)) fs.rmSync(path.join(clips, f), { force: true });
+      throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a clip.");
+    }
+    return raw;
+  }
+
+  function generateTalking(p: Project, ep: Episode, scene: Scene, a: { workflow: string; picture: string; renders?: (TurnRender & { picture: string })[] }) {
+    return enqueue(p.id, { projectId: p.id, targetId: scene.id, kind: "scene", label: `${ep.title}: scene ${scene.number} (talking${a.renders ? `, ${a.renders.length} renders` : ""})` }, async job => {
       const fresh = store.get(p.id)!;
       const liveEp = fresh.episodes.find(e => e.id === ep.id)!;
       const live = liveEp.scenes.find(s => s.id === scene.id)!;
@@ -619,56 +689,43 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       if (!live.voiceFile || !fs.existsSync(live.voiceFile)) throw new Error("This scene's voice file is gone. Make the voice again.");
       const voiceS = await probeDuration(live.voiceFile);
       if (!voiceS) throw new Error("Could not read the length of this scene's voice file.");
-      const plan = planTalking(voiceS);
-      if (plan.tooLong) throw new Error(`This voice is ${voiceS.toFixed(1)} s but a talking video can carry at most ${plan.maxSeconds.toFixed(1)} s. Nothing is cut.`);
-      const oi = await objectInfo();
-      const info = loadWorkflowInfo(a.workflow, {}, oi);
-      if (!info.isRunnable) throw new Error(`The talking-video workflow cannot run: ${info.missing.join(", ") || "unknown reason"}`);
-      if (info.refImageNodeIds.length !== 1 || info.refAudioNodeIds.length !== 1) throw new Error("The talking-video workflow was changed: it needs exactly one picture and one audio input.");
-      const { graph } = loadApiWorkflow(a.workflow, oi);
-      const size = talkingSize(fresh.settings.width, fresh.settings.height);
-      forceSizeAndLength(graph, size); // sets the width/height of the S2V node only; its length and 16 fps stay
-      // Fewer chunks = far less GPU time for a short voice. If the graph cannot be shortened, stop rather than silently run all three (about 3x the GPU time).
-      if (plan.chunks < MAX_CHUNKS && !limitChunks(graph, plan.chunks)) throw new Error("The talking-video workflow was changed, so it cannot be shortened for a short voice (it would run 3 times longer). Re-export it with the same nodes, or use a longer voice.");
-
-      // The picture on the video's shape (cropped round the face, not stretched), so the model gets what it will draw.
-      const sharp = (await import("sharp")).default;
-      const cropped = path.join(fresh.dir, "talking", `${live.id.replace(/[^A-Za-z0-9_-]/g, "_")}.png`);
-      fs.mkdirSync(path.dirname(cropped), { recursive: true });
-      await sharp(a.picture).rotate().resize(size.width, size.height, { fit: "cover", position: sharp.strategy.attention }).png().toFile(cropped);
-
       const seed = live.clipPath ? newSeed() : live.seed; // a new seed, or ComfyUI hands back its cached clip
-      mark(p.id, scene.id, "scene", { status: "running", error: null, seed });
       const clips = store.clipsDir(fresh);
       const base = `ep${String(liveEp.number).padStart(2, "0")}_scene${String(live.number).padStart(2, "0")}`;
-      const raw = path.join(clips, `${base}_talkraw.mp4`);
-      fs.mkdirSync(clips, { recursive: true });
-      fs.rmSync(raw, { force: true });
-      await runWorkflow({
-        baseUrl: opts.getComfyUrl(),
-        workflow: graph,
-        info,
-        promptText: talkingPrompt(live.shot, fresh.styleLock),
-        refImagePaths: [cropped],
-        refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
-        refAudioPaths: [live.voiceFile!],
-        fieldValues: {},
-        seed,
-        destFolder: clips,
-        destFilename: path.basename(raw),
-        onEvent: runEventSink(p.id, job),
-        signal: job.abort.signal,
-        onSubmitted: id => { job.promptId = id; mark(p.id, scene.id, "scene", { promptId: id }); },
-      });
-      if (job.abort.signal.aborted || !fs.existsSync(raw)) {
-        // The runner may have saved the file under another extension; only this feature's own _talkraw files are removed.
-        for (const f of fs.readdirSync(clips)) if (f.startsWith(`${base}_talkraw.`)) fs.rmSync(path.join(clips, f), { force: true });
-        throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a clip.");
-      }
-
-      // Cut to the voice (+ a short tail) with the voice at the loudness mixed voices get; the raw model output is not kept.
       const dest = uniqueDestination(path.join(clips, `${base}.mp4`));
-      try { await runFfmpeg(buildTalkingTrimArgs(raw, dest, voiceS + TALK_TAIL), job.abort.signal); } catch (e) { fs.rmSync(dest, { force: true }); throw e; } finally { fs.rmSync(raw, { force: true }); }
+
+      if (!a.renders) {
+        const raw = await renderTalkRaw(job, p, liveEp, live, { workflow: a.workflow, picture: a.picture, audio: live.voiceFile, seconds: voiceS, seed });
+        // Cut to the voice (+ a short tail) with the voice at the loudness mixed voices get; the raw model output is not kept.
+        try { await runFfmpeg(buildTalkingTrimArgs(raw, dest, voiceS + TALK_TAIL), job.abort.signal); } catch (e) { fs.rmSync(dest, { force: true }); throw e; } finally { fs.rmSync(raw, { force: true }); }
+      } else {
+        // One render per speaker turn, in order; each piece is cut to its turn + the join gap (the last: + the tail), so the pieces together line up with the joined voice. Only this job's own temp files are removed.
+        const renders = a.renders;
+        const mine: string[] = [];
+        const pieces: string[] = [];
+        try {
+          // the turns are read again now: the voice may have been made again since the button was pressed
+          const tp = isMultiSpeaker(live.voiceTurns) && turnsMatchVoice(live.voiceTurns!, voiceS) ? planTurnRenders(live.voiceTurns!) : { reason: "This scene's voice no longer has several speakers. Press the button again." };
+          if ("reason" in tp) throw new Error(tp.reason);
+          if (tp.renders.length !== renders.length || tp.renders.some((r, i) => r.files.join("|") !== renders[i].files.join("|") || r.speaker !== renders[i].speaker || Math.abs(r.seconds - renders[i].seconds) > 0.01)) throw new Error("The scene's voice was made again while this was waiting. Press the button again.");
+          const cuts = pieceLengths(renders.map(r => r.seconds));
+          for (const [i, r] of renders.entries()) {
+            emit(p.id, { type: "note", targetId: scene.id, text: `render ${i + 1} of ${renders.length}: ${r.speaker || "narrator"}` });
+            let audio = r.files[0];
+            if (r.files.length > 1) { // neighbouring turns of one speaker, joined the same way the scene voice is
+              audio = path.join(fresh.dir, "talking", `${live.id.replace(/[^A-Za-z0-9_-]/g, "_")}_audio${i}.wav`);
+              fs.mkdirSync(path.dirname(audio), { recursive: true }); mine.push(audio);
+              await runFfmpeg(buildJoinArgs(r.files, audio, TURN_GAP), job.abort.signal);
+            }
+            const raw = await renderTalkRaw(job, p, liveEp, live, { workflow: a.workflow, picture: r.picture, audio, seconds: r.seconds, seed });
+            const piece = path.join(clips, `${base}_talkpart${i}.mp4`);
+            mine.push(piece);
+            try { await runFfmpeg(buildTalkingPieceArgs(raw, piece, cuts[i]), job.abort.signal); } finally { fs.rmSync(raw, { force: true }); }
+            pieces.push(piece);
+          }
+          try { await runFfmpeg(buildTalkingConcatArgs(pieces, dest), job.abort.signal); } catch (e) { fs.rmSync(dest, { force: true }); throw e; }
+        } finally { for (const f of mine) fs.rmSync(f, { force: true }); }
+      }
       if (job.abort.signal.aborted) { fs.rmSync(dest, { force: true }); throw new Error("Cancelled."); }
       const duration = await probeDuration(dest);
       mark(p.id, scene.id, "scene", { status: "done", clipPath: dest, durationS: duration, error: null, talking: true, talkingClip: dest, talkingVoice: live.voiceText ?? "", clipBeforeTalking: isTalking(live) ? live.clipBeforeTalking ?? null : live.clipPath });

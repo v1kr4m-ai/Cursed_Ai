@@ -14,6 +14,7 @@ import { createSeriesStore } from "./store";
 import { planEpisode, stampOf, tokenCapWithSample } from "./voiceTrack";
 import { probeDuration, buildJoinArgs } from "./ffmpeg";
 import { BUILTIN_SPEAKERS } from "./xttsPlan";
+import type { VoiceTurn } from "./talking";
 import { diaSetup, buildDiaJob, xttsSetup, buildXttsJob, voiceStarting, type XttsItem } from "../trainTool/voice";
 import { freeVram, isRunning, startTask, stopJob } from "../trainTool/jobs";
 
@@ -68,14 +69,14 @@ export function registerVoiceTrack(app: express.Express, opts: VoiceTrackOptions
     fs.mkdirSync(dir, { recursive: true });
 
     /** Records a finished voice file on its scene. */
-    const record = (x: (typeof plans)[number], target: string) => {
+    const record = (x: (typeof plans)[number], target: string, turns?: VoiceTurn[]) => {
       const fresh = store.get(p.id), sc = fresh?.episodes.find(e => e.id === ep.id)?.scenes.find(s => s.id === x.sceneId);
-      if (fresh && sc) { sc.voiceFile = target; sc.voiceText = stampOf(x); store.save(fresh); }
+      if (fresh && sc) { sc.voiceFile = target; sc.voiceText = stampOf(x); if (turns) sc.voiceTurns = turns; else delete sc.voiceTurns; store.save(fresh); }
     };
     const finish = (made: number[], failed: { scene: number; error: string }[], { progress, signal }: Ctx) => {
       // a scene that cannot be voiced any more must not keep an old voice that no longer matches its words
       const fresh = store.get(p.id), fep = fresh?.episodes.find(e => e.id === ep.id);
-      for (const x of plans.filter(x => x.skipped)) { const sc = fep?.scenes.find(s => s.id === x.sceneId); if (fresh && sc?.voiceFile) { delete sc.voiceFile; delete sc.voiceText; store.save(fresh); } }
+      for (const x of plans.filter(x => x.skipped)) { const sc = fep?.scenes.find(s => s.id === x.sceneId); if (fresh && sc?.voiceFile) { delete sc.voiceFile; delete sc.voiceText; delete sc.voiceTurns; store.save(fresh); } }
       progress(100, "done");
       if (failed.length && !made.length && !signal.aborted) throw new Error(`No scene was voiced: ${failed.map(f => `scene ${f.scene}: ${f.error}`).join("; ")}`);
       return { made, failed, skipped: plans.filter(x => x.skipped).map(x => ({ scene: x.number, reason: x.skipped })) };
@@ -111,13 +112,25 @@ export function registerVoiceTrack(app: express.Express, opts: VoiceTrackOptions
         if (lost.length) { const why = err || `${lost.length} of ${parts.length} turn(s) were not spoken (see the XTTS lines)`; failed.push({ scene: x.number, error: why }); log(`[voice] scene ${x.number} failed: ${why}`); continue; }
         const target = path.join(p.dir, x.file), tmp = target.replace(/\.wav$/, ".new.wav");
         const joined = await new Promise<string>(done => execFile("ffmpeg", buildJoinArgs(parts, tmp), { windowsHide: true }, e => done(e ? e.message : "")));
+        let replaced = false;
         try {
           if (joined || !fs.existsSync(tmp)) throw new Error(joined || "ffmpeg wrote no file");
           fs.renameSync(tmp, target);
-          record(x, target);
+          replaced = true;
+          // each turn kept as its own file (voice/<sceneId>_t<N>.wav) so a talking video can use each speaker's picture; the older ones of this scene are replaced
+          const stem = path.basename(target, ".wav");
+          for (const f of fs.readdirSync(dir)) if (f.startsWith(`${stem}_t`) && f.endsWith(".wav")) fs.rmSync(path.join(dir, f), { force: true });
+          const kept: VoiceTurn[] = [];
+          for (const [k, part] of parts.entries()) {
+            const file = path.join(dir, `${stem}_t${k}.wav`);
+            fs.renameSync(part, file);
+            kept.push({ speaker: x.turns![k].who, file, seconds: (await probeDuration(file)) || 0 });
+          }
+          record(x, target, kept.every(t => t.seconds > 0) ? kept : undefined);
           made.push(x.number);
         } catch (e: any) {
           try { fs.rmSync(tmp, { force: true }); } catch { /* none */ }
+          if (replaced) record(x, target); // the new voice is in place but its turns are not: never keep the old scene's turns
           failed.push({ scene: x.number, error: e?.message || String(e) }); log(`[voice] scene ${x.number} failed: ${e?.message || e}`);
         }
       }

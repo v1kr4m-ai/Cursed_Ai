@@ -90,3 +90,52 @@ export const talkingStale = (s: { talkingClip?: string | null; clipPath: string 
 
 /** The voice file to mix over a scene's clip when joining: none for a talking clip, which already carries the voice, so it is not laid on twice. */
 export const joinVoice = (s: { voiceFile?: string; talkingClip?: string | null; clipPath: string | null }): string | undefined => (isTalking(s) ? undefined : s.voiceFile);
+
+// ---------------------------------------------------------- several speakers in one scene (XTTS voices only: Dia makes one file, so its turn timing is unknown)
+
+/** One speaker's turn of a scene voice made by XTTS, kept as its own file (voice/<sceneId>_t<N>.wav). `speaker` "" = narrator. */
+export interface VoiceTurn { speaker: string; file: string; seconds: number }
+/** The silence between turns in the joined scene voice (buildJoinArgs); the talking clips keep it so picture and sound stay in sync with that voice. */
+export const TURN_GAP = 0.35;
+/** About how long one render takes on this 8 GB card (measured on a 4 s voice; longer ones take longer). */
+export const MINUTES_PER_RENDER = 3;
+const spk = (s?: string) => (s || "").trim().toLowerCase();
+
+/** True when the kept turns are by two or more different speakers: only then is a talking scene rendered turn by turn. */
+export const isMultiSpeaker = (turns?: VoiceTurn[]): boolean => !!turns && new Set(turns.map(t => spk(t.speaker))).size >= 2;
+
+/** The kept turns still belong to the voice file: their lengths plus the join gaps add up to the file's length (a Dia redo or a copied project can leave older turns behind). */
+export const turnsMatchVoice = (turns: VoiceTurn[], voiceSeconds: number, tolerance = 0.1): boolean =>
+  turns.length > 0 && Math.abs(turns.reduce((n, t) => n + t.seconds, 0) + TURN_GAP * (turns.length - 1) - voiceSeconds) <= tolerance;
+
+/** How long to cut each piece so the pieces together keep the joined voice's timing: piece i ends at the running end time rounded to a 1/16 s frame, so rounding never adds up. `seconds` are the renders' lengths. */
+export function pieceLengths(seconds: number[], fps = TALK_FPS): number[] {
+  let end = 0, prev = 0;
+  return seconds.map((s, i) => {
+    end += s + (i < seconds.length - 1 ? TURN_GAP : TALK_TAIL);
+    const frames = Math.round(end * fps);
+    const len = (frames - prev) / fps;
+    prev = frames;
+    return len;
+  });
+}
+
+export interface TurnRender { speaker: string; files: string[]; seconds: number }
+
+/** The renders for a multi-speaker scene: one per turn, but neighbouring turns of one speaker are merged while the whole still fits one clip. Or the reason a turn is too long (nothing is cut). */
+export function planTurnRenders(turns: VoiceTurn[]): { renders: TurnRender[]; chunks: number } | { reason: string } {
+  const renders: TurnRender[] = [];
+  for (const t of turns) {
+    const last = renders[renders.length - 1];
+    if (last && spk(last.speaker) === spk(t.speaker) && last.seconds + TURN_GAP + t.seconds <= MAX_TALK_SECONDS) { last.files.push(t.file); last.seconds += TURN_GAP + t.seconds; }
+    else renders.push({ speaker: t.speaker, files: [t.file], seconds: t.seconds });
+  }
+  const long = renders.findIndex(r => planTalking(r.seconds).tooLong);
+  if (long >= 0) return { reason: `${renders[long].speaker || "The narrator"}'s turn (${renders[long].seconds.toFixed(1)} s) is longer than the ${MAX_TALK_SECONDS.toFixed(1)} s one talking clip can carry. Nothing is cut: shorten that speaker's lines or split the scene, then make the voice again.` };
+  return { renders, chunks: renders.reduce((n, r) => n + planTalking(r.seconds).chunks, 0) };
+}
+
+/** The picture for one speaker's turn: the same choice as for a single speaker, as if that person spoke first. Narrator: the scene's first person picture. */
+export function pickTurnPicture(refs: PicRef[], scene: TalkScene, speaker: string, exists: (file: string) => boolean): { ref: PicRef } | { reason: string } {
+  return pickTalkingPicture(refs, { refIds: scene.refIds, cast: scene.cast, lines: speaker.trim() ? [{ speaker, text: "" }] : undefined }, exists);
+}

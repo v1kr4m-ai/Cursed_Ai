@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { MAX_TALK_SECONDS, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingSize, talkingStale, type PicRef } from "../seriesTool/talking";
-import { buildFilter, buildTalkingTrimArgs } from "../seriesTool/ffmpeg";
+import { MAX_TALK_SECONDS, TURN_GAP, isMultiSpeaker, turnsMatchVoice, pieceLengths, planTurnRenders, pickTurnPicture, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingSize, talkingStale, type PicRef } from "../seriesTool/talking";
+import { buildFilter, buildTalkingTrimArgs, buildTalkingPieceArgs, buildTalkingConcatArgs } from "../seriesTool/ffmpeg";
+import { keepVoices } from "../seriesTool/voiceTrack";
 import { unusedTakes } from "../seriesTool/takes";
 import { copyEpisode } from "../src/components/tools/series/EpisodeManager";
 import fs from "fs";
@@ -119,5 +120,65 @@ describe("talking clip bookkeeping", () => {
     const e: any = { id: "e", title: "T", refs: [], scenes: [{ id: "s", number: 1, refIds: [], clipPath: "c", talking: true, talkingClip: "c", clipBeforeTalking: "o", talkingVoice: "v" }] };
     const c = copyEpisode(e).scenes[0];
     expect([c.talking, c.talkingClip, c.clipBeforeTalking, c.talkingVoice]).toEqual([undefined, undefined, undefined, undefined]);
+  });
+});
+
+describe("several speakers in one talking scene", () => {
+  const t = (speaker: string, seconds: number, n = 0) => ({ speaker, seconds, file: `v_t${n}.wav` });
+  it("only turns by 2+ different speakers make a per-turn scene; old scenes (no turns) and one speaker stay as today", () => {
+    expect(isMultiSpeaker(undefined)).toBe(false);
+    expect(isMultiSpeaker([t("Mona", 3), t("mona ", 2, 1)])).toBe(false);
+    expect(isMultiSpeaker([t("Mona", 3), t("Richie", 2, 1)])).toBe(true);
+  });
+  it("one render per turn, in order", () => {
+    const p = planTurnRenders([t("Mona", 3), t("Richie", 2, 1), t("Mona", 4, 2)]) as any;
+    expect(p.renders.map((r: any) => r.speaker)).toEqual(["Mona", "Richie", "Mona"]);
+    expect(p.chunks).toBe(3);
+  });
+  it("merges neighbouring turns of one speaker while the whole fits, with the join gap", () => {
+    const p = planTurnRenders([t("Mona", 3), t("Mona", 2, 1), t("Richie", 2, 2)]) as any;
+    expect(p.renders).toHaveLength(2);
+    expect(p.renders[0].files).toEqual(["v_t0.wav", "v_t1.wav"]);
+    expect(p.renders[0].seconds).toBeCloseTo(5 + TURN_GAP);
+    const long = planTurnRenders([t("Mona", 8), t("Mona", 8, 1), t("Richie", 2, 2)]) as any;
+    expect(long.renders).toHaveLength(3);
+  });
+  it("refuses a turn longer than one clip with the speaker named, cutting nothing", () => {
+    const p = planTurnRenders([t("Mona", 3), t("Richie", MAX_TALK_SECONDS + 0.5, 1)]) as any;
+    expect(p.reason).toMatch(/Richie/);
+    expect(p.renders).toBeUndefined();
+  });
+  it("each speaker gets their own picture; a missing one is refused by name", () => {
+    const refs = [ref("a", { person: "Mona" }), ref("b", { person: "Richie" })];
+    const scene = { refIds: ["a", "b"], lines: [{ speaker: "Mona", text: "hi" }] };
+    expect((pickTurnPicture(refs, scene, "Richie", has) as any).ref.id).toBe("b");
+    expect((pickTurnPicture(refs, scene, "Mona", has) as any).ref.id).toBe("a");
+    expect((pickTurnPicture([ref("a", { person: "Mona" })], { refIds: ["a"] }, "Richie", has) as any).reason).toMatch(/Richie/);
+  });
+  it("piece and concat args: exact length, pieces joined in order", () => {
+    const a = buildTalkingPieceArgs("raw.mp4", "p0.mp4", 3.35);
+    expect(a).toContain("3.35"); expect(a.join(" ")).toContain("tpad"); expect(a[a.length - 1]).toBe("p0.mp4");
+    const c = buildTalkingConcatArgs(["p0.mp4", "p1.mp4"], "out.mp4");
+    expect(c.join(" ")).toContain("[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]");
+    expect(c.indexOf("p0.mp4")).toBeLessThan(c.indexOf("p1.mp4")); expect(c[c.length - 1]).toBe("out.mp4");
+  });
+  it("the kept turns survive a save from the UI", () => {
+    const turns = [t("Mona", 3)];
+    const kept = keepVoices([{ id: "e", scenes: [{ id: "s", voiceTurns: turns }] }], [{ id: "e", scenes: [{ id: "s" }] }]);
+    expect((kept[0].scenes[0] as any).voiceTurns).toEqual(turns);
+  });
+  it("turns belong to the voice only while their lengths plus gaps match the file", () => {
+    const ts = [t("Mona", 3), t("Richie", 2, 1)];
+    expect(turnsMatchVoice(ts, 5.35)).toBe(true);
+    expect(turnsMatchVoice(ts, 5.4)).toBe(true);
+    expect(turnsMatchVoice(ts, 7)).toBe(false);
+    expect(turnsMatchVoice([], 0)).toBe(false);
+  });
+  it("piece cuts land on frames and never drift from the joined voice", () => {
+    const secs = [1.03, 1.03, 1.03, 1.03, 1.03, 1.03];
+    const cuts = pieceLengths(secs);
+    const total = cuts.reduce((a, b) => a + b, 0);
+    expect(Math.abs(total - (secs.reduce((a, b) => a + b, 0) + TURN_GAP * 5 + 0.25))).toBeLessThan(1 / 16);
+    cuts.forEach(c => expect(Math.abs(c * 16 - Math.round(c * 16))).toBeLessThan(1e-9));
   });
 });

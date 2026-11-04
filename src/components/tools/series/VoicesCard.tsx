@@ -5,7 +5,7 @@ import { api, fileUrl, type Episode, type Project } from "./api";
 import { planEpisode, voiceStamp } from "../../../../seriesTool/voiceTrack";
 import { usesAiVoice } from "../../../../seriesTool/voices";
 import { notifyError } from "../../../lib/notify";
-import { isTalking, pickTalkingPicture, talkingStale } from "../../../../seriesTool/talking";
+import { MINUTES_PER_RENDER, isMultiSpeaker, isTalking, pickTalkingPicture, pickTurnPicture, planTurnRenders, talkingStale } from "../../../../seriesTool/talking";
 
 /** Develop: one person's voice sample to copy. Dia uses it for [S1] only (one sample per scene); XTTS uses every person's own. */
 export function VoiceSample({ project, name, onSaved }: { project: Project; name: string; onSaved: (p: Project) => void }) {
@@ -96,9 +96,28 @@ export function VoicesCard({ project, episode, onChanged }: { project: Project; 
     return () => { clearInterval(t); window.removeEventListener("focus", refreshTalk); };
   }, [episode.id, refreshTalk]);
   // The picture is picked on the server with the same function; here it only decides whether the button can work.
-  const noPicture = (id: string) => { const r = pickTalkingPicture(episode.refs, sceneOf(id), () => true); return "reason" in r ? r.reason : ""; };
+  // Several speakers: with XTTS turns each speaker's turn is its own render with their picture; otherwise (Dia, or a voice made before turns were kept) one picture, the first speaker's.
+  const turnPlan = (sc: Episode["scenes"][number]) => (isMultiSpeaker(sc.voiceTurns) ? planTurnRenders(sc.voiceTurns!) : null);
+  const manySpeakers = (sc: Episode["scenes"][number]) => new Set((sc.lines || []).map(l => (l.speaker || "").trim().toLowerCase()).filter(Boolean)).size >= 2;
+  const noPicture = (id: string) => {
+    const sc = sceneOf(id), tp = turnPlan(sc);
+    if (tp) {
+      if ("reason" in tp) return tp.reason;
+      for (const r of tp.renders) { const pr = pickTurnPicture(episode.refs, sc, r.speaker, () => true); if ("reason" in pr) return pr.reason; }
+      return "";
+    }
+    const r = pickTalkingPicture(episode.refs, sc, () => true); return "reason" in r ? r.reason : "";
+  };
+  const renderNote = (sc: Episode["scenes"][number]) => {
+    const tp = turnPlan(sc);
+    if (tp && !("reason" in tp)) return `This scene has several speakers: ${tp.renders.length} renders, one per speaker turn with that speaker's picture, about ${MINUTES_PER_RENDER} minutes each (roughly ${tp.renders.length * MINUTES_PER_RENDER} minutes in all).`;
+    return manySpeakers(sc) ? `Several speakers need XTTS voices (the voice is made per turn, so the turns can be timed): this clip uses one picture, the first speaker's, for the whole scene. 1 render, about ${MINUTES_PER_RENDER} minutes.${xt ? " Make the voice again to keep the turns." : ""}` : "";
+  };
   const makeTalking = async (id: string) => {
-    if (talk?.warning && !window.confirm(`${talk.warning}
+    const note = renderNote(sceneOf(id));
+    if (talk?.warning && !window.confirm(`${talk.warning}${note ? `
+
+${note}` : ""}
 
 Make the talking video for this scene?`)) return;
     setBusy(true);
@@ -154,6 +173,8 @@ Make the talking video for this scene?`)) return;
                     {isTalking(sc) && sc.clipBeforeTalking && <button disabled={working} onClick={() => backToNormal(x.sceneId)} className="rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-40">Back to normal clip</button>}
                     {working && sc.promptId !== undefined && <span className="text-sky-300"><Loader2 size={10} className="mr-1 inline animate-spin" />{sc.status === "queued" ? "waiting for the graphics card" : "making the clip (see the scene card for progress)"}</span>}
                     {why && !working && <span className="text-neutral-500">{why}</span>}
+                    {!why && manySpeakers(sc) && !turnPlan(sc) && <span className="text-amber-300/80">several speakers in one talking clip need XTTS voices (per-turn timing): only the first speaker's picture is used{xt ? "; redo the voice to keep the turns" : ""}</span>}
+                    {!why && !!turnPlan(sc) && <span className="text-neutral-500">{renderNote(sc)}</span>}
                   </>;
                 })()}
               </>}
