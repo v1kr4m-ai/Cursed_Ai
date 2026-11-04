@@ -5,6 +5,7 @@ import { registerLmStudio } from "./lmStudio";
 import { registerSubtitles } from "./seriesTool/subtitles";
 import { registerExport } from "./seriesTool/exportEpisodes";
 import { registerFinish } from "./seriesTool/finish";
+import { registerVoiceTrack } from "./seriesTool/voiceTrackRoutes";
 import { registerTemplates } from "./seriesTool/templates";
 import { registerBackup } from "./seriesTool/backup";
 import { registerMerge } from "./seriesTool/merge";
@@ -1730,6 +1731,7 @@ async function startServer() {
   registerVoice(app, { appRoot: process.cwd(), comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL });
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
+  registerVoiceTrack(app, { projectsRoot: path.join(process.cwd(), "series"), appRoot: process.cwd(), comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerBackup(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerMerge(app, { projectsRoot: path.join(process.cwd(), "series") });

@@ -7,7 +7,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
-import { probeDuration } from "./ffmpeg";
+import { probeDuration, mixedLength } from "./ffmpeg";
 import { upsertOutput } from "./finishCore";
 import { createSeriesStore } from "./store";
 import { buildAss, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan, type Cue, type SubStyle, type Subtitles } from "./subtitlesCore";
@@ -58,6 +58,14 @@ async function geminiTranscribe(key: string, samples: Float32Array): Promise<str
   return (d?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join(" ").trim();
 }
 
+/** A scene's length in the joined episode: its clip, lengthened when a made voice (Dia) outlasts it (see stitch). */
+async function sceneLength(p: { voiceEngine?: string }, s: { clipPath: string | null; durationS: number | null; voiceFile?: string }): Promise<number> {
+  const clip = (await probeDuration(s.clipPath!)) || s.durationS || 7;
+  if (p.voiceEngine !== "dia" || !s.voiceFile || !fs.existsSync(s.voiceFile)) return clip;
+  const voice = await probeDuration(s.voiceFile);
+  return voice ? mixedLength(clip, voice) : clip;
+}
+
 export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
   const store = createSeriesStore(opts.projectsRoot);
   const bad = (res: express.Response, code: number, message: string) => res.status(code).json({ error: message });
@@ -96,7 +104,7 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
     try {
       let offset = 0, from = 0, to = 0;
       for (let i = 0; i <= target; i++) {
-        const dur = (await probeDuration(scenes[i].clipPath!)) || scenes[i].durationS || 7;
+        const dur = await sceneLength(p, scenes[i]);
         if (i === target) { from = offset; to = offset + dur; } else offset += dur;
       }
       const prev: Subtitles = ep.subtitles || { cues: [], style: { ...DEFAULT_SUB_STYLE }, source, updatedAt: "" };
@@ -128,7 +136,7 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
       const cues: Cue[] = [];
       let offset = 0;
       for (const s of scenes) {
-        const dur = (await probeDuration(s.clipPath!)) || s.durationS || 7;
+        const dur = await sceneLength(p, s);
         cues.push(...(await cuesForScene(s, offset, dur, source, style, key)));
         offset += dur;
       }

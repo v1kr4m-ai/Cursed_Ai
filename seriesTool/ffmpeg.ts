@@ -17,31 +17,62 @@ export interface StitchArgs {
   fps: number;
   onLine?: (line: string) => void;
   signal?: AbortSignal;
+  /** Optional spoken voice per clip (same order as `clips`; null = none). Mixed over the clip with its own sound ducked. */
+  voices?: (string | null | undefined)[];
 }
 
-export function buildFilter(count: number, width: number, height: number, fps: number): string {
+/** A clip's own sound is turned down to this while a made voice speaks, so the model's invented speech does not double it. */
+export const DUCK = 0.2;
+/** Silence left after a voice that runs past its clip. */
+export const VOICE_TAIL = 0.25;
+
+/** How long the clip plays when a voice is laid over it: never shorter than the voice, so no speech is cut (the last frame is held). */
+export const mixedLength = (clip: number, voice: number): number => Math.round(Math.max(clip, voice + VOICE_TAIL) * 1000) / 1000;
+
+/**
+ * `voices[i]` (optional): this clip gets the voice from input `input` (inputs after the clips). The voice (Dia's files are very quiet, so it is loudness-normalised) is laid over the clip with
+ * the clip's own sound at DUCK; if the voice outlasts the clip, the last frame is held and the sound padded so nothing is cut.
+ */
+export type ClipVoice = { input: number; clip: number; voice: number } | null | undefined;
+
+export function buildFilter(count: number, width: number, height: number, fps: number, voices?: ClipVoice[]): string {
   let filter = "";
   for (let i = 0; i < count; i++) {
+    const v = voices?.[i];
+    const total = v ? mixedLength(v.clip, v.voice) : 0;
+    const hold = v && total > v.clip + 0.01 ? `,tpad=stop_mode=clone:stop_duration=${Math.round((total - v.clip) * 1000) / 1000}` : "";
     filter += `[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`;
-    filter += `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${i}];`;
-    filter += `[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}];`;
+    filter += `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}${hold}[v${i}];`;
+    if (v) {
+      const std = "aresample=48000,aformat=channel_layouts=stereo";
+      filter += `[${i}:a]${std},volume=${DUCK},apad=whole_dur=${total}[c${i}];[${v.input}:a]${std},loudnorm=I=-16:TP=-1.5:LRA=11,apad=whole_dur=${total}[s${i}];`;
+      filter += `[c${i}][s${i}]amix=inputs=2:duration=longest:normalize=0,atrim=duration=${total}[a${i}];`;
+    } else filter += `[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}];`;
   }
   for (let i = 0; i < count; i++) filter += `[v${i}][a${i}]`;
   filter += `concat=n=${count}:v=1:a=1[v][a]`;
   return filter;
 }
 
-export function stitch(a: StitchArgs): Promise<string> {
-  if (!a.clips.length) return Promise.reject(new Error("No finished clips to join yet."));
+export async function stitch(a: StitchArgs): Promise<string> {
+  if (!a.clips.length) throw new Error("No finished clips to join yet.");
   for (const clip of a.clips) {
-    if (!fs.existsSync(clip)) return Promise.reject(new Error(`Missing clip: ${path.basename(clip)}`));
+    if (!fs.existsSync(clip)) throw new Error(`Missing clip: ${path.basename(clip)}`);
   }
 
   fs.mkdirSync(path.dirname(a.outFile), { recursive: true });
   const args = ["-y"];
   for (const clip of a.clips) args.push("-i", clip);
+  const mixes: ClipVoice[] = [];
+  let next = a.clips.length;
+  const withVoice = a.voices?.some((f, i) => f && i < a.clips.length && fs.existsSync(f));
+  const lengths = withVoice ? await Promise.all(a.clips.map((c, i) => (a.voices?.[i] && fs.existsSync(a.voices[i]!) ? Promise.all([probeDuration(c), probeDuration(a.voices[i]!)]) : null))) : [];
+  a.clips.forEach((_c, i) => {
+    const l = lengths[i], f = a.voices?.[i];
+    if (l && l[0] && l[1] && f) { args.push("-i", f); mixes[i] = { input: next++, clip: l[0], voice: l[1] }; }
+  });
   args.push(
-    "-filter_complex", buildFilter(a.clips.length, a.width, a.height, a.fps),
+    "-filter_complex", buildFilter(a.clips.length, a.width, a.height, a.fps, mixes),
     "-map", "[v]", "-map", "[a]",
     "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",

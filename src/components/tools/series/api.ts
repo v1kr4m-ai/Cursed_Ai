@@ -18,7 +18,7 @@ export interface Ref {
 
 export interface Scene {
   id: string; number: number; vo: string; lines?: { speaker?: string; text: string }[]; shot: string; textCard: string;
-  refIds: string[]; cast?: string[]; seed: number; promptText: string; promptEdited: boolean;
+  refIds: string[]; cast?: string[]; voiceFile?: string; voiceText?: string; seed: number; promptText: string; promptEdited: boolean;
   status: Status; clipPath: string | null; durationS: number | null;
   promptId: string | null; error: string | null;
 }
@@ -63,7 +63,9 @@ export interface Project {
   allowTextCards?: boolean;
   stillPeople?: string[];
   /** Optional own voice per person, keyed by name (seriesTool/voices.ts). */
-  people?: Record<string, { voice?: string }>;
+  people?: Record<string, { voice?: string; refAudio?: string; refText?: string }>;
+  /** "model" (default): the video model speaks. "dia": the local Dia voice is made in Produce and mixed in when joining. */
+  voiceEngine?: "model" | "dia";
   episodeSeconds?: number;
   bible?: { characters: string; places: string; rules: string; extra: string };
   creativity?: number;

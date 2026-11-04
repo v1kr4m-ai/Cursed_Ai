@@ -46,6 +46,9 @@ export interface Scene {
   lines?: SceneLine[];
   /** The people who appear in this scene, by name; their pictures lead the reference order. */
   cast?: string[];
+  /** The scene's spoken voice made by the local Dia voice (voiceEngine "dia"), and the script it was made from. */
+  voiceFile?: string;
+  voiceText?: string;
   seed: number;
   /** The assembled prompt actually sent to ComfyUI. Editable - regenerating does not overwrite edits. */
   promptText: string;
@@ -146,6 +149,8 @@ export interface Project {
   voice?: string;
   /** Optional own voice per person of the series, keyed by name; a person without one speaks with `voice`. */
   people?: PeopleVoices;
+  /** Who speaks: the video model's own voice ("model", the default) or the local Dia voice, made in Produce and mixed in at the join. */
+  voiceEngine?: "model" | "dia";
   /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
   allowTextCards?: boolean;
   /** People who get a picture generated from their photos. Everyone else appears as their own photo, used as it is. */

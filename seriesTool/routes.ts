@@ -731,6 +731,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     try {
       await stitch({
         clips: ordered.map(s => s.clipPath!),
+        // Made voices (voiceEngine "dia") go over their clips, which are turned down so the model's own speech does not double them.
+        voices: p.voiceEngine === "dia" ? ordered.map(s => s.voiceFile) : undefined,
         outFile,
         width: p.settings.width,
         height: p.settings.height,

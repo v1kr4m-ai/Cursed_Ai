@@ -17,7 +17,7 @@ const MIME: Record<string, string> = { ".wav": "audio/wav", ".mp3": "audio/mpeg"
 
 export interface DiaJob {
   text: string; output: string; referenceAudio?: string; referenceText?: string;
-  seed?: number; cfgScale?: number; temperature?: number;
+  seed?: number; cfgScale?: number; temperature?: number; maxTokens?: number;
 }
 
 /** The job file handed to dia_run.py: blank or invalid numbers are left out so the script's defaults apply. */
@@ -30,21 +30,28 @@ export function buildDiaJob(r: DiaJob): Record<string, unknown> {
     ...(num(r.seed) !== undefined ? { seed: Math.trunc(r.seed!) } : {}),
     ...(num(r.cfgScale) ? { cfgScale: r.cfgScale } : {}),
     ...(num(r.temperature) ? { temperature: r.temperature } : {}),
+    ...(num(r.maxTokens) && r.maxTokens! > 0 ? { maxTokens: Math.trunc(r.maxTokens!) } : {}),
   };
 }
 
-export function registerVoice(app: express.Express, opts: VoiceOptions) {
-  const root = path.join(opts.appRoot, "voice", "dia");
+/** Where Dia lives and what is missing from it; also used by the Series voice. */
+export function diaSetup(appRoot: string) {
+  const root = path.join(appRoot, "voice", "dia");
   const python = path.join(root, "env", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
-  const script = path.join(opts.appRoot, "trainTool", "scripts", "dia_run.py");
-  const outDir = path.join(opts.appRoot, "outputs", "voice");
-  const results = () => { try { return fs.readdirSync(outDir).filter(n => AUDIO_RE.test(n) && n.startsWith("dia_")).map(n => path.join(outDir, n)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs).slice(0, 60); } catch { return []; } };
+  const script = path.join(appRoot, "trainTool", "scripts", "dia_run.py");
   const missing = () => [
     !exists(python) && "its Python environment (voice/dia/env)",
     !exists(path.join(root, "code", "dia", "model.py")) && "the Dia code (voice/dia/code)",
     !exists(path.join(root, "hf", "hub", "models--nari-labs--Dia-1.6B-0626")) && "the Dia weights (voice/dia/hf)",
     !exists(path.join(root, "dac")) && "the audio codec weights (voice/dia/dac)",
   ].filter(Boolean) as string[];
+  return { root, python, script, missing };
+}
+
+export function registerVoice(app: express.Express, opts: VoiceOptions) {
+  const { python, script, missing } = diaSetup(opts.appRoot);
+  const outDir = path.join(opts.appRoot, "outputs", "voice");
+  const results = () => { try { return fs.readdirSync(outDir).filter(n => AUDIO_RE.test(n) && n.startsWith("dia_")).map(n => path.join(outDir, n)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs).slice(0, 60); } catch { return []; } };
 
   app.get("/api/voice/status", (_req, res) => {
     const m = missing();
@@ -53,6 +60,7 @@ export function registerVoice(app: express.Express, opts: VoiceOptions) {
 
   app.post("/api/voice/dia/start", async (req, res) => {
     if (isRunning("dia")) return res.status(409).json({ error: "Dia is already speaking." });
+    if (isRunning("seriesvoice")) return res.status(409).json({ error: "Dia is busy making a series' voices." });
     const b = req.body || {};
     const text = String(b.text || "").trim();
     if (!text) return res.status(400).json({ error: "Type the text to speak first." });

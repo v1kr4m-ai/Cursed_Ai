@@ -22,6 +22,7 @@ import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type St
 /** Same file, whatever the slashes or letter case (Windows paths). */
 const sameFile = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
 import { RefDrop } from "./RefDrop";
+import { VoicesCard } from "./VoicesCard";
 import { isWholePerson, newRef, renameRef } from "./refRename";
 
 /**
@@ -622,6 +623,7 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                     </div>
                     <div className="space-y-2">
                       <h4 className="text-[11px] uppercase tracking-wide text-neutral-500">Scenes{onlyTodo ? " that need work" : ""}</h4>
+                      {project.voiceEngine === "dia" && <VoicesCard project={project} episode={ep} onChanged={onChanged} />}
                       {onlyTodo && !ep.scenes.some(s => s.status !== "done") && <p className="text-xs text-emerald-300">All clips of this episode are done.</p>}
                       <SceneList project={project} episode={ep} scenes={[...ep.scenes].sort((a, b) => a.number - b.number).filter(s => !onlyTodo || s.status !== "done")} running={running} onChanged={onChanged} />
                     </div>

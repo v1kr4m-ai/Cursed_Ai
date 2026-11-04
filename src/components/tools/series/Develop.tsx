@@ -4,6 +4,7 @@ import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNot
 import { SERIES_FORMATS, VOICE_TAGS, projectFormat, setVoiceMode, tagList, toggleTag, voiceParts, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
 import { goProduceBlockedWhy } from "./developSteps";
+import { VoiceEnginePicker, VoiceSample } from "./VoicesCard";
 import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
@@ -348,7 +349,7 @@ export function Develop({ project, modelId, models, onSaved, focusAdd, onGoProdu
   /** Builds a training dataset from one person's photos, then opens Train LoRA with it chosen and the trigger word filled in. */
   const setPersonVoice = async (name: string, voice: string) => {
     const people = { ...(project.people || {}), [name]: { ...(project.people?.[name] || {}), voice: voice.trim() } };
-    if (!voice.trim()) delete people[name];
+    if (!voice.trim()) { delete (people[name] as any).voice; if (!Object.keys(people[name]).length) delete people[name]; }
     if (JSON.stringify(people) !== JSON.stringify(project.people || {})) onSaved(await api.patch(project.id, { people }));
   };
   const trainPerson = async (name: string) => {
@@ -820,6 +821,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
               {voiceParts(project.voice).tags.length > 0 && <button onClick={async () => onSaved(await api.patch(project.id, { voice: setVoiceMode("", voiceParts(project.voice).mode), ...threadPatch(messages) }))} className="text-[11px] text-neutral-500 hover:text-neutral-200">Clear voice tags</button>}
             </div>
           </div>
+          <VoiceEnginePicker project={project} onSaved={onSaved} />
           <p className="text-[11px] leading-relaxed text-neutral-500">{fmt.blurb} Each scene has one <span className="text-neutral-300">{fmt.lineLabel.toLowerCase()}</span>. Change the style, then build the plan again (renders you already made are kept).</p>
           {PHOTO_STYLES[fmt.id] && (
             <div className="space-y-1.5 rounded-lg border border-sky-900/50 bg-sky-950/20 p-2.5 text-[11px] leading-relaxed text-sky-200/80">
@@ -1020,6 +1022,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
                   <div className="flex flex-wrap gap-1">
                     {VOICE_TAGS.map(t => <button key={t} onClick={() => setPersonVoice(person.name, toggleVoiceWord(personVoice(project.people, person.name), t))} className={"rounded-full border px-2 py-0.5 text-[10px] transition " + ((personVoice(project.people, person.name) || "").split(/,\s*/).includes(t) ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-500 hover:text-neutral-200 hover:border-neutral-500")}>{t}</button>)}
                   </div>
+                  {project.voiceEngine === "dia" && <VoiceSample project={project} name={person.name} onSaved={onSaved} />}
                 </div>
                 </React.Fragment>
               ))}

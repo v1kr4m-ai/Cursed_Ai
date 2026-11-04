@@ -3,7 +3,8 @@
  * `lines` behave exactly as before (one project voice, one `vo` line per scene).
  */
 export interface SceneLine { speaker?: string; text: string }
-export type PeopleVoices = Record<string, { voice?: string }>;
+/** `refAudio`/`refText`: an optional voice sample (and what it says) the local Dia voice copies. */
+export type PeopleVoices = Record<string, { voice?: string; refAudio?: string; refText?: string }>;
 
 const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 

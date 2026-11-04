@@ -21,12 +21,12 @@
 - Chat replies terse (caveman); code, commits, README normal prose.
 
 ## Backlog
-1. Dia voice tab in Audio Studio (in progress).
-2. Series 7: references after the episode plan + a final button to Produce.
-3. Series 8: several characters / several voices per project (existing projects must keep loading).
-4. Series 9: multi-select tags in Look and Voice.
-5. Series 10: renamable / addable placeholders in Produce.
-6. XTTS-v2 download (1.8 GB) for Hindi voices - ask first.
+1. XTTS-v2 download (1.8 GB) for Hindi voices - ask first.
+2. Wan 2.2 speech-to-video "talking video" button per scene (Dia audio + character picture).
+3. Dia: listen-test voices; trim trailing babble; clone test with a real sample.
+4. Ollama_Claude: optional "remove sessions of missing folders" (deletes transcripts - ask first).
+5. Video-model prompt still asks the model to speak when voiceEngine=dia (its speech is only ducked).
 
 ## Done log
 - 2026-11-04: Pinokio removed (trainer in-app), 64.7 GB models set aside, workflow notes added, Face Swap page (commit after 4a3ca82).
+- 2026-11-04: Dia voice tab (Audio Studio), Series 7-10, Series Dia voices step, Ollama_Claude hides sessions of deleted folders. Workflow: sonnet builds, opus reviews risky diffs.

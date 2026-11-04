@@ -11,6 +11,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { keepVoices } from "./voiceTrack";
 import {
   DEFAULT_SETTINGS, DEFAULT_STYLE_LOCK, DEFAULT_VOICE_LOCK,
   newId, type Project,
@@ -85,6 +86,7 @@ export function createSeriesStore(root: string) {
     patch(id: string, changes: Partial<Project>): Project | null {
       const p = this.get(id);
       if (!p) return null;
+      if (changes.episodes) changes = { ...changes, episodes: keepVoices(p.episodes, changes.episodes) };
       return write({ ...p, ...changes, id: p.id, dir: p.dir, createdAt: p.createdAt });
     },
 
