@@ -12,6 +12,7 @@ export interface WorkflowInfo {
   warnings: string[];
   needsAssignment: string[];
   needsPrompt: boolean;
+  builtInPrompt?: string;
   outputKind: "image" | "video" | "audio" | "3d";
   refImageCount: number; refVideoCount: number; refAudioCount: number;
   refImageLabels: string[]; refVideoLabels: string[]; refAudioLabels: string[];

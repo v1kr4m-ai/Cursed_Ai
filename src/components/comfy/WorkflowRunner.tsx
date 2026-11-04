@@ -390,7 +390,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const otherFields = wf ? wf.fields.filter(f => !f.role && !f.group && !promptTexts.includes(f) && !exprFields.includes(f)) : [];
   const promptKey = wf?.promptKeys?.[0] && wf.promptKeys[0] !== "text" ? wf.promptKeys[0] : "";
   const promptTitle = promptKey ? promptKey.replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "Prompt";
-  const promptHint = /tags|genre|style/i.test(promptKey) ? "Style tags: genre, mood, instruments, voice, tempo (e.g. upbeat pop, female vocals, acoustic guitar, 120 bpm)" : promptKey ? `${promptTitle}...` : undefined;
+  const promptHint = wf?.builtInPrompt?.trim() ? `Leave empty to use the workflow's own prompt: "${wf.builtInPrompt.trim().slice(0, 90)}${wf.builtInPrompt.trim().length > 90 ? "..." : ""}"` : /tags|genre|style/i.test(promptKey) ? "Style tags: genre, mood, instruments, voice, tempo (e.g. upbeat pop, female vocals, acoustic guitar, 120 bpm)" : promptKey ? `${promptTitle}...` : undefined;
   // Every other value of every node, grouped by node, for full control (folded away by default).
   const allFields = wf ? wf.fields.filter(f => !f.role && f.group && !exprFields.includes(f)) : [];
   const [allQuery, setAllQuery] = React.useState("");
@@ -445,7 +445,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
 
   const missingRefs = wf ? (["image", "video", "audio"] as const).flatMap(t => slots[t].map((p, i) => ({ t, i, p, bypass: !!wf[`ref${t[0].toUpperCase()}${t.slice(1)}Bypassable` as "refImageBypassable"][i] })).filter(r => !r.p && (!r.bypass || !skip[t][r.i]))) : [];
   const canRunBase = !!wf && wf.isRunnable && missingRefs.length === 0 && wf.needsAssignment.length === 0;
-  const canRun = canRunBase && !queuing && (!wf!.needsPrompt || prompt.trim().length > 0);
+  const canRun = canRunBase && !queuing && (!wf!.needsPrompt || prompt.trim().length > 0 || !!wf!.builtInPrompt?.trim());
 
   const watch = (id: string) => {
     esRef.current?.close();
@@ -882,7 +882,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               {busy && <button onClick={cancel} title="Cancel the running job" className="px-3.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-colors"><Square size={14} className="fill-current" /></button>}
             </div>
             {batch.length > 1 && <button onClick={() => submit(batch)} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors">{queuing ? "Queuing..." : `Run all ${batch.length} prompts${count > 1 ? ` ×${count}` : ""}`}</button>}
-            {wf?.isRunnable && (wf.needsPrompt && !prompt.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""} (or bypass optional ones).</p> : null)}
+            {wf?.isRunnable && (wf.needsPrompt && !prompt.trim() && !wf.builtInPrompt?.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""} (or bypass optional ones).</p> : null)}
           </div>
         </div>
         </ReorderGroup>

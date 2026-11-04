@@ -57,7 +57,8 @@ export function injectWorkflow(a: InjectArgs): Json {
     if (got.length !== needed.length) throw new Error(`expected ${needed.length} ${noun}(s), got ${got.length}`);
   }
   const result: Json = JSON.parse(JSON.stringify(a.workflow));
-  if (info.promptNodeId !== null) for (const key of info.promptKeys) result[info.promptNodeId].inputs[key] = a.promptText;
+  // An empty prompt keeps the workflow's own (a workflow can come with its prompt written in).
+  if (info.promptNodeId !== null && a.promptText.trim()) for (const key of info.promptKeys) result[info.promptNodeId].inputs[key] = a.promptText;
 
   for (const [ids, names, defaultKey] of [[info.refImageNodeIds, a.refImageFilenames, "image"], [info.refVideoNodeIds, video, "video"], [info.refAudioNodeIds, audio, "audio"]] as const) {
     ids.forEach((nodeId, i) => {

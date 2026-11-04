@@ -53,6 +53,8 @@ export interface WorkflowInfo {
   /** Node types the workflow uses that this ComfyUI does not have (custom nodes to install). */
   missingNodes: string[];
   needsPrompt: boolean;
+  /** The prompt written into the workflow itself, used when the prompt box is left empty. */
+  builtInPrompt: string;
   outputKind: OutputKind;
   fields: WorkflowField[];
   warnings: string[];
@@ -67,7 +69,7 @@ const blank = (name: string, p: string): WorkflowInfo => ({
   name, path: p, refImageCount: 0, isRunnable: false, missing: [], promptNodeId: null, outputNodeId: null,
   refImageNodeIds: [], refVideoCount: 0, refVideoNodeIds: [], refAudioCount: 0, refAudioNodeIds: [], refKeys: {},
   refImageLabels: [], refVideoLabels: [], refAudioLabels: [], refImageBypassable: [], refVideoBypassable: [], refAudioBypassable: [],
-  promptKeys: ["text"], missingNodes: [], needsPrompt: true, outputKind: "image", fields: [], warnings: [], needsAssignment: [],
+  promptKeys: ["text"], missingNodes: [], needsPrompt: true, builtInPrompt: "", outputKind: "image", fields: [], warnings: [], needsAssignment: [],
   promptCandidates: [], outputCandidates: [], workflowGroupCount: 0,
 });
 const unusable = (name: string, p: string, reason: string): WorkflowInfo => ({ ...blank(name, p), missing: [reason] });
@@ -307,6 +309,7 @@ export function loadWorkflowInfo(file: string, overrides: Overrides = {}, object
     promptKeys,
     missingNodes: [...missingNodes].sort(),
     needsPrompt: promptInId !== null,
+    builtInPrompt: promptInId !== null && typeof graph[promptInId]?.inputs?.[promptKeys[0]] === "string" ? graph[promptInId].inputs[promptKeys[0]] : "",
     outputKind: outputId ? outputKindOf(String(graph[outputId].class_type || "")) : "image",
     fields: describeFields(graph, promptInId, negativeId, scope, objectInfo),
     warnings,
