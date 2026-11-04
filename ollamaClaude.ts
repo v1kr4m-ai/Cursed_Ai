@@ -319,6 +319,11 @@ export function registerOllamaClaude(app: express.Express, opts: OllamaClaudeOpt
 
   /** Every folder with Claude Code sessions, for the folder tree. */
   app.get("/api/oclaude/folders", (_req, res) => res.json({ folders: listFolders() }));
+  /** Which of these folders are gone from the disk (a deleted project): the sidebar hides their sessions. */
+  app.post("/api/oclaude/missing", (req, res) => {
+    const paths: string[] = Array.isArray(req.body?.paths) ? req.body.paths.filter((p: unknown) => typeof p === "string").slice(0, 500) : [];
+    res.json({ missing: paths.filter(p => !fs.existsSync(p)) });
+  });
   app.delete("/api/oclaude/history/:id", (req, res) => {
     if (!deleteSession(String(req.query.cwd || ""), req.params.id)) return res.status(404).json({ error: "That session was not found in this folder." });
     res.json({ ok: true });

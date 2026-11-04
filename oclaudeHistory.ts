@@ -73,12 +73,12 @@ export function cwdOf(lines: string[]): string | null {
   return null;
 }
 
-/** Every folder Claude Code has sessions in, newest first, with how many. Temporary folders are left out. */
-export function listFolders(home = os.homedir()): { cwd: string; count: number; updatedAt: number }[] {
+/** Every folder Claude Code has sessions in, newest first, with how many and whether the folder still exists. Temporary folders are left out. */
+export function listFolders(home = os.homedir()): { cwd: string; count: number; updatedAt: number; exists: boolean }[] {
   const root = path.join(home, ".claude", "projects");
   let dirs: string[];
   try { dirs = fs.readdirSync(root); } catch { return []; }
-  const out: { cwd: string; count: number; updatedAt: number }[] = [];
+  const out: { cwd: string; count: number; updatedAt: number; exists: boolean }[] = [];
   for (const d of dirs) {
     const dir = path.join(root, d);
     let files: { f: string; t: number }[];
@@ -94,7 +94,7 @@ export function listFolders(home = os.homedir()): { cwd: string; count: number; 
       if (cwd) break;
     }
     if (!cwd || /[\\/](temp|tmp)[\\/]/i.test(cwd)) continue;
-    out.push({ cwd, count: files.length, updatedAt: files[0].t });
+    out.push({ cwd, count: files.length, updatedAt: files[0].t, exists: fs.existsSync(cwd) });
   }
   return out.sort((a, b) => b.updatedAt - a.updatedAt);
 }

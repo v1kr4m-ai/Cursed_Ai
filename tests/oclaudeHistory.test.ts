@@ -46,7 +46,14 @@ describe("a folder's Claude Code sessions", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
     const put = (cwd: string, id: string) => { const d = projectDirFor(cwd, home); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, id + ".jsonl"), line({ type: "user", cwd, message: { content: "hi" } })); };
     put("C:/work/shop", "a"); put("C:/work/shop", "b"); put("C:/Users/me/AppData/Local/Temp/x", "c");
-    expect(listFolders(home)).toEqual([expect.objectContaining({ cwd: "C:/work/shop", count: 2 })]);
+    expect(listFolders(home)).toEqual([expect.objectContaining({ cwd: "C:/work/shop", count: 2, exists: false })]);
+  });
+  it("says whether a folder still exists", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+    const real = process.cwd(); // a folder that exists and is not a temporary one
+    const d = projectDirFor(real, home); fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, "a.jsonl"), line({ type: "user", cwd: real, message: { content: "hi" } }));
+    expect(listFolders(home)).toEqual([expect.objectContaining({ cwd: real, exists: true })]);
   });
 });
 

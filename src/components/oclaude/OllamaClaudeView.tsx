@@ -299,10 +299,20 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
       ...history.filter(h => !known.has(h.id)).map(h => ({ key: "cc-" + h.id, title: h.title, updatedAt: h.updatedAt, claudeId: h.id })),
     ].sort((a, b) => b.updatedAt - a.updatedAt);
   })();
-  const [treeFolders, setTreeFolders] = React.useState<{ cwd: string; count: number; updatedAt: number }[]>([]);
+  const [treeFolders, setTreeFolders] = React.useState<{ cwd: string; count: number; updatedAt: number; exists?: boolean }[]>([]);
+  /** Folders that no longer exist (a deleted project) are hidden from the tree unless asked for. */
+  const [gone, setGone] = React.useState<string[]>([]);
+  const [showGone, setShowGone] = React.useState(false);
+  const [folderTick, setFolderTick] = React.useState(0);
   const [treeSessions, setTreeSessions] = React.useState<Record<string, { id: string; title: string; updatedAt: number }[]>>({});
   const [openFolders, setOpenFolders] = React.useState<string[]>(() => { try { return JSON.parse(localStorage.getItem("cursed.oclaude.openFolders") || "[]"); } catch { return []; } });
-  React.useEffect(() => { fetch("/api/oclaude/folders").then(r => r.json()).then(d => setTreeFolders(d.folders || [])).catch(() => {}); }, [running]);
+  React.useEffect(() => { fetch("/api/oclaude/folders").then(r => r.json()).then(d => setTreeFolders(d.folders || [])).catch(() => {}); }, [running, folderTick]);
+  const folderKey = [...new Set([...sessions.map(s => s.cwd), ...treeFolders.map(f => f.cwd)].filter(Boolean))].sort().join("|");
+  React.useEffect(() => {
+    if (!folderKey) { setGone([]); return; }
+    fetch("/api/oclaude/missing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: folderKey.split("|") }) }).then(r => r.json()).then(d => setGone(d.missing || [])).catch(() => {});
+  }, [folderKey, folderTick]);
+  const isGone = (cwd: string) => gone.some(g => same(g, cwd));
   const loadFolder = (cwd: string) => fetch("/api/oclaude/history?cwd=" + encodeURIComponent(cwd)).then(r => r.json()).then(d => setTreeSessions(m => ({ ...m, [cwd]: d.sessions || [] }))).catch(() => {});
   const toggleFolder = (cwd: string) => {
     const next = openFolders.includes(cwd) ? openFolders.filter(x => x !== cwd) : [...openFolders, cwd];
@@ -328,7 +338,7 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
       ].sort((a, b) => b.updatedAt - a.updatedAt).filter(e => !q || e.title.toLowerCase().includes(q) || f.cwd.toLowerCase().includes(q));
       const name = f.cwd.split(/[\\/]/).filter(Boolean).pop() || f.cwd;
       return { ...f, name, entries, total: Math.max(f.count + mine.filter(s => !s.claudeSessionId).length, entries.length) };
-    }).filter(f => !q || f.entries.length || f.cwd.toLowerCase().includes(q));
+    }).filter(f => (showGone || !isGone(f.cwd)) && (!q || f.entries.length || f.cwd.toLowerCase().includes(q)));
   })();
   /** Opens a session from the folder list; one Claude Code made elsewhere is brought in with its conversation and continues where it stopped. */
   const [rowMenu, setRowMenu] = React.useState<string | null>(null);
@@ -464,6 +474,10 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input value={sessionQuery} onChange={e => setSessionQuery(e.target.value)} placeholder="Search" className="w-full rounded-xl bg-transparent py-2 pl-8 pr-2 text-sm text-zinc-200 placeholder:text-zinc-500 hover:bg-white/5 focus:bg-white/5 focus:outline-none" />
+            </div>
+            <div className="flex items-center gap-1 px-1 text-[11px] text-zinc-500">
+              <button onClick={() => setFolderTick(n => n + 1)} title="Check the folders again: sessions of folders you deleted drop out of the list" className="flex items-center gap-1 rounded-lg px-1.5 py-1 hover:bg-white/5 hover:text-zinc-300"><RefreshCw size={11} />Refresh</button>
+              {gone.length > 0 && <button onClick={() => setShowGone(v => !v)} className="rounded-lg px-1.5 py-1 hover:bg-white/5 hover:text-zinc-300">{showGone ? "Hide" : "Show"} {gone.length} missing {gone.length === 1 ? "folder" : "folders"}</button>}
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
