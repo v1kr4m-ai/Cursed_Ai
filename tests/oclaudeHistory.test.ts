@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { itemsOf, listFolders, listSessions, projectDirFor, readSession, titleOf } from "../oclaudeHistory";
+import { deleteSession, itemsOf, listFolders, listSessions, projectDirFor, readSession, titleOf } from "../oclaudeHistory";
 
 const line = (o: any) => JSON.stringify(o);
 
@@ -47,5 +47,19 @@ describe("a folder's Claude Code sessions", () => {
     const put = (cwd: string, id: string) => { const d = projectDirFor(cwd, home); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, id + ".jsonl"), line({ type: "user", cwd, message: { content: "hi" } })); };
     put("C:/work/shop", "a"); put("C:/work/shop", "b"); put("C:/Users/me/AppData/Local/Temp/x", "c");
     expect(listFolders(home)).toEqual([expect.objectContaining({ cwd: "C:/work/shop", count: 2 })]);
+  });
+});
+
+describe("deleteSession", () => {
+  it("removes one session's transcript of a folder, and refuses odd ids", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+    const cwd = path.join(home, "work");
+    const dir = projectDirFor(cwd, home);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "abc-123.jsonl"), "{}\n");
+    expect(deleteSession(cwd, "../escape", home)).toBe(false);
+    expect(deleteSession(cwd, "abc-123", home)).toBe(true);
+    expect(fs.existsSync(path.join(dir, "abc-123.jsonl"))).toBe(false);
+    expect(deleteSession(cwd, "abc-123", home)).toBe(false);
   });
 });

@@ -331,6 +331,17 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     }).filter(f => !q || f.entries.length || f.cwd.toLowerCase().includes(q));
   })();
   /** Opens a session from the folder list; one Claude Code made elsewhere is brought in with its conversation and continues where it stopped. */
+  const [rowMenu, setRowMenu] = React.useState<string | null>(null);
+  /** Deletes a session from the tree: this app's own, or one Claude Code saved for that folder (its transcript file). */
+  const deleteEntry = async (e: FolderEntry) => {
+    if (!confirm(`Delete the session "${e.title}"? Its conversation is removed (files it changed stay changed).`)) return;
+    if (e.app) removeSession(e.app.id);
+    if (e.claudeId && e.cwd) {
+      const r = await fetch(`/api/oclaude/history/${encodeURIComponent(e.claudeId)}?cwd=${encodeURIComponent(e.cwd)}`, { method: "DELETE" });
+      if (!r.ok && !e.app) { notifyError((await r.json().catch(() => ({}))).error || "Could not delete that session."); return; }
+      loadFolder(e.cwd);
+    }
+  };
   const resumeEntry = async (e: FolderEntry) => {
     setSessionsOpen(false);
     if (e.app) { setPrefs({ activeId: e.app.id }); return; }
@@ -460,9 +471,9 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
               const open = openFolders.includes(f.cwd) || !!sessionQuery.trim();
               return (
                 <div key={f.cwd} className="mb-1">
-                  <button onClick={() => toggleFolder(f.cwd)} title={f.cwd} className={cn("group flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[12px] hover:bg-white/5", same(f.cwd, session.cwd) ? "text-zinc-200" : "text-zinc-400")}>
+                  <button onClick={() => toggleFolder(f.cwd)} title={f.cwd} className={cn("group flex w-full items-center gap-1.5 rounded-lg bg-amber-400/[0.06] px-2 py-1.5 text-left text-[12px] hover:bg-amber-400/[0.12]", same(f.cwd, session.cwd) ? "text-amber-200" : "text-amber-300/80")}>
                     <ChevronDown size={12} className={cn("shrink-0 transition-transform", !open && "-rotate-90")} />
-                    <FolderOpen size={13} className="shrink-0 text-zinc-500" />
+                    <FolderOpen size={13} className="shrink-0 text-amber-400" />
                     <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
                     {f.total > 0 && <span className="shrink-0 text-[10px] text-zinc-600">{f.total}</span>}
                     <span role="button" tabIndex={0} onClick={ev => { ev.stopPropagation(); startNew(f.cwd); }} title={`New session in ${f.name}`} className="hidden shrink-0 rounded p-0.5 text-zinc-500 hover:text-white group-hover:block"><Plus size={12} /></span>
@@ -472,7 +483,19 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
                       {f.entries.map(e => (
                         <div key={e.key} className={cn("group flex items-center rounded-lg", e.app?.id === session.id ? "bg-white/10" : "hover:bg-white/5")}>
                           <button onClick={() => resumeEntry(e)} title={`${e.title}\n${ago(e.updatedAt)}${e.claudeId ? " - made in Claude Code, opens here and continues" : ""}`} className={cn("min-w-0 flex-1 truncate px-2 py-1.5 text-left text-[13px]", e.app?.id === session.id ? "text-white" : e.claudeId ? "text-zinc-400" : "text-zinc-300")}>{e.title}</button>
-                          {e.app && <button onClick={() => { if (confirm(`Delete the session "${e.title}"?`)) removeSession(e.app!.id); }} title="Delete" className="mr-1 hidden rounded p-1 text-zinc-500 hover:text-rose-400 group-hover:block"><Trash2 size={12} /></button>}
+                          <div className="relative">
+                            <button onClick={() => setRowMenu(rowMenu === e.key ? null : e.key)} title="More" className={cn("mr-1 rounded p-1 text-zinc-500 hover:text-white", rowMenu === e.key ? "block" : "hidden group-hover:block")}><MoreVertical size={13} /></button>
+                            {rowMenu === e.key && (
+                              <>
+                                <div className="fixed inset-0 z-30" onClick={() => setRowMenu(null)} />
+                                <div className="absolute right-0 top-full z-40 mt-1 w-36 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 py-1 text-[12px] shadow-2xl">
+                                  <button onClick={() => { setRowMenu(null); resumeEntry(e); }} className="block w-full px-3 py-1.5 text-left text-zinc-200 hover:bg-white/10">Open</button>
+                                  {e.app && <button onClick={() => { setRowMenu(null); const t = window.prompt("Rename this session", e.title); if (t?.trim()) update(e.app!.id, x => ({ ...x, title: t.trim().slice(0, 80) })); }} className="block w-full px-3 py-1.5 text-left text-zinc-200 hover:bg-white/10">Rename</button>}
+                                  <button onClick={() => { setRowMenu(null); deleteEntry(e); }} className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-rose-300 hover:bg-rose-500/10"><Trash2 size={12} />Delete</button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       ))}
                       {!f.entries.length && <p className="px-2 py-1 text-[11px] text-zinc-600">{treeSessions[f.cwd] ? "No sessions." : "Loading..."}</p>}
@@ -494,6 +517,7 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <button onClick={() => setPrefs({ rightPane: !prefs.rightPane })} title={prefs.rightPane ? "Hide the details" : "Show the details"} className="hidden p-2 text-zinc-500 transition-colors hover:text-white lg:block"><PanelRight size={18} /></button>
+          <button onClick={() => { if (confirm(`Delete the session "${session.title}"? Its conversation is removed (files it changed stay changed).`)) removeSession(session.id); }} title="Delete this session" className="p-2 text-zinc-500 transition-colors hover:text-rose-400"><Trash2 size={17} /></button>
           <button onClick={() => setSetupOpen(v => !v)} title="Session settings" className={cn("p-2 transition-colors", setupOpen ? "text-violet-400" : "text-zinc-500 hover:text-white")}><Settings2 size={18} /></button>
           <div className="relative">
             <button onClick={() => { if (!sessionsOpen) loadHistory(); setSessionsOpen(v => !v); }} title="Sessions in this folder" className="p-2 text-zinc-500 transition-colors hover:text-white"><Archive size={18} /></button>

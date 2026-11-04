@@ -99,6 +99,13 @@ export function listFolders(home = os.homedir()): { cwd: string; count: number; 
   return out.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+/** Removes one Claude Code session of a folder (its .jsonl transcript). False when there is no such session. */
+export function deleteSession(cwd: string, id: string, home?: string): boolean {
+  if (!/^[A-Za-z0-9-]+$/.test(id)) return false;
+  const file = path.join(projectDirFor(cwd, home), id + ".jsonl");
+  try { fs.unlinkSync(file); return true; } catch { return false; }
+}
+
 export function readSession(cwd: string, id: string, home?: string): HistoryItem[] | null {
   if (!/^[A-Za-z0-9-]+$/.test(id)) return null;
   const file = path.join(projectDirFor(cwd, home), id + ".jsonl");
