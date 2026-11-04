@@ -23,5 +23,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["node_modules", "train", "android", "dist"]
+  "exclude": ["node_modules", "train", "android", "dist", "faceswap", "voice"]
 }

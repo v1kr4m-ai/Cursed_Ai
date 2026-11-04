@@ -1,7 +1,8 @@
 import React from "react";
 import { AudioLines, Clapperboard, ImagePlus } from "lucide-react";
 import { DirectStudio } from "./DirectStudio";
-import { StudioToolbar, Source } from "./StudioToolbar";
+import { VoicePanel } from "./VoicePanel";
+import { StudioToolbar, Source, AudioTab } from "./StudioToolbar";
 import { useLocalMode } from "./ModeSwitch";
 import { WorkflowRunner } from "./WorkflowRunner";
 import { Kind } from "./types";
@@ -16,6 +17,8 @@ export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) 
   const [source, setSourceState] = React.useState<Source>(() => { try { const v = localStorage.getItem(`cursed.source.${kind}`); return v === "cloud" || v === "local" ? v : savedSetting("defaultSource", "local"); } catch { return "local"; } });
   const setSource = (s: Source) => { setSourceState(s); try { localStorage.setItem(`cursed.source.${kind}`, s); } catch { /* private window */ } };
   const [mode, setMode] = useLocalMode(kind);
+  const [audioTab, setAudioTabState] = React.useState<AudioTab>(() => { try { return localStorage.getItem("cursed.audioTab") === "voice" ? "voice" : "workflows"; } catch { return "workflows"; } });
+  const setAudioTab = (t: AudioTab) => { setAudioTabState(t); try { localStorage.setItem("cursed.audioTab", t); } catch { /* private window */ } };
   const [showHistory, setShowHistory] = React.useState(false);
   React.useEffect(() => {
     const onReq = (e: Event) => { if ((e as CustomEvent).detail?.kind === kind) setShowHistory(false); };
@@ -24,13 +27,15 @@ export function StudioPage({ kind, modelId }: { kind: Kind; modelId?: string }) 
   }, [kind]);
   const icon = kind === "image" ? <ImagePlus className="text-pink-500" size={24} /> : kind === "audio" ? <AudioLines className="text-teal-500" size={24} /> : <Clapperboard className="text-orange-500" size={24} />;
   const toolbar = (
-    <StudioToolbar kind={kind} icon={icon} title={kind === "image" ? "Image Studio" : kind === "audio" ? "Audio Studio" : "Video Studio"} source={source} onSource={setSource} mode={mode} onMode={setMode} showHistory={showHistory} onHistory={() => setShowHistory(h => !h)} />
+    <StudioToolbar kind={kind} icon={icon} title={kind === "image" ? "Image Studio" : kind === "audio" ? "Audio Studio" : "Video Studio"} source={source} onSource={setSource} mode={mode} onMode={setMode} showHistory={showHistory} onHistory={() => setShowHistory(h => !h)} audioTab={audioTab} onAudioTab={setAudioTab} />
   );
   const workflows = kind === "audio" || (source === "local" && mode === "workflows");
   return (
     <div className="flex-1 bg-transparent p-4 h-full overflow-hidden">
       <div className="max-w-[1600px] mx-auto h-full">
-        {workflows
+        {kind === "audio" && audioTab === "voice"
+          ? <div className="flex h-full flex-col gap-3">{toolbar}<VoicePanel /></div>
+          : workflows
           ? <WorkflowRunner kind={kind} modelId={modelId} toolbar={toolbar} showHistory={showHistory} onCloseHistory={() => setShowHistory(false)} />
           : <DirectStudio key={`${kind}-${source}`} kind={kind} engine={source === "cloud" ? "cloud" : "quick"} modelId={modelId} toolbar={toolbar} showHistory={showHistory} onCloseHistory={() => setShowHistory(false)} />}
       </div>

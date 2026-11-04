@@ -20,6 +20,7 @@ import { registerTrainTool } from "./trainTool/routes";
 import { registerSpeechTool } from "./trainTool/speech";
 import { registerMobileTool } from "./trainTool/mobile";
 import { registerFaceSwap } from "./trainTool/faceswap";
+import { registerVoice } from "./trainTool/voice";
 import type { TrainConfig } from "./trainTool/paths";
 import { createLocalModels, shortHash } from "./localModels";
 import { registerSystemStats } from "./systemStats";
@@ -1726,6 +1727,7 @@ async function startServer() {
   registerSpeechTool(app, { appRoot: process.cwd(), getConfig: () => ({ ...(serverConfig.train || {}), comfyuiPath: serverConfig.comfyuiPath }) });
   registerMobileTool(app, { appRoot: process.cwd(), getConfig: () => ({ ...(serverConfig.train || {}), comfyuiPath: serverConfig.comfyuiPath }) });
   registerFaceSwap(app, { appRoot: process.cwd(), comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL });
+  registerVoice(app, { appRoot: process.cwd(), comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL });
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });

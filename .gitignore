@@ -76,3 +76,4 @@ comfy-object-info.json
 
 # Face swap engine (FaceFusion + its Python environment and models), set up locally
 /faceswap/
+/voice/
