@@ -9,6 +9,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { probeDuration, mixedLength } from "./ffmpeg";
 import { usesAiVoice } from "./voices";
+import { joinVoice } from "./talking";
 import { upsertOutput } from "./finishCore";
 import { createSeriesStore } from "./store";
 import { buildAss, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan, type Cue, type SubStyle, type Subtitles } from "./subtitlesCore";
@@ -60,10 +61,11 @@ async function geminiTranscribe(key: string, samples: Float32Array): Promise<str
 }
 
 /** A scene's length in the joined episode: its clip, lengthened when a made voice (Dia) outlasts it (see stitch). */
-async function sceneLength(p: { voiceEngine?: string }, s: { clipPath: string | null; durationS: number | null; voiceFile?: string }): Promise<number> {
+async function sceneLength(p: { voiceEngine?: string }, s: { clipPath: string | null; durationS: number | null; voiceFile?: string; talkingClip?: string | null }): Promise<number> {
   const clip = (await probeDuration(s.clipPath!)) || s.durationS || 7;
-  if (!usesAiVoice(p) || !s.voiceFile || !fs.existsSync(s.voiceFile)) return clip;
-  const voice = await probeDuration(s.voiceFile);
+  const vf = joinVoice(s);
+  if (!usesAiVoice(p) || !vf || !fs.existsSync(vf)) return clip;
+  const voice = await probeDuration(vf);
   return voice ? mixedLength(clip, voice) : clip;
 }
 

@@ -1716,6 +1716,7 @@ async function startServer() {
   registerSeriesTool(app, {
     projectsRoot: path.join(process.cwd(), "series"),
     getComfyUrl: () => COMFYUI_URL,
+    getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath || null,
   });
   registerOllamaClaude(app, { ollamaUrl: OLLAMA_URL });
   registerOnlineModels(app, { get: () => serverConfig.online || {}, set: s => { serverConfig.online = s; saveConfig(); } });

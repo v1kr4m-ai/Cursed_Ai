@@ -61,6 +61,9 @@ export function registerVoiceTrack(app: express.Express, opts: VoiceTrackOptions
     const plans = planEpisode(p, ep, sceneId);
     const todo = plans.filter(x => !x.skipped);
     if (!todo.length) return res.status(400).json({ error: `Nothing to voice: ${plans.map(x => `scene ${x.number}: ${x.skipped}`).join("; ") || "no scenes"}` });
+    // A scene being rendered (a talking video reads its voice file) must not get its voice overwritten.
+    const busy = todo.filter(x => { const st = ep.scenes.find(s => s.id === x.sceneId)?.status; return st === "queued" || st === "running"; });
+    if (busy.length) return res.status(409).json({ error: `Scene ${busy.map(x => x.number).join(", ")} is being rendered right now. Wait for it or cancel it, then make the voice.` });
     const dir = path.join(p.dir, "voice");
     fs.mkdirSync(dir, { recursive: true });
 

@@ -23,8 +23,8 @@ export function takesIn(dir: string, episode: number, scene: number): Take[] {
  * Takes no scene uses: every take of a scene except the one it joins. Scenes with no chosen clip, or rendering
  * right now, and files of scenes that no longer exist are left alone - nothing here can tell what matters there.
  */
-export function unusedTakes(dir: string, episodes: { number: number; scenes: { number: number; clipPath: string | null; status?: string }[] }[]): Take[] {
+export function unusedTakes(dir: string, episodes: { number: number; scenes: { number: number; clipPath: string | null; status?: string; clipBeforeTalking?: string | null; talkingClip?: string | null }[] }[]): Take[] {
   const same = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
   return episodes.flatMap(e => e.scenes.filter(s => s.clipPath && s.status !== "running" && s.status !== "queued")
-    .flatMap(s => takesIn(dir, e.number, s.number).filter(t => !same(t.path, s.clipPath!))));
+    .flatMap(s => takesIn(dir, e.number, s.number).filter(t => ![s.clipPath, s.clipBeforeTalking, s.talkingClip].some(k => k && same(t.path, k)))));
 }

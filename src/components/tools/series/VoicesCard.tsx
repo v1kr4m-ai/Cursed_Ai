@@ -1,10 +1,11 @@
 import React from "react";
-import { Loader2, Mic, Play, RefreshCw, X, AlertTriangle, FolderOpen } from "lucide-react";
+import { Clapperboard, Loader2, Mic, Play, RefreshCw, X, AlertTriangle, FolderOpen } from "lucide-react";
 import { useJob } from "../../train/trainApi";
 import { api, fileUrl, type Episode, type Project } from "./api";
 import { planEpisode, voiceStamp } from "../../../../seriesTool/voiceTrack";
 import { usesAiVoice } from "../../../../seriesTool/voices";
 import { notifyError } from "../../../lib/notify";
+import { isTalking, pickTalkingPicture, talkingStale } from "../../../../seriesTool/talking";
 
 /** Develop: one person's voice sample to copy. Dia uses it for [S1] only (one sample per scene); XTTS uses every person's own. */
 export function VoiceSample({ project, name, onSaved }: { project: Project; name: string; onSaved: (p: Project) => void }) {
@@ -85,6 +86,25 @@ export function VoicesCard({ project, episode, onChanged }: { project: Project; 
     } catch (e) { notifyError(e); } finally { setBusy(false); }
   };
   const sceneOf = (id: string) => episode.scenes.find(s => s.id === id)!;
+  const [talk, setTalk] = React.useState<{ ready: boolean; reason: string; warning: string } | null>(null);
+  const refreshTalk = React.useCallback(() => { api.talkingStatus().then(setTalk).catch(() => setTalk({ ready: false, reason: "Could not reach the app server.", warning: "" })); }, []);
+  React.useEffect(() => {
+    refreshTalk();
+    // ComfyUI may be started after this page opened: look again every 15 s while the button is off, and when the window is used again.
+    const t = setInterval(() => { if (!document.hidden) setTalk(cur => { if (!cur?.ready) refreshTalk(); return cur; }); }, 15000);
+    window.addEventListener("focus", refreshTalk);
+    return () => { clearInterval(t); window.removeEventListener("focus", refreshTalk); };
+  }, [episode.id, refreshTalk]);
+  // The picture is picked on the server with the same function; here it only decides whether the button can work.
+  const noPicture = (id: string) => { const r = pickTalkingPicture(episode.refs, sceneOf(id), () => true); return "reason" in r ? r.reason : ""; };
+  const makeTalking = async (id: string) => {
+    if (talk?.warning && !window.confirm(`${talk.warning}
+
+Make the talking video for this scene?`)) return;
+    setBusy(true);
+    try { await api.makeTalking(project.id, id); onChanged(await api.get(project.id)); } catch (e) { notifyError(e); } finally { setBusy(false); }
+  };
+  const backToNormal = async (id: string) => { try { await api.revertTalking(project.id, id); onChanged(await api.get(project.id)); } catch (e) { notifyError(e); } };
   const speakable = plans.filter(x => !x.skipped);
   const missing = speakable.filter(x => !sceneOf(x.sceneId).voiceFile).length;
   const stale = (id: string) => { const s = sceneOf(id); return !!s.voiceFile && s.voiceText !== voiceStamp(project, episode, s); };
@@ -122,13 +142,26 @@ export function VoicesCard({ project, episode, onChanged }: { project: Project; 
               {x.skipped ? <span className="text-neutral-500">skipped: {x.skipped}</span> : <>
                 {sc.voiceFile ? <audio controls preload="none" src={`${fileUrl(sc.voiceFile)}&v=${encodeURIComponent(project.updatedAt)}`} className="h-7" /> : <span className="text-neutral-500"><Play size={10} className="mr-1 inline" />not made yet (about {x.seconds} s)</span>}
                 {stale(x.sceneId) && <span className="text-amber-300" title="The words, speakers or voice samples changed since this was made">out of date</span>}
-                <button disabled={running || busy} onClick={() => start(x.sceneId)} className="flex items-center gap-1 rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-40"><RefreshCw size={10} /> {sc.voiceFile ? "Redo" : "Make"}</button>
+                <button disabled={running || busy || sc.status === "queued" || sc.status === "running"} title={sc.status === "queued" || sc.status === "running" ? "This scene is being rendered; wait for it" : undefined} onClick={() => start(x.sceneId)} className="flex items-center gap-1 rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-40"><RefreshCw size={10} /> {sc.voiceFile ? "Redo" : "Make"}</button>
                 {x.notes.map((n, i) => <span key={i} className="text-neutral-500">- {n}</span>)}
+                {sc.voiceFile && (() => {
+                  const working = sc.status === "queued" || sc.status === "running";
+                  const why = !talk ? "Checking ComfyUI..." : !talk.ready ? talk.reason : noPicture(x.sceneId);
+                  return <>
+                    <button disabled={!!why || working || running || busy} onClick={() => makeTalking(x.sceneId)} title={why || "Make this scene a talking video: the character's picture speaks this voice with lip-sync (Wan 2.2 S2V, slow)"} className="flex items-center gap-1 rounded border border-violet-700/60 px-1.5 py-0.5 text-violet-200 hover:bg-violet-900/30 disabled:opacity-40"><Clapperboard size={10} /> {isTalking(sc) ? "Talking video again" : "Make talking video"}</button>
+                    {isTalking(sc) && <span className="text-violet-300">talking clip in use</span>}
+                    {talkingStale(sc) && <span className="text-amber-300">talking clip has the old voice - make it again</span>}
+                    {isTalking(sc) && sc.clipBeforeTalking && <button disabled={working} onClick={() => backToNormal(x.sceneId)} className="rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-40">Back to normal clip</button>}
+                    {working && sc.promptId !== undefined && <span className="text-sky-300"><Loader2 size={10} className="mr-1 inline animate-spin" />{sc.status === "queued" ? "waiting for the graphics card" : "making the clip (see the scene card for progress)"}</span>}
+                    {why && !working && <span className="text-neutral-500">{why}</span>}
+                  </>;
+                })()}
               </>}
             </li>
           );
         })}
       </ul>
+      <p className="text-[10px] leading-relaxed text-neutral-600">"Make talking video" is optional and always your choice per scene: it turns the character's picture into a clip that speaks this voice with lip-sync (Wan 2.2 S2V 14B in ComfyUI). It is slow on an 8 GB card and uses the whole graphics card; such a clip already has the voice in it, so joining does not mix the voice again.</p>
       <p className="text-[10px] leading-relaxed text-neutral-600">Voices are mixed over the clips when you join the episode in Assemble (join again after making or redoing voices). The clip's own sound is turned down to 20%; a voice longer than its clip holds the last frame.</p>
     </div>
   );

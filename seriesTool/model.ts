@@ -49,6 +49,12 @@ export interface Scene {
   /** The scene's spoken voice made by the local Dia voice (voiceEngine "dia"), and the script it was made from. */
   voiceFile?: string;
   voiceText?: string;
+  /** Talking video (talking.ts): the clip is made from the voice + a picture of the speaker, so it carries the voice itself. `talkingClip` is that clip; `clipBeforeTalking` the normal clip to go back to. */
+  talking?: boolean;
+  talkingClip?: string;
+  /** The voice (scene.voiceText) the talking clip was made from, to tell when it is out of date. */
+  talkingVoice?: string;
+  clipBeforeTalking?: string | null;
   seed: number;
   /** The assembled prompt actually sent to ComfyUI. Editable - regenerating does not overwrite edits. */
   promptText: string;

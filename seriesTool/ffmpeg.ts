@@ -107,6 +107,24 @@ export function probeDuration(file: string): Promise<number | null> {
   });
 }
 
+/** ffmpeg arguments that cut a talking clip to `seconds` (the voice plus a short tail) and bring its voice to the same loudness the mixed voices get. */
+export function buildTalkingTrimArgs(input: string, out: string, seconds: number): string[] {
+  return ["-y", "-v", "error", "-i", input, "-t", String(Math.round(seconds * 1000) / 1000), "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+    "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out];
+}
+
+/** Runs ffmpeg with these arguments; rejects with the tail of its error. */
+export function runFfmpeg(args: string[], signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn("ffmpeg", args, { windowsHide: true });
+    let tail = "";
+    proc.stderr.on("data", (c: Buffer) => { tail = (tail + c.toString()).slice(-2000); });
+    proc.on("error", e => reject(new Error(`Could not run ffmpeg - is it on PATH? (${(e as Error).message})`)));
+    proc.on("close", code => (code === 0 ? resolve() : reject(new Error(tail.split(/\r?\n/).filter(Boolean).slice(-3).join(" ") || `ffmpeg exit code ${code}`))));
+    signal?.addEventListener("abort", () => proc.kill("SIGKILL"), { once: true });
+  });
+}
+
 /** ffmpeg arguments that join spoken turns (wav files) into one 24 kHz mono wav, `gap` seconds of silence after each turn but the last. */
 export function buildJoinArgs(inputs: string[], out: string, gap = 0.35): string[] {
   const pads = inputs.map((_, i) => `[${i}:a]${i < inputs.length - 1 ? `apad=pad_dur=${gap}` : "anull"}[a${i}]`).join(";");

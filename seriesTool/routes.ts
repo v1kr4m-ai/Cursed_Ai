@@ -14,7 +14,8 @@ import fs from "fs";
 import path from "path";
 import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTool/registry";
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
-import { probeDuration, stitch } from "./ffmpeg";
+import { probeDuration, stitch, buildTalkingTrimArgs, runFfmpeg } from "./ffmpeg";
+import { MAX_CHUNKS, TALK_TAIL, TALK_WARNING, TALK_WORKFLOW, MAX_TALK_SECONDS, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingPrompt, talkingSize } from "./talking";
 import { takesIn, unusedTakes } from "./takes";
 import { upsertOutput } from "./finishCore";
 import { extractUpload } from "../comfyTool/extract";
@@ -22,6 +23,8 @@ import { fillSlots, refSourceFiles } from "./refSources";
 import { refKindInfo } from "./refKinds";
 import { buildScenePrompt, newId, snapFrames, type Episode, type Project, type Ref, type Scene, type Source, type Status } from "./model";
 import { createSeriesStore } from "./store";
+import { isRunning } from "../trainTool/jobs";
+import { voiceStarting } from "../trainTool/voice";
 import { importLines, joinLines, usesAiVoice } from "./voices";
 
 type Json = Record<string, any>;
@@ -30,6 +33,8 @@ export interface SeriesOptions {
   /** Where project folders live. */
   projectsRoot: string;
   getComfyUrl: () => string;
+  /** The ComfyUI portable folder, if known: the talking-video workflow is looked for in its workflows folder. */
+  getComfyRoot?: () => string | null;
 }
 
 interface Job {
@@ -548,6 +553,129 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     });
   }
 
+  // ---------------------------------------------------------- talking video
+
+  /** The S2V workflow file: the API copy first, else the saved one (read only, never written). */
+  function talkingWorkflowFile(): string | null {
+    const root = opts.getComfyRoot?.();
+    if (!root) return null;
+    // The API copy and the saved one may differ: the newer file wins, so edits made in ComfyUI are not ignored.
+    const files = ["ComfyUI", ""].flatMap(sub => [path.join(root, sub, "user", "default", "workflows")]).flatMap(dir => [path.join(dir, "API_FORMAT", TALK_WORKFLOW), path.join(dir, TALK_WORKFLOW)]).filter(f => fs.existsSync(f));
+    return files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0] || null;
+  }
+  const comfyIsUp = async () => { try { return (await fetch(`${opts.getComfyUrl()}/system_stats`, { signal: AbortSignal.timeout(6000) })).ok; } catch { return false; } };
+
+  /** Whether the "Make talking video" button can work, and why not. */
+  app.get("/api/series/talking/status", async (_req, res) => {
+    const file = talkingWorkflowFile();
+    const comfyUp = await comfyIsUp();
+    const reason = !comfyUp ? "ComfyUI is not running. Start it, then try again." : !file ? `The workflow "${TALK_WORKFLOW}" was not found in ComfyUI's workflows folder.` : "";
+    res.json({ ready: !reason, reason, comfyUp, workflow: file, maxSeconds: MAX_TALK_SECONDS, warning: TALK_WARNING });
+  });
+
+  /** Render one scene as a talking video: its voice file + a picture of the speaker, through the S2V workflow, queued like any clip. */
+  app.post("/api/series/projects/:id/scenes/:sceneId/talking", async (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const found = findScene(p, req.params.sceneId);
+    if (!found) return bad(res, 404, "No such scene.");
+    const { ep, scene } = found;
+    if (scene.status === "running" || scene.status === "queued") return bad(res, 409, "This scene is rendering right now. Cancel it first.");
+    if (!scene.voiceFile || !fs.existsSync(scene.voiceFile)) return bad(res, 400, "Make this scene's voice first (the Voices card).");
+    const voiceS = await probeDuration(scene.voiceFile);
+    if (!voiceS) return bad(res, 400, "Could not read the length of this scene's voice file.");
+    const plan = planTalking(voiceS);
+    if (plan.tooLong) return bad(res, 400, `This voice is ${voiceS.toFixed(1)} s but a talking video can carry at most ${plan.maxSeconds.toFixed(1)} s. Nothing is cut: split the scene or shorten its words, then make the voice again.`);
+    const pic = pickTalkingPicture(ep.refs, scene, f => fs.existsSync(f));
+    if ("reason" in pic) return bad(res, 400, pic.reason);
+    const wf = talkingWorkflowFile();
+    if (!wf) return bad(res, 400, `The workflow "${TALK_WORKFLOW}" was not found in ComfyUI's workflows folder.`);
+    if (!(await comfyIsUp())) return bad(res, 503, "ComfyUI is not running. Start it, then try again.");
+    if (voiceStarting() || isRunning("dia") || isRunning("xtts") || isRunning("seriesvoice")) return bad(res, 409, "A voice is being made right now and needs the graphics card. Wait for it to finish, then try again.");
+    generateTalking(p, ep, scene, { workflow: wf, picture: pic.ref.file! });
+    res.json({ ok: true, chunks: plan.chunks, voiceSeconds: voiceS, picture: pic.ref.name });
+  });
+
+  /** Go back to the normal clip the scene had before its talking video. The talking clip stays on disk as a take. */
+  app.post("/api/series/projects/:id/scenes/:sceneId/talking/revert", async (req, res) => {
+    const p = store.get(req.params.id);
+    if (!p) return bad(res, 404, "No such project.");
+    const found = findScene(p, req.params.sceneId);
+    if (!found) return bad(res, 404, "No such scene.");
+    const s = found.scene;
+    if (s.status === "running" || s.status === "queued") return bad(res, 409, "This scene is rendering right now. Cancel it first.");
+    if (!isTalking(s)) return bad(res, 400, "This scene is not using a talking clip.");
+    if (!s.clipBeforeTalking || !fs.existsSync(s.clipBeforeTalking)) return bad(res, 400, "There is no normal clip to go back to (the scene had none before the talking video). Render the scene normally instead.");
+    mark(p.id, s.id, "scene", { status: "done", clipPath: s.clipBeforeTalking, durationS: await probeDuration(s.clipBeforeTalking), talking: false, error: null });
+    res.json({ ok: true, clipPath: s.clipBeforeTalking });
+  });
+
+  function generateTalking(p: Project, ep: Episode, scene: Scene, a: { workflow: string; picture: string }) {
+    return enqueue(p.id, { projectId: p.id, targetId: scene.id, kind: "scene", label: `${ep.title}: scene ${scene.number} (talking)` }, async job => {
+      const fresh = store.get(p.id)!;
+      const liveEp = fresh.episodes.find(e => e.id === ep.id)!;
+      const live = liveEp.scenes.find(s => s.id === scene.id)!;
+      // The length is read from the voice file as it is now (not when the job was queued).
+      if (!live.voiceFile || !fs.existsSync(live.voiceFile)) throw new Error("This scene's voice file is gone. Make the voice again.");
+      const voiceS = await probeDuration(live.voiceFile);
+      if (!voiceS) throw new Error("Could not read the length of this scene's voice file.");
+      const plan = planTalking(voiceS);
+      if (plan.tooLong) throw new Error(`This voice is ${voiceS.toFixed(1)} s but a talking video can carry at most ${plan.maxSeconds.toFixed(1)} s. Nothing is cut.`);
+      const oi = await objectInfo();
+      const info = loadWorkflowInfo(a.workflow, {}, oi);
+      if (!info.isRunnable) throw new Error(`The talking-video workflow cannot run: ${info.missing.join(", ") || "unknown reason"}`);
+      if (info.refImageNodeIds.length !== 1 || info.refAudioNodeIds.length !== 1) throw new Error("The talking-video workflow was changed: it needs exactly one picture and one audio input.");
+      const { graph } = loadApiWorkflow(a.workflow, oi);
+      const size = talkingSize(fresh.settings.width, fresh.settings.height);
+      forceSizeAndLength(graph, size); // sets the width/height of the S2V node only; its length and 16 fps stay
+      // Fewer chunks = far less GPU time for a short voice. If the graph cannot be shortened, stop rather than silently run all three (about 3x the GPU time).
+      if (plan.chunks < MAX_CHUNKS && !limitChunks(graph, plan.chunks)) throw new Error("The talking-video workflow was changed, so it cannot be shortened for a short voice (it would run 3 times longer). Re-export it with the same nodes, or use a longer voice.");
+
+      // The picture on the video's shape (cropped round the face, not stretched), so the model gets what it will draw.
+      const sharp = (await import("sharp")).default;
+      const cropped = path.join(fresh.dir, "talking", `${live.id.replace(/[^A-Za-z0-9_-]/g, "_")}.png`);
+      fs.mkdirSync(path.dirname(cropped), { recursive: true });
+      await sharp(a.picture).rotate().resize(size.width, size.height, { fit: "cover", position: sharp.strategy.attention }).png().toFile(cropped);
+
+      const seed = live.clipPath ? newSeed() : live.seed; // a new seed, or ComfyUI hands back its cached clip
+      mark(p.id, scene.id, "scene", { status: "running", error: null, seed });
+      const clips = store.clipsDir(fresh);
+      const base = `ep${String(liveEp.number).padStart(2, "0")}_scene${String(live.number).padStart(2, "0")}`;
+      const raw = path.join(clips, `${base}_talkraw.mp4`);
+      fs.mkdirSync(clips, { recursive: true });
+      fs.rmSync(raw, { force: true });
+      await runWorkflow({
+        baseUrl: opts.getComfyUrl(),
+        workflow: graph,
+        info,
+        promptText: talkingPrompt(live.shot, fresh.styleLock),
+        refImagePaths: [cropped],
+        refVideoPaths: new Array(info.refVideoNodeIds.length).fill(""),
+        refAudioPaths: [live.voiceFile!],
+        fieldValues: {},
+        seed,
+        destFolder: clips,
+        destFilename: path.basename(raw),
+        onEvent: runEventSink(p.id, job),
+        signal: job.abort.signal,
+        onSubmitted: id => { job.promptId = id; mark(p.id, scene.id, "scene", { promptId: id }); },
+      });
+      if (job.abort.signal.aborted || !fs.existsSync(raw)) {
+        // The runner may have saved the file under another extension; only this feature's own _talkraw files are removed.
+        for (const f of fs.readdirSync(clips)) if (f.startsWith(`${base}_talkraw.`)) fs.rmSync(path.join(clips, f), { force: true });
+        throw new Error(job.abort.signal.aborted ? "Cancelled." : "ComfyUI finished without saving a clip.");
+      }
+
+      // Cut to the voice (+ a short tail) with the voice at the loudness mixed voices get; the raw model output is not kept.
+      const dest = uniqueDestination(path.join(clips, `${base}.mp4`));
+      try { await runFfmpeg(buildTalkingTrimArgs(raw, dest, voiceS + TALK_TAIL), job.abort.signal); } catch (e) { fs.rmSync(dest, { force: true }); throw e; } finally { fs.rmSync(raw, { force: true }); }
+      if (job.abort.signal.aborted) { fs.rmSync(dest, { force: true }); throw new Error("Cancelled."); }
+      const duration = await probeDuration(dest);
+      mark(p.id, scene.id, "scene", { status: "done", clipPath: dest, durationS: duration, error: null, talking: true, talkingClip: dest, talkingVoice: live.voiceText ?? "", clipBeforeTalking: isTalking(live) ? live.clipBeforeTalking ?? null : live.clipPath });
+      emit(p.id, { type: "finished", targetId: scene.id, kind: "scene", file: dest });
+    });
+  }
+
   app.post("/api/series/projects/:id/refs/:refId/generate", (req, res) => {
     const p = store.get(req.params.id);
     if (!p) return bad(res, 404, "No such project.");
@@ -618,6 +746,7 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     const take = takesIn(store.clipsDir(p), found.ep.number, found.scene.number).find(t => path.resolve(t.path) === path.resolve(String(req.body?.path || "")));
     if (!take) return bad(res, 400, "That is not a take of this scene.");
     if (found.scene.clipPath && path.resolve(found.scene.clipPath).toLowerCase() === path.resolve(take.path).toLowerCase()) return bad(res, 400, "This take is the one the scene uses. Pick another take first.");
+    if ([found.scene.clipBeforeTalking, found.scene.talkingClip].some(f => f && path.resolve(f).toLowerCase() === path.resolve(take.path).toLowerCase())) return bad(res, 400, "This take belongs to the scene's talking video (the talking clip or the clip to go back to). Use Back to normal clip, or render the scene again, first.");
     fs.rmSync(take.path, { force: true });
     res.json({ ok: true });
   });
@@ -731,8 +860,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
     try {
       await stitch({
         clips: ordered.map(s => s.clipPath!),
-        // Made voices (Dia or XTTS) go over their clips, which are turned down so the model's own speech does not double them.
-        voices: usesAiVoice(p) ? ordered.map(s => s.voiceFile) : undefined,
+        // Made voices (Dia or XTTS) go over their clips, which are turned down so the model's own speech does not double them. A talking clip already carries its voice: nothing is laid over it.
+        voices: usesAiVoice(p) ? ordered.map(joinVoice) : undefined,
         outFile,
         width: p.settings.width,
         height: p.settings.height,

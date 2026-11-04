@@ -47,7 +47,7 @@ export function moveScene(episodes: Episode[], fromId: string, sceneId: string, 
 export function copyEpisode(e: Episode): Episode {
   const refIds = new Map<string, string>();
   const refs = e.refs.map(r => { const id = newId(); refIds.set(r.id, id); return { ...r, id, status: "pending" as const, error: null, file: r.prompt.trim() ? null : r.file }; });
-  const scenes: Scene[] = e.scenes.map(s => ({ ...s, id: newId(), status: "pending", error: null, clipPath: undefined, durationS: undefined, refIds: s.refIds.map(id => refIds.get(id) || id) } as Scene));
+  const scenes: Scene[] = e.scenes.map(s => ({ ...s, id: newId(), status: "pending", error: null, clipPath: undefined, durationS: undefined, talking: undefined, talkingClip: undefined, clipBeforeTalking: undefined, talkingVoice: undefined, refIds: s.refIds.map(id => refIds.get(id) || id) } as Scene));
   return { ...e, id: newId(), title: `${e.title} (copy)`, refs, scenes, exportPath: null, outputs: undefined, finalKind: undefined, subtitles: undefined, audio: undefined, exportedAt: undefined };
 }
 
