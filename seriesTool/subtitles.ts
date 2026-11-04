@@ -8,11 +8,11 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { probeDuration, mixedLength } from "./ffmpeg";
-import { usesAiVoice } from "./voices";
+import { cleanLines, usesAiVoice } from "./voices";
 import { joinVoice } from "./talking";
 import { upsertOutput } from "./finishCore";
 import { createSeriesStore } from "./store";
-import { buildAss, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan, type Cue, type SubStyle, type Subtitles } from "./subtitlesCore";
+import { aiVoiceCues, buildAss, cleanCues, DEFAULT_SUB_STYLE, makeCues, speechSpan, type Cue, type SubStyle, type Subtitles } from "./subtitlesCore";
 
 export interface SubtitleOptions {
   projectsRoot: string;
@@ -80,7 +80,13 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
   const base = "/api/series/projects/:id/episodes/:episodeId/subtitles";
 
   /** Cues for one scene's clip, placed at its offset in the joined episode. */
-  async function cuesForScene(s: { clipPath: string | null; vo: string }, offset: number, dur: number, source: string, style: SubStyle, key?: string): Promise<Cue[]> {
+  async function cuesForScene(p: { voiceEngine?: string }, s: { clipPath: string | null; vo: string; lines?: any; voiceFile?: string; voiceTurns?: { speaker: string; seconds: number }[]; talkingClip?: string | null }, offset: number, dur: number, source: string, style: SubStyle, key?: string): Promise<Cue[]> {
+    // A made voice (Dia/XTTS) is the speech: the cues follow its real timing, not the clip's audio or a reading-speed guess.
+    const vf = source === "script" && usesAiVoice(p) ? s.voiceFile : undefined;
+    if (vf && fs.existsSync(vf)) {
+      const voiceLen = await probeDuration(vf);
+      if (voiceLen) return aiVoiceCues({ lines: cleanLines(s.lines), vo: s.vo || "", turns: s.voiceTurns, voiceLen, offset, dur, maxWords: style.maxWords });
+    }
     let samples: Float32Array | null = null;
     let text = "";
     // Timing always comes from the audio when there is some: speech does not fill the whole clip.
@@ -111,7 +117,7 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
         if (i === target) { from = offset; to = offset + dur; } else offset += dur;
       }
       const prev: Subtitles = ep.subtitles || { cues: [], style: { ...DEFAULT_SUB_STYLE }, source, updatedAt: "" };
-      const fresh = await cuesForScene(scenes[target], from, to - from, source, { ...DEFAULT_SUB_STYLE, ...prev.style }, key);
+      const fresh = await cuesForScene(p, scenes[target], from, to - from, source, { ...DEFAULT_SUB_STYLE, ...prev.style }, key);
       const mid = (c: Cue) => (c.start + c.end) / 2;
       const kept = prev.cues.filter(c => !(mid(c) >= from && mid(c) < to));
       ep.subtitles = { ...prev, cues: [...kept, ...fresh].sort((a, b) => a.start - b.start), updatedAt: new Date().toISOString() };
@@ -140,7 +146,7 @@ export function registerSubtitles(app: express.Express, opts: SubtitleOptions) {
       let offset = 0;
       for (const s of scenes) {
         const dur = await sceneLength(p, s);
-        cues.push(...(await cuesForScene(s, offset, dur, source, style, key)));
+        cues.push(...(await cuesForScene(p, s, offset, dur, source, style, key)));
         offset += dur;
       }
       ep.subtitles = { cues, style, source, updatedAt: new Date().toISOString() };

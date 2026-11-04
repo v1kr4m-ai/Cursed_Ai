@@ -83,6 +83,30 @@ export function makeCues(text: string, start: number, end: number, maxWords: num
   });
 }
 
+/**
+ * Cues for a scene whose voice is made locally: placed on the real voice, never on a reading-speed guess.
+ * With XTTS turns (turn k starts after the earlier turns plus the 0.35 s join gaps) each speaker's words get that turn's time;
+ * otherwise (Dia, or turns that do not pair with the lines) the lines share the voice length in proportion to their size.
+ * Nothing runs past `dur`, the scene's length in the episode. Lines are {speaker?, text}; with no lines, `vo` is one line.
+ */
+export function aiVoiceCues(a: { lines: { speaker?: string; text: string }[]; vo: string; turns?: { speaker: string; seconds: number }[]; voiceLen: number; offset: number; dur: number; maxWords: number; gap?: number }): Cue[] {
+  const gap = a.gap ?? 0.35, k = (s?: string) => (s || "").trim().toLowerCase();
+  const lines = a.lines.filter(l => l.text.trim());
+  const src = lines.length ? lines : a.vo.trim() ? [{ text: a.vo }] : [];
+  const spans: { text: string; start: number; end: number }[] = [];
+  const groups: { who: string; text: string }[] = [];
+  for (const l of src) { const g = groups[groups.length - 1]; if (g && k(g.who) === k(l.speaker)) g.text += " " + l.text.trim(); else groups.push({ who: l.speaker || "", text: l.text.trim() }); }
+  if (a.turns?.length && a.turns.length === groups.length) {
+    let t = 0;
+    a.turns.forEach((u, i) => { spans.push({ text: groups[i].text, start: t, end: t + u.seconds }); t += u.seconds + gap; });
+  } else {
+    const w = src.map(l => Math.max(1, l.text.trim().length)), sum = w.reduce((x, y) => x + y, 0);
+    let t = 0;
+    src.forEach((l, i) => { const d = (a.voiceLen * w[i]) / sum; spans.push({ text: l.text.trim(), start: t, end: t + d }); t += d; });
+  }
+  return spans.flatMap(sp => makeCues(sp.text, a.offset + Math.min(sp.start, a.dur), a.offset + Math.min(sp.end, a.dur), a.maxWords));
+}
+
 const hex = (c: string) => { const m = /^#?([0-9a-f]{6})$/i.exec(c.trim()); return m ? m[1] : "ffffff"; };
 /** ASS colours are &HAABBGGRR (alpha 00 = opaque). */
 export const assColor = (c: string, alpha = 0) => {

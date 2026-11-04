@@ -229,6 +229,9 @@ export function cleanLook(look: string): string {
 
 export const NO_TEXT = "No subtitles, captions, lyrics text, watermarks, logos or any other writing appear in the frame.";
 
+/** A sound line without its "the person's own voice(s), clear and close," opening (the ambience and action sounds stay): a made voice speaks instead. */
+export const withoutVoices = (sound: string): string => sound.replace(/^(?:The |Her |His )?(?:[\w']+'s )?(?:own )?voices?(?:,? (?:clear and close|close and clear))?,?\s*(?:over |with )?/i, "").replace(/^./, c => c.toUpperCase());
+
 /**
  * The three prompt fields the video model expects for one scene.
  * `voice` is the project's own voice description; the format's default replaces the narrator default.
@@ -243,7 +246,8 @@ export function sceneFields(opts: { format: SeriesFormat; look: string; voice: s
   // Several speakers: each line carries its speaker's own voice (the project voice when they have none).
   const lines = cleanLines(opts.lines); // blanks and malformed entries dropped first, so an empty added line changes nothing
   const multi = isMultiSpeaker(lines) && format.speech !== "none" ? lines : [];
-  if (opts.aiVoice && (multi.length || text) && ["voiceover", "oncamera", "dialogue"].includes(format.speech)) spoken = " Nobody speaks in this clip.";
+  const silenced = !!opts.aiVoice && !!(multi.length || text) && ["voiceover", "oncamera", "dialogue"].includes(format.speech);
+  if (silenced) spoken = " Nobody speaks in this clip.";
   else if (multi.length) {
     const say = (l: SceneLine) => {
       const v = (l.speaker && opts.voiceOf?.(l.speaker)) || opts.voice;
@@ -262,7 +266,7 @@ export function sceneFields(opts: { format: SeriesFormat; look: string; voice: s
   }
   return {
     description: `integrated_multimodal_description: [Shot 1] ${look} ${shot.trim()}${card}${spoken}${noText}`.replace(/\s+/g, " ").trim(),
-    soundscape: `overall_soundscape: ${format.sound}`,
+    soundscape: `overall_soundscape: ${silenced ? withoutVoices(format.sound) : format.sound}`,
     music: `non_diegetic_music: ${format.music}`,
   };
 }
