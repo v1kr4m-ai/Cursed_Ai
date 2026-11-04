@@ -15,4 +15,11 @@ describe("matchModelFiles", () => {
     expect(g[2].inputs.ckpt_name).toBe("sd15.safetensors");
     expect(g[3].inputs.ckpt_name).toBe("twin.safetensors");
   });
+
+  it("uses the same model at another precision, loaded in fp8", () => {
+    const info = { UNETLoader: { input: { required: { unet_name: [["flux1-dev.safetensors", "qwen_image_fp8_e4m3fn.safetensors"]], weight_dtype: [["default", "fp8_e4m3fn", "fp8_e5m2"]] } } } };
+    const g: any = { 1: { class_type: "UNETLoader", inputs: { unet_name: "flux1-dev-fp8.safetensors", weight_dtype: "default" } } };
+    matchModelFiles(g, info);
+    expect(g[1].inputs).toEqual({ unet_name: "flux1-dev.safetensors", weight_dtype: "fp8_e4m3fn" });
+  });
 });

@@ -89,8 +89,24 @@ function slotLabels(graph: Json, ids: string[], kind: string): string[] {
   return ids.map((nid, i) => {
     const title = (graph[nid]._meta || {}).title || "";
     const generic = !title || title === graph[nid].class_type || GENERIC_SLOT_TITLE.test(title);
+    if (generic && feedsControlNet(graph, nid)) return "Pose / layout to follow (ControlNet)";
     return generic ? `${kind} ${i + 1}` : title;
   });
+}
+
+/**
+ * Whether a picture ends up in a ControlNet within a few steps (through resizes and preprocessors). Such a picture is
+ * a layout to follow - a pose sheet, an outline - not a photo of the subject, and the slot says so.
+ */
+function feedsControlNet(graph: Json, from: string, depth = 4): boolean {
+  if (depth === 0) return false;
+  for (const [id, node] of Object.entries<any>(graph)) {
+    const uses = Object.values<any>(node?.inputs || {}).some(v => Array.isArray(v) && String(v[0]) === String(from));
+    if (!uses) continue;
+    if (/controlnet/i.test(String(node.class_type))) return true;
+    if (feedsControlNet(graph, id, depth - 1)) return true;
+  }
+  return false;
 }
 
 /**
@@ -136,6 +152,7 @@ const MODEL_FILE = /\.(safetensors|sft|gguf|ckpt|pt|pth|bin|onnx)$/i;
 export function matchModelFiles(graph: Json, objectInfo: Json | null): Json {
   if (!objectInfo || !graph || typeof graph !== "object") return graph;
   const base = (v: string) => v.split(/[\\/]/).pop()!.toLowerCase();
+  const family = (v: string) => base(v).replace(MODEL_FILE, "").replace(/[-_.](fp8|fp16|bf16|fp32|e4m3fn|e5m2|scaled|pruned|emaonly)\b/g, "").replace(/[-_.]+$/, "");
   for (const node of Object.values<any>(graph)) {
     const spec = objectInfo[node?.class_type]?.input;
     if (!spec || !node.inputs) continue;
@@ -145,7 +162,16 @@ export function matchModelFiles(graph: Json, objectInfo: Json | null): Json {
       const list: string[] | undefined = Array.isArray(options) ? options : Array.isArray(options?.[1]?.options) ? options[1].options : undefined;
       if (!list || list.includes(value)) continue;
       const same = list.filter(o => typeof o === "string" && base(o) === base(value));
-      if (same.length === 1) node.inputs[key] = same[0];
+      if (same.length === 1) { node.inputs[key] = same[0]; continue; }
+      // The same model saved at another precision ("flux1-dev-fp8" wanted, "flux1-dev" here): use it, and keep the
+      // memory saving by loading it in fp8 when the loader can.
+      const near = list.filter(o => typeof o === "string" && family(o) === family(value));
+      if (near.length !== 1) continue;
+      node.inputs[key] = near[0];
+      if (/fp8|e4m3/i.test(value) && "weight_dtype" in node.inputs) {
+        const dtypes = spec.required?.weight_dtype?.[0];
+        if (Array.isArray(dtypes) && dtypes.includes("fp8_e4m3fn")) node.inputs.weight_dtype = "fp8_e4m3fn";
+      }
     }
   }
   return graph;
