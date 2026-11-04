@@ -101,12 +101,36 @@ export function pruneToOutput(graph: Json, outputNodeId: string | null): Json {
 }
 
 /** Upload a local file (image / video / audio) to ComfyUI; returns the filename it assigned. */
-export async function uploadFile(baseUrl: string, filePath: string): Promise<string> {
+export async function uploadFile(baseUrl: string, filePath: string, square = false): Promise<string> {
   const form = new FormData();
-  form.append("image", new Blob([fs.readFileSync(filePath)]), path.basename(filePath));
+  form.append("image", new Blob([square ? await padToSquare(filePath) : fs.readFileSync(filePath)]), square ? path.parse(filePath).name + "_square.png" : path.basename(filePath));
   const resp = await fetch(`${baseUrl}/upload/image`, { method: "POST", body: form });
   if (!resp.ok) throw new Error(`Uploading ${path.basename(filePath)} to ComfyUI failed (HTTP ${resp.status})`);
   return ((await resp.json()) as any).name;
+}
+
+/** The picture on a square canvas, its edges padded (white) instead of cut - for encoders that crop to the centre. */
+async function padToSquare(filePath: string): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  const upright = await sharp(filePath).rotate().toBuffer(); // phone photos: honour the EXIF turn first
+  const { width: w = 0, height: h = 0 } = await sharp(upright).metadata();
+  const side = Math.max(w, h);
+  return sharp(upright).extend({ top: Math.floor((side - h) / 2), bottom: Math.ceil((side - h) / 2), left: Math.floor((side - w) / 2), right: Math.ceil((side - w) / 2), background: "#ffffff" }).png().toBuffer();
+}
+
+/**
+ * Whether a picture reaches an image encoder that crops it to the centre square (CLIPVisionEncode crop "center",
+ * used by image-to-3D workflows): such pictures are padded to a square first, so the sides of a wide or tall
+ * picture are not cut away.
+ */
+export function cropsToCenter(graph: Json, from: string, depth = 3): boolean {
+  if (depth === 0) return false;
+  for (const [id, node] of Object.entries<any>(graph)) {
+    if (!Object.values<any>(node?.inputs || {}).some(v => Array.isArray(v) && String(v[0]) === String(from))) continue;
+    if (/CLIPVisionEncode/i.test(String(node.class_type)) && node.inputs?.crop === "center") return true;
+    if (cropsToCenter(graph, id, depth - 1)) return true;
+  }
+  return false;
 }
 
 const short = (text: any, limit = 220) => { const t = String(text).split(/\s+/).filter(Boolean).join(" "); return t.length <= limit ? t : t.slice(0, limit) + "..."; };
@@ -219,7 +243,8 @@ export async function runWorkflow(a: RunArgs): Promise<void> {
 
   // A blank path is a bypassed slot - nothing to upload.
   const uploadAll = (paths: string[]) => Promise.all(paths.map(p => (p ? uploadFile(a.baseUrl, p) : Promise.resolve(p))));
-  const [images, videos, audios] = [await uploadAll(a.refImagePaths), await uploadAll(a.refVideoPaths || []), await uploadAll(a.refAudioPaths || [])];
+  const images = await Promise.all(a.refImagePaths.map((p, i) => (p ? uploadFile(a.baseUrl, p, cropsToCenter(a.workflow, a.info.refImageNodeIds[i])) : Promise.resolve(p))));
+  const [videos, audios] = [await uploadAll(a.refVideoPaths || []), await uploadAll(a.refAudioPaths || [])];
   let graph = injectWorkflow({ workflow: a.workflow, info: a.info, promptText: a.promptText, refImageFilenames: images, refVideoFilenames: videos, refAudioFilenames: audios, fieldValues: a.fieldValues, randomizeSeed: a.randomizeSeed, seed: a.seed });
   graph = pruneToOutput(graph, a.info.outputNodeId);
 

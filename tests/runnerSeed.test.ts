@@ -12,3 +12,12 @@ describe("injectWorkflow seeds", () => {
     expect([same["1"].inputs.seed, same["2"].inputs.noise_seed]).toEqual([5, 7]);
   });
 });
+
+import { cropsToCenter } from "../comfyTool/runner";
+describe("cropsToCenter", () => {
+  it("spots a picture that ends in a centre-cropping image encoder", () => {
+    const g = { 2: { class_type: "LoadImage", inputs: { image: "x.png" } }, 3: { class_type: "CLIPVisionEncode", inputs: { image: ["2", 0], crop: "center" } } };
+    expect(cropsToCenter(g, "2")).toBe(true);
+    expect(cropsToCenter({ ...g, 3: { class_type: "CLIPVisionEncode", inputs: { image: ["2", 0], crop: "none" } } }, "2")).toBe(false);
+  });
+});
