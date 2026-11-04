@@ -16,6 +16,7 @@ import { applyPreset, CHAT_PRESETS, LENGTH_PRESETS, type SeriesTemplate, api, as
 import { RefDrop } from "./RefDrop";
 import { seriesPhotos, syncPhotos } from "./photos";
 import { isChatModel, loadRecords, noteOutcome, rateModel, recommend, TIER_LABEL, tierRank } from "./modelRating";
+import { personVoice, rekeyPeople, toggleVoiceWord, voiceCastInstruction } from "../../../../seriesTool/voices";
 import { adoptPlannedPeople, castInstruction, ensureCast, peopleOf, renamePerson, setSkip, wantsStill, type Person } from "./people";
 import { kindOf, refKindInfo } from "../../../../seriesTool/refKinds";
 import { WorkflowCheck } from "./WorkflowPicker";
@@ -52,7 +53,7 @@ const PART = 10;
 /** How many clips an episode needs to last `seconds`; the old fixed length (8) when nothing was chosen. */
 const sceneTarget = (project: Project) => (project.episodeSeconds ? Math.max(2, Math.round(project.episodeSeconds / Math.max(1, project.settings.seconds || 7))) : 8);
 
-function rulesFor(fmt: SeriesFormat, people: Person[], scenes = 8, photos = 0) {
+function rulesFor(fmt: SeriesFormat, people: Person[], scenes = 8, photos = 0, voices?: Project["people"]) {
   const lineRule = fmt.speech === "none"
     ? `- The "vo" line is only a short note (${fmt.lineWords} words) for the editor: nothing is spoken in the clip.`
     : `- Every "vo" line is ${fmt.lineWords} words: it is ${fmt.speech === "voiceover" ? "spoken over" : fmt.speech === "sung" ? "sung during" : "said on camera in"} one short clip.`;
@@ -65,13 +66,13 @@ ${lineRule}
 - Every scene needs a real, specific "shot" (what the camera sees and what the person does) and a real "vo". Never leave them empty and never repeat the same text in two fields.
 - Always leave "textCard" empty. Subtitles and captions are added later by the editor, never inside the clips.
 - Image prompts should describe a photographic still, with lighting and grade, not a character sheet.
-${people.length ? castInstruction(people) : photos > 0 ? `- ${photos} reference photo${photos === 1 ? " is" : "s are"} already attached for the people of this series. Do NOT write a "character" ref for anyone who appears in an attached photo: the photo itself is used in the scenes. Name that person in each scene's "cast" and write refs only for outfits, products and places.` : `- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.`}
+${people.length ? castInstruction(people) + (voiceCastInstruction(people.map(x => x.name), voices) ? " " + voiceCastInstruction(people.map(x => x.name), voices) : "") : photos > 0 ? `- ${photos} reference photo${photos === 1 ? " is" : "s are"} already attached for the people of this series. Do NOT write a "character" ref for anyone who appears in an attached photo: the photo itself is used in the scenes. Name that person in each scene's "cast" and write refs only for outfits, products and places.` : `- If a person must look exactly like an attached reference photo, give them a "character" ref and mention the photo in its prompt.`}
 - A ref may carry a "kind": person, outfit, product, location, pose, prop, palette or style. Give each outfit or product its own ref with that kind.
 - Scene "refs" lists ref names from the same episode, style_plate first.`;
 }
 
 /** Asks for the whole plan: every episode of the season, or exactly `count` of them. */
-function planInstruction(fmt: SeriesFormat, count: number, people: Person[], scenes = 8, photos = 0) {
+function planInstruction(fmt: SeriesFormat, count: number, people: Person[], scenes = 8, photos = 0, voices?: Project["people"]) {
   return `Turn our discussion into a production plan and reply with JSON only - no commentary, no code fences.
 ${count > 0 ? `Write exactly ${count} episode${count > 1 ? "s" : ""}.` : "Write every episode we discussed."}
 
@@ -80,11 +81,11 @@ Shape - a JSON array of episodes:
   ${episodeShape(people.length > 0)}
 ]
 
-${rulesFor(fmt, people, scenes, photos)}`;
+${rulesFor(fmt, people, scenes, photos, voices)}`;
 }
 
 /** Asks for one more episode that carries on from the ones already planned. */
-function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[], scenes = 8, photos = 0) {
+function nextEpisodeInstruction(fmt: SeriesFormat, project: Project, direction: string, people: Person[], scenes = 8, photos = 0, voices = project.people) {
   const number = (project.episodes[project.episodes.length - 1]?.number || 0) + 1;
   const recap = project.episodes.map(e => `Episode ${e.number} "${e.title}" (${e.era || "no period"}): ${e.scenes.slice(0, 2).map(sc => sc.vo).filter(Boolean).join(" / ")}${e.hookOut ? ` - ends with: ${e.hookOut}` : ""}`).join("\n");
   return `Write the NEXT episode, number ${number}, and reply with JSON only - no commentary, no code fences.
@@ -98,7 +99,7 @@ ${direction.trim() ? `What I want in this episode: ${direction.trim()}
 Shape - one JSON object (a single episode, not an array):
 ${episodeShape(people.length > 0).replace('"number": 1', `"number": ${number}`)}
 
-${rulesFor(fmt, people, scenes, photos)}`;
+${rulesFor(fmt, people, scenes, photos, voices)}`;
 }
 
 /** The plan the page already holds, written back in the shape the planner uses, so one more episode can be added without losing renders. */
@@ -106,7 +107,7 @@ function planJson(project: Project) {
   return project.episodes.map(e => ({
     number: e.number, title: e.title, era: e.era, hookOut: e.hookOut, group: e.group,
     refs: e.refs.map(r => ({ name: r.name, role: r.role, kind: r.kind, person: r.person, skip: r.skip, prompt: r.prompt, negative: r.negative, seed: r.seed })),
-    scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, shot: sc.shot, textCard: sc.textCard, cast: sc.cast, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
+    scenes: e.scenes.map(sc => ({ number: sc.number, vo: sc.vo, lines: sc.lines, shot: sc.shot, textCard: sc.textCard, cast: sc.cast, seed: sc.seed, refs: sc.refIds.map(id => e.refs.find(r => r.id === id)?.name).filter(Boolean) })),
   }));
 }
 
@@ -345,6 +346,11 @@ export function Develop({ project, modelId, models, onSaved, focusAdd, onGoProdu
   const [step, setStep] = React.useState<number>(() => (project.episodes.length ? 3 : project.idea.logline.trim() ? 2 : 1));
   /** Opens the Reference photos card and brings it into view. */
   /** Builds a training dataset from one person's photos, then opens Train LoRA with it chosen and the trigger word filled in. */
+  const setPersonVoice = async (name: string, voice: string) => {
+    const people = { ...(project.people || {}), [name]: { ...(project.people?.[name] || {}), voice: voice.trim() } };
+    if (!voice.trim()) delete people[name];
+    if (JSON.stringify(people) !== JSON.stringify(project.people || {})) onSaved(await api.patch(project.id, { people }));
+  };
   const trainPerson = async (name: string) => {
     try {
       const r = await fetch("/api/train/lora/from-series", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, person: name }) });
@@ -609,7 +615,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         ...storyBlocks,
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
-      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project), sceneTarget(project), photoCount), a => setRawPlan(a));
+      const episodes = await askForJson(base, planInstruction(fmt, episodeCount, peopleOf(project), sceneTarget(project), photoCount, project.people), a => setRawPlan(a));
       // Asked for one episode, a model often sends the episode itself rather than a list of one.
       const list = Array.isArray(episodes) ? episodes : Array.isArray(episodes?.episodes) ? episodes.episodes : episodes && typeof episodes === "object" && Array.isArray(episodes.scenes) ? [episodes] : null;
       if (!list) throw new Error("The plan must be a list of episodes.");
@@ -1002,14 +1008,22 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             <div className="space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-2.5">
               <div className="text-[10px] uppercase tracking-wider text-neutral-500">People in this series</div>
               {peopleOf(project).map(person => (
-                <div key={person.name} className="flex items-center gap-2 text-xs text-neutral-300">
-                  <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
+                <React.Fragment key={person.name}>
+                <div className="flex items-center gap-2 text-xs text-neutral-300">
+                  <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to), ...(rekeyPeople(project.people, person.name, to) !== project.people ? { people: rekeyPeople(project.people, person.name, to) } : {}) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
                   <span className="shrink-0 text-[10px] text-neutral-500">{person.photos.length} photo{person.photos.length === 1 ? "" : "s"}</span>
                   <label className="flex shrink-0 items-center gap-1 text-[10px] text-neutral-400" title="Off: this person appears as their own photo, used as it is. On: ComfyUI first makes a new picture from the photos and the scenes use that."><input type="checkbox" checked={wantsStill(project, person.name)} onChange={async e => { const stillPeople = e.target.checked ? [...(project.stillPeople || []), person.name] : (project.stillPeople || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()); const next = { ...project, stillPeople }; onSaved(await api.patch(project.id, { stillPeople, episodes: ensureCast(next) })); }} />make a picture</label>
                   <button onClick={() => trainPerson(person.name)} title="Build a LoRA dataset from this person's photos and open Train LoRA with their trigger word" className="shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-[10px] text-neutral-300 hover:border-violet-500 hover:text-violet-200">Train a LoRA</button>
                 </div>
+                <div className="-mt-0.5 mb-1 space-y-1 pl-1">
+                  <input key={personVoice(project.people, person.name) || ""} defaultValue={personVoice(project.people, person.name) || ""} placeholder={`${person.name}'s own voice (empty: the series voice)`} onBlur={e => setPersonVoice(person.name, e.target.value)} className="w-full rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-[11px] focus:outline-none focus:border-sky-600" />
+                  <div className="flex flex-wrap gap-1">
+                    {VOICE_TAGS.map(t => <button key={t} onClick={() => setPersonVoice(person.name, toggleVoiceWord(personVoice(project.people, person.name), t))} className={"rounded-full border px-2 py-0.5 text-[10px] transition " + ((personVoice(project.people, person.name) || "").split(/,\s*/).includes(t) ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-500 hover:text-neutral-200 hover:border-neutral-500")}>{t}</button>)}
+                  </div>
+                </div>
+                </React.Fragment>
               ))}
-              <p className="text-[10px] leading-relaxed text-neutral-600">Each person appears as their own photo, used as it is. Tick "make a picture" only if you want ComfyUI to make a new picture of them first. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
+              <p className="text-[10px] leading-relaxed text-neutral-600">A voice set here is used for that person's lines (dialogue is added per scene in Produce). Each person appears as their own photo, used as it is. Tick "make a picture" only if you want ComfyUI to make a new picture of them first. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
             </div>
           )}
           {project.episodes.length > 1 && seriesPhotos(project).length > 0 && (

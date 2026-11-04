@@ -17,7 +17,7 @@ export interface Ref {
 }
 
 export interface Scene {
-  id: string; number: number; vo: string; shot: string; textCard: string;
+  id: string; number: number; vo: string; lines?: { speaker?: string; text: string }[]; shot: string; textCard: string;
   refIds: string[]; cast?: string[]; seed: number; promptText: string; promptEdited: boolean;
   status: Status; clipPath: string | null; durationS: number | null;
   promptId: string | null; error: string | null;
@@ -62,6 +62,8 @@ export interface Project {
   /** Burn each scene's text card into the picture. Off by default. */
   allowTextCards?: boolean;
   stillPeople?: string[];
+  /** Optional own voice per person, keyed by name (seriesTool/voices.ts). */
+  people?: Record<string, { voice?: string }>;
   episodeSeconds?: number;
   bible?: { characters: string; places: string; rules: string; extra: string };
   creativity?: number;

@@ -100,7 +100,10 @@ export function renamePerson(project: Project, from: string, to: string): Episod
   return project.episodes.map(ep => ({
     ...ep,
     refs: ep.refs.map(r => (same(r.person, from) ? { ...r, person: name, ...(same(r.name, from) ? { name } : {}) } : r)),
-    scenes: ep.scenes.map(sc => (sc.cast?.some(n => same(n, from)) ? { ...sc, cast: sc.cast.map(n => (same(n, from) ? name : n)) } : sc)),
+    scenes: ep.scenes.map(sc => {
+      const s = sc.cast?.some(n => same(n, from)) ? { ...sc, cast: sc.cast.map(n => (same(n, from) ? name : n)) } : sc;
+      return s.lines?.some(l => same(l.speaker, from)) ? { ...s, lines: s.lines.map(l => (same(l.speaker, from) ? { ...l, speaker: name } : l)) } : s;
+    }),
   }));
 }
 

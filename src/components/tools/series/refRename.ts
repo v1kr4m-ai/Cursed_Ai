@@ -22,6 +22,9 @@ export function replaceName(text: string, from: string, to: string): string {
   return out + text.slice(at);
 }
 
+/** Renaming this card renames the person everywhere (people.* keys and dialogue speakers follow). */
+export const isWholePerson = (ref: Ref) => kindOf(ref) === "person" && same(ref.person || ref.name, ref.name);
+
 /** The episodes after giving a reference a new name; unchanged when the name is empty or the same. */
 export function renameRef(episodes: Episode[], episodeId: string, refId: string, rawName: string): Episode[] {
   const name = rawName.trim();
@@ -29,7 +32,7 @@ export function renameRef(episodes: Episode[], episodeId: string, refId: string,
   if (!ref || !name || name === ref.name) return episodes;
   const old = ref.name;
   // A person is one name shared by all their pictures in every episode: rename them all together.
-  const wholePerson = kindOf(ref) === "person" && same(ref.person || ref.name, ref.name);
+  const wholePerson = isWholePerson(ref);
   const swap = (t: string) => replaceName(t, old, name);
   return episodes.map(e => {
     if (!wholePerson && e.id !== episodeId) return e;
@@ -43,6 +46,7 @@ export function renameRef(episodes: Episode[], episodeId: string, refId: string,
         ...sc,
         shot: swap(sc.shot), vo: swap(sc.vo), textCard: swap(sc.textCard), promptText: swap(sc.promptText),
         cast: sc.cast?.map(c => (same(c, old) ? name : c)),
+        ...(sc.lines ? { lines: sc.lines.map(l => ({ ...l, ...(same(l.speaker, old) ? { speaker: name } : {}), text: swap(l.text) })) } : {}),
       })),
     };
   });

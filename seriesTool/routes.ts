@@ -22,6 +22,7 @@ import { fillSlots, refSourceFiles } from "./refSources";
 import { refKindInfo } from "./refKinds";
 import { buildScenePrompt, newId, snapFrames, type Episode, type Project, type Ref, type Scene, type Source, type Status } from "./model";
 import { createSeriesStore } from "./store";
+import { importLines, joinLines } from "./voices";
 
 type Json = Record<string, any>;
 
@@ -804,10 +805,12 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
           const refIds = (Array.isArray(s.refs) ? s.refs : [])
             .map((name: string) => refs.find(r => r.name === name)?.id)
             .filter(Boolean) as string[];
+          const lines = importLines(s.lines);
           return {
             id: prior?.id || newId(),
             number: sceneNumber,
-            vo: String(s.vo || ""),
+            vo: String(s.vo || "") || joinLines(lines),
+            lines: lines.length ? lines : undefined,
             shot: String(s.shot || ""),
             textCard: String(s.textCard || ""),
             refIds: refIds.length ? refIds : refs.filter(r => r.role === "style").map(r => r.id),

@@ -145,7 +145,7 @@ export function EpisodeManager({ project, onSaved }: { project: Project; onSaved
                           )}
                         </span></div>
                       <textarea key={s.id + s.shot} defaultValue={s.shot} rows={2} onBlur={ev => ev.target.value !== s.shot && editScene(e.id, s.id, { shot: ev.target.value })} placeholder="Shot" className={field + " resize-none"} />
-                      <textarea key={s.id + s.vo} defaultValue={s.vo} rows={2} onBlur={ev => ev.target.value !== s.vo && editScene(e.id, s.id, { vo: ev.target.value })} placeholder="Line" className={field + " mt-1 resize-none"} />
+                      <textarea key={s.id + s.vo} defaultValue={s.vo} rows={2} onBlur={ev => ev.target.value !== s.vo && editScene(e.id, s.id, { vo: ev.target.value, ...(s.lines ? { lines: undefined } : {}) })} placeholder="Line" className={field + " mt-1 resize-none"} />
                     </div>
                   ))}
                 </div>

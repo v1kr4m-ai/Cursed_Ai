@@ -88,7 +88,7 @@ function RedoCard({ project, onChanged, onGo }: { project: Project; onChanged?: 
     setBusy(true); setNote("");
     try {
       if (changed) {
-        const episodes = project.episodes.map(e => e.id !== ep!.id ? e : { ...e, scenes: e.scenes.map(s => s.id !== scene!.id ? s : { ...s, shot, vo, ...(s.promptEdited ? {} : { promptText: "" }) }) });
+        const episodes = project.episodes.map(e => e.id !== ep!.id ? e : { ...e, scenes: e.scenes.map(s => s.id !== scene!.id ? s : { ...s, shot, vo, ...(vo !== s.vo && s.lines ? { lines: undefined } : {}), ...(s.promptEdited ? {} : { promptText: "" }) }) });
         onChanged?.(await api.patch(project.id, { episodes }));
       }
       await api.generateScene(project.id, scene!.id);

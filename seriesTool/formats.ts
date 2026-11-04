@@ -6,6 +6,7 @@
  * Pure data and string building: the server uses it to build prompts, the page to show the choices.
  */
 
+import { cleanLines, isMultiSpeaker, type SceneLine } from "./voices";
 export type Speech = "voiceover" | "oncamera" | "dialogue" | "sung" | "none";
 
 /** Whether the clips carry a voice: the style's own choice, never, or always (the person talks to the camera). */
@@ -232,13 +233,25 @@ export const NO_TEXT = "No subtitles, captions, lyrics text, watermarks, logos o
  * The three prompt fields the video model expects for one scene.
  * `voice` is the project's own voice description; the format's default replaces the narrator default.
  */
-export function sceneFields(opts: { format: SeriesFormat; look: string; voice: string; line: string; shot: string; card: string; allowCard: boolean }) {
+export function sceneFields(opts: { format: SeriesFormat; look: string; voice: string; line: string; shot: string; card: string; allowCard: boolean; lines?: SceneLine[]; voiceOf?: (speaker: string) => string | undefined }) {
   const { format, line, shot } = opts;
   const look = [cleanLook(opts.look), format.look].filter(Boolean).join(" ");
   const card = opts.allowCard && opts.card.trim() ? ` Plain white text reading "${opts.card.trim()}" appears low in the frame.` : "";
   const noText = opts.allowCard && opts.card.trim() ? "" : ` ${NO_TEXT}`;
   const text = line.trim();
   let spoken = "";
+  // Several speakers: each line carries its speaker's own voice (the project voice when they have none).
+  const lines = cleanLines(opts.lines); // blanks and malformed entries dropped first, so an empty added line changes nothing
+  const multi = isMultiSpeaker(lines) && format.speech !== "none" ? lines : [];
+  if (multi.length) {
+    const say = (l: SceneLine) => {
+      const v = (l.speaker && opts.voiceOf?.(l.speaker)) || opts.voice;
+      const who = l.speaker ? (v ? `${l.speaker} (${v})` : l.speaker) : format.speech === "voiceover" ? `A ${v}` : `The person in the shot, ${v},`;
+      const how = format.speech === "voiceover" ? "says in an off-screen voiceover" : format.speech === "sung" ? "sings, with natural lip movement" : "says, with natural lip movement";
+      return `${who} ${how}: <d>[English] ${l.text.trim()}</d>`;
+    };
+    spoken = " " + multi.map(say).join(" ");
+  } else
   switch (format.speech) {
     case "voiceover": spoken = text ? ` A ${opts.voice} says in an off-screen voiceover: <d>[English] ${text}</d>` : ""; break;
     case "oncamera": spoken = text ? ` The person in the shot, ${opts.voice}, looks at the camera and says, with natural lip movement: <d>[English] ${text}</d>` : ""; break;

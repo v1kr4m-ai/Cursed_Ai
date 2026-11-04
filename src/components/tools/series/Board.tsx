@@ -8,6 +8,7 @@ import { RenderQueue } from "./RenderQueue";
 import { useWorkflowInfo } from "./workflows";
 import { WorkflowCheck } from "./WorkflowPicker";
 import { ZoomImage } from "./ZoomImage";
+import { cleanLines, joinLines, rekeyPeople } from "../../../../seriesTool/voices";
 import { projectFormat } from "../../../../seriesTool/formats";
 import { kindOf, refKindInfo, REF_KINDS } from "../../../../seriesTool/refKinds";
 import { motion, AnimatePresence } from "motion/react";
@@ -21,7 +22,7 @@ import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type St
 /** Same file, whatever the slashes or letter case (Windows paths). */
 const sameFile = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
 import { RefDrop } from "./RefDrop";
-import { newRef, renameRef } from "./refRename";
+import { isWholePerson, newRef, renameRef } from "./refRename";
 
 /**
  * Stage 2. The production board: every episode, its reference stills and its scenes, each with a
@@ -81,7 +82,8 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
   const rename = async () => {
     const name = nameDraft.trim();
     if (!name || name === ref_.name) { setNameDraft(ref_.name); return; }
-    onChanged(await api.patch(project.id, { episodes: renameRef(project.episodes, episode.id, ref_.id, name) }));
+    const people = isWholePerson(ref_) ? rekeyPeople(project.people, ref_.name, name) : project.people;
+    onChanged(await api.patch(project.id, { episodes: renameRef(project.episodes, episode.id, ref_.id, name), ...(people !== project.people ? { people } : {}) }));
   };
   const picker = React.useRef<HTMLInputElement>(null);
   const [swapping, setSwapping] = React.useState(false);
@@ -286,8 +288,9 @@ function SceneCard({ project, episode, scene, running, onChanged, takes = [], pi
     try { await api.pickTake(project.id, scene.id, shownTake); onChanged(await api.get(project.id)); setShownTake(null); }
     catch (e: any) { notifyError(e?.message || String(e), "series"); }
   };
-  const [draft, setDraft] = React.useState(scene);
-  React.useEffect(() => setDraft(scene), [scene.id, scene.status, scene.clipPath]);
+  const tidy = (s: Scene): Scene => (s.lines === undefined ? s : { ...s, lines: cleanLines(s.lines).length ? cleanLines(s.lines) : undefined });
+  const [draft, setDraft] = React.useState(() => tidy(scene));
+  React.useEffect(() => setDraft(tidy(scene)), [scene.id, scene.status, scene.clipPath]);
 
   const isRunning = running?.targetId === scene.id;
   const fmt = projectFormat(project);
@@ -303,6 +306,9 @@ function SceneCard({ project, episode, scene, running, onChanged, takes = [], pi
     const episodes = project.episodes.map(e => e.id !== episode.id ? e : { ...e, scenes: e.scenes.map(s => (s.id === scene.id ? next : s)) });
     onChanged(await api.patch(project.id, { episodes }));
   };
+
+  /** Dialogue lines: `vo` keeps the joined text; no lines left means the plain single line again. */
+  const setLines = (lines: { speaker?: string; text: string }[]) => save(lines.length ? { lines, vo: joinLines(lines) } : { lines: undefined });
 
   const toggleRef = (refId: string) => {
     const has = draft.refIds.includes(refId);
@@ -407,7 +413,24 @@ function SceneCard({ project, episode, scene, running, onChanged, takes = [], pi
                   <span className="flex items-center gap-1"><Mic size={10} /> {fmt.lineLabel}</span>
                   <motion.span animate={{ color: inRange ? "rgb(52 211 153)" : "rgb(251 191 36)" }}>{words} words{fmt.speech === "none" ? "" : ` (aim for ${fmt.lineWords})`}</motion.span>
                 </label>
-                <textarea className={`${field} h-16 resize-none text-xs`} value={draft.vo} onChange={e => setDraft({ ...draft, vo: e.target.value })} onBlur={() => save({ vo: draft.vo })} />
+                {draft.lines?.length ? (
+                  <div className="space-y-1">
+                    {draft.lines.map((l, i) => (
+                      <div key={i} className="flex items-start gap-1">
+                        <select className={`${field} !w-28 shrink-0 !px-1.5 !py-1.5 text-xs`} value={l.speaker || ""} title="Who says this line (their own voice is used)" onChange={e => setLines(draft.lines!.map((x, j) => (j === i ? { ...x, speaker: e.target.value || undefined } : x)))}>
+                          <option value="">{fmt.speech === "voiceover" ? "Narrator" : "Series voice"}</option>
+                          {people.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                          {l.speaker && !people.some(p => p.name === l.speaker) && <option value={l.speaker}>{l.speaker}</option>}
+                        </select>
+                        <textarea className={`${field} !w-auto min-w-0 flex-1 h-10 resize-none text-xs`} value={l.text} onChange={e => setDraft({ ...draft, lines: draft.lines!.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)) })} onBlur={() => setLines(draft.lines!)} />
+                        <button className="px-1 text-neutral-500 hover:text-rose-300" title="Remove this line" onClick={() => setLines(draft.lines!.filter((_, j) => j !== i))}>x</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <textarea className={`${field} h-16 resize-none text-xs`} value={draft.vo} onChange={e => setDraft({ ...draft, vo: e.target.value })} onBlur={() => save({ vo: draft.vo })} />
+                )}
+                {fmt.speech !== "none" && <button className="mt-1 text-[11px] text-sky-300 hover:underline" onClick={() => setLines([...(draft.lines?.length ? draft.lines : draft.vo.trim() ? [{ text: draft.vo.trim() }] : []), { speaker: people[0]?.name, text: "" }])}>+ Add line (another speaker)</button>}
               </div>
               <div>
                 <label className="flex items-center gap-1 text-[11px] text-neutral-500"><Clapperboard size={10} /> Shot</label>

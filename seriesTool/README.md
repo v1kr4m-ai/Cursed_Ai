@@ -8,6 +8,8 @@ Open it from the **Series** tab in the sidebar.
 
 ## The flow
 
+Several voices: `project.people[name].voice` (optional, free text plus the voice chips in Develop's "People in this series") is that person's own voice; a person without one speaks with the project voice. A scene may carry `lines: {speaker?, text}[]` (dialogue, edited in Produce with "+ Add line"); `vo` stays the joined text so subtitles and word counts are unchanged. `sceneFields` (formats.ts) puts each speaker's voice in front of their line only when a line names a speaker or there are several lines; scenes without `lines` produce exactly the old prompt. The planner is told the cast and voices and may add `lines`; `vo` is still required. Pure helpers live in `voices.ts`.
+
 Develop steps are Story, Look and voice, Episodes, Reference photos; the last step ends in a "Go to Produce" button (off until an episode is planned). Look and voice are tag lists stored as one comma-separated string (`format: "ugc,vlog"`, `voice: "on,warm"`); an old single value is a list of one. The first look tag is the main style, the rest add their camera phrase; voice has one mode (auto/off/on) plus descriptor tags. In Produce a reference card can be renamed (a person is renamed in every episode, scenes' cast, shot, line and prompt included; the picture stays) and new empty references added (`src/components/tools/series/refRename.ts`).
 
 ```

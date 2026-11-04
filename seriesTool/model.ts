@@ -42,6 +42,8 @@ export interface Scene {
   textCard: string;
   /** Ref ids in connection order: these become <Picture 1>..<Picture N> in the prompt. */
   refIds: string[];
+  /** Dialogue: several lines, each by a speaker (a person of the series; none = the project voice). Optional; `vo` keeps the joined text. */
+  lines?: SceneLine[];
   /** The people who appear in this scene, by name; their pictures lead the reference order. */
   cast?: string[];
   seed: number;
@@ -55,6 +57,7 @@ export interface Scene {
   error: string | null;
 }
 
+import { personVoice, type PeopleVoices, type SceneLine } from "./voices";
 import type { Subtitles } from "./subtitlesCore";
 import { projectFormat, sceneFields } from "./formats";
 import { kindOf, refKindInfo, REF_KINDS } from "./refKinds";
@@ -141,6 +144,8 @@ export interface Project {
   format?: string;
   /** Voice in the clips: the style's own choice (auto), none (off, clean for your own music) or always talking (on). */
   voice?: string;
+  /** Optional own voice per person of the series, keyed by name; a person without one speaks with `voice`. */
+  people?: PeopleVoices;
   /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
   allowTextCards?: boolean;
   /** People who get a picture generated from their photos. Everyone else appears as their own photo, used as it is. */
@@ -203,7 +208,7 @@ export function buildScenePrompt(project: Project, episode: Episode, scene: Scen
   const format = projectFormat(project);
   // The default narrator is for narration; an on-camera format needs a person's voice instead.
   const voice = format.voice && project.voiceLock === DEFAULT_VOICE_LOCK ? format.voice : project.voiceLock;
-  const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });
+  const fields = sceneFields({ format, look: project.styleLock, voice, line: scene.vo, lines: scene.lines, voiceOf: n => personVoice(project.people, n), shot: scene.shot, card: scene.textCard, allowCard: !!project.allowTextCards });
 
   // With several people in the shot, say who is who and that they must stay different.
   const people = refs.map((r, i) => ({ r, i })).filter(({ r }) => kindOf(r) === "person" && r.person);
