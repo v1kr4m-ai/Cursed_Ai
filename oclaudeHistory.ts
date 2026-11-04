@@ -74,11 +74,11 @@ export function cwdOf(lines: string[]): string | null {
 }
 
 /** Every folder Claude Code has sessions in, newest first, with how many and whether the folder still exists. Temporary folders are left out. */
-export function listFolders(home = os.homedir()): { cwd: string; count: number; updatedAt: number; exists: boolean }[] {
+export function listFolders(home = os.homedir()): { cwd: string; count: number; updatedAt: number; exists: boolean; dir: string }[] {
   const root = path.join(home, ".claude", "projects");
   let dirs: string[];
   try { dirs = fs.readdirSync(root); } catch { return []; }
-  const out: { cwd: string; count: number; updatedAt: number; exists: boolean }[] = [];
+  const out: { cwd: string; count: number; updatedAt: number; exists: boolean; dir: string }[] = [];
   for (const d of dirs) {
     const dir = path.join(root, d);
     let files: { f: string; t: number }[];
@@ -94,7 +94,7 @@ export function listFolders(home = os.homedir()): { cwd: string; count: number; 
       if (cwd) break;
     }
     if (!cwd || /[\\/](temp|tmp)[\\/]/i.test(cwd)) continue;
-    out.push({ cwd, count: files.length, updatedAt: files[0].t, exists: fs.existsSync(cwd) });
+    out.push({ cwd, count: files.length, updatedAt: files[0].t, exists: fs.existsSync(cwd), dir });
   }
   return out.sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -104,6 +104,23 @@ export function deleteSession(cwd: string, id: string, home?: string): boolean {
   if (!/^[A-Za-z0-9-]+$/.test(id)) return false;
   const file = path.join(projectDirFor(cwd, home), id + ".jsonl");
   try { fs.unlinkSync(file); return true; } catch { return false; }
+}
+
+/**
+ * Folders whose project is gone from the disk, with how many sessions each holds. With `remove`, deletes those folders' session
+ * transcripts (the .jsonl files only, nothing else in Claude Code's folder). A folder on a drive that is not connected right now
+ * counts as present, so an unplugged disk never loses its history.
+ */
+export function purgeMissingFolders(remove: boolean, home = os.homedir()): { folders: { cwd: string; count: number }[]; deleted: number } {
+  const folders: { cwd: string; count: number }[] = [];
+  let deleted = 0;
+  for (const f of listFolders(home)) {
+    if (f.exists || !fs.existsSync(path.parse(f.cwd).root)) continue;
+    folders.push({ cwd: f.cwd, count: f.count });
+    if (!remove) continue;
+    for (const n of fs.readdirSync(f.dir)) if (n.endsWith(".jsonl")) { try { fs.unlinkSync(path.join(f.dir, n)); deleted++; } catch { /* in use */ } }
+  }
+  return { folders, deleted };
 }
 
 export function readSession(cwd: string, id: string, home?: string): HistoryItem[] | null {

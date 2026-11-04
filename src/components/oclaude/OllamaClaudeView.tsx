@@ -313,6 +313,19 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
     fetch("/api/oclaude/missing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: folderKey.split("|") }) }).then(r => r.json()).then(d => setGone(d.missing || [])).catch(() => {});
   }, [folderKey, folderTick]);
   const isGone = (cwd: string) => gone.some(g => same(g, cwd));
+  /** Deletes the saved sessions of folders that are gone from the disk - after showing what and how many. */
+  const purgeGone = async () => {
+    try {
+      const post = (remove: boolean) => fetch("/api/oclaude/purge-missing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remove }) }).then(r => r.json());
+      const p = await post(false);
+      const total = (p.folders || []).reduce((n: number, f: { count: number }) => n + f.count, 0);
+      if (!total) { setFolderTick(n => n + 1); return; }
+      const names = (p.folders as { cwd: string; count: number }[]).slice(0, 12).map(f => `${f.count}  ${f.cwd}`).join("\n");
+      if (!window.confirm(`Permanently delete ${total} saved session${total === 1 ? "" : "s"} of ${p.folders.length} folder${p.folders.length === 1 ? "" : "s"} that no longer exist?\n\n${names}${p.folders.length > 12 ? "\n..." : ""}\n\nThis cannot be undone.`)) return;
+      await post(true);
+    } catch { /* server restarting */ }
+    setFolderTick(n => n + 1);
+  };
   const loadFolder = (cwd: string) => fetch("/api/oclaude/history?cwd=" + encodeURIComponent(cwd)).then(r => r.json()).then(d => setTreeSessions(m => ({ ...m, [cwd]: d.sessions || [] }))).catch(() => {});
   const toggleFolder = (cwd: string) => {
     const next = openFolders.includes(cwd) ? openFolders.filter(x => x !== cwd) : [...openFolders, cwd];
@@ -478,6 +491,7 @@ export function OllamaClaudeView({ settings }: { settings: AppSettings }) {
             <div className="flex items-center gap-1 px-1 text-[11px] text-zinc-500">
               <button onClick={() => setFolderTick(n => n + 1)} title="Check the folders again: sessions of folders you deleted drop out of the list" className="flex items-center gap-1 rounded-lg px-1.5 py-1 hover:bg-white/5 hover:text-zinc-300"><RefreshCw size={11} />Refresh</button>
               {gone.length > 0 && <button onClick={() => setShowGone(v => !v)} className="rounded-lg px-1.5 py-1 hover:bg-white/5 hover:text-zinc-300">{showGone ? "Hide" : "Show"} {gone.length} missing {gone.length === 1 ? "folder" : "folders"}</button>}
+              {gone.length > 0 && <button onClick={purgeGone} title="Delete the saved sessions of folders that no longer exist (asks first)" className="rounded-lg px-1.5 py-1 hover:bg-red-500/10 hover:text-red-300">Delete…</button>}
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">

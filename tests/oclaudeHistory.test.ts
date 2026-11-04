@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { deleteSession, itemsOf, listFolders, listSessions, projectDirFor, readSession, titleOf } from "../oclaudeHistory";
+import { deleteSession, itemsOf, listFolders, purgeMissingFolders, listSessions, projectDirFor, readSession, titleOf } from "../oclaudeHistory";
 
 const line = (o: any) => JSON.stringify(o);
 
@@ -54,6 +54,21 @@ describe("a folder's Claude Code sessions", () => {
     const d = projectDirFor(real, home); fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(path.join(d, "a.jsonl"), line({ type: "user", cwd: real, message: { content: "hi" } }));
     expect(listFolders(home)).toEqual([expect.objectContaining({ cwd: real, exists: true })]);
+  });
+});
+
+describe("purgeMissingFolders", () => {
+  it("lists folders that are gone and deletes only their session transcripts when asked", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+    const put = (cwd: string, id: string) => { const d = projectDirFor(cwd, home); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, id + ".jsonl"), line({ type: "user", cwd, message: { content: "hi" } })); return d; };
+    const gone = "C:/definitely/not/here/shop";
+    const dGone = put(gone, "a"); put(gone, "b"); fs.writeFileSync(path.join(dGone, "notes.txt"), "keep");
+    const kept = put(process.cwd(), "c");
+    expect(purgeMissingFolders(false, home)).toEqual({ folders: [{ cwd: gone, count: 2 }], deleted: 0 });
+    expect(fs.existsSync(path.join(dGone, "a.jsonl"))).toBe(true);
+    expect(purgeMissingFolders(true, home).deleted).toBe(2);
+    expect(fs.readdirSync(dGone)).toEqual(["notes.txt"]);
+    expect(fs.existsSync(path.join(kept, "c.jsonl"))).toBe(true);
   });
 });
 
