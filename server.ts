@@ -1718,12 +1718,12 @@ async function startServer() {
   registerOnlineModels(app, { get: () => serverConfig.online || {}, set: s => { serverConfig.online = s; saveConfig(); } });
   registerTrainTool(app, {
     appRoot: process.cwd(), dataDir: process.cwd(),
-    getConfig: () => serverConfig.train || {}, setConfig: c => { serverConfig.train = c; saveConfig(); },
+    getConfig: () => ({ ...(serverConfig.train || {}), comfyuiPath: serverConfig.comfyuiPath }), setConfig: c => { serverConfig.train = c; saveConfig(); },
     comfyUrl: COMFYUI_URL, ollamaUrl: OLLAMA_URL, geminiKey: () => geminiKey(),
     getComfyRoot: () => process.env.COMFYUI_PATH || serverConfig.comfyuiPath,
   });
-  registerSpeechTool(app, { appRoot: process.cwd(), getConfig: () => serverConfig.train || {} });
-  registerMobileTool(app, { appRoot: process.cwd(), getConfig: () => serverConfig.train || {} });
+  registerSpeechTool(app, { appRoot: process.cwd(), getConfig: () => ({ ...(serverConfig.train || {}), comfyuiPath: serverConfig.comfyuiPath }) });
+  registerMobileTool(app, { appRoot: process.cwd(), getConfig: () => ({ ...(serverConfig.train || {}), comfyuiPath: serverConfig.comfyuiPath }) });
   registerExport(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerFinish(app, { projectsRoot: path.join(process.cwd(), "series") });
   registerTemplates(app, { projectsRoot: path.join(process.cwd(), "series") });

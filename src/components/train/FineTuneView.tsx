@@ -273,7 +273,7 @@ export function FineTuneView() {
                   )}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2"><SelectField label="Model that writes the pairs" value={f.pairModel} onChange={v => set({ pairModel: v })} options={pairOptions} empty="Start Ollama, or add a Gemini key" hint="Offline models need nothing else. Online ones send the text to that service." /></div>
-                    {imageSource && <div className="col-span-2"><SelectField label="Reads pictures with" value={f.visionModel} onChange={v => set({ visionModel: v })} options={[{ value: "", label: "Florence-2 (FluxGym's environment)" }, ...pairModels.vision.map(m => ({ value: m, label: m + " (Ollama vision)" }))]} /></div>}
+                    {imageSource && <div className="col-span-2"><SelectField label="Reads pictures with" value={f.visionModel} onChange={v => set({ visionModel: v })} options={[{ value: "", label: "Florence-2 (LoRA trainer's environment)" }, ...pairModels.vision.map(m => ({ value: m, label: m + " (Ollama vision)" }))]} /></div>}
                     <NumberField label="Pairs per chunk" value={f.count} onChange={v => set({ count: v })} min={1} max={20} />
                     <TextField label="Topic hint (optional)" value={f.topic} onChange={v => set({ topic: v })} placeholder="e.g. our refund policy" />
                   </div>

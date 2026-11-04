@@ -104,7 +104,7 @@ export async function describeWithOllama(ollamaUrl: string, model: string, file:
 
 export const VISION_HINT = /llava|moondream|vision|vl\b|qwen2\.5vl|gemma3|minicpm|bakllava/i;
 
-/** Text of one source. Images use an Ollama vision model when one is given, otherwise Florence-2 through the FluxGym environment. */
+/** Text of one source. Images use an Ollama vision model when one is given, otherwise Florence-2 through the LoRA trainer environment. */
 export async function sourceText(s: Source, p: TrainPaths, o: { ollamaUrl: string; visionModel?: string }): Promise<string> {
   if (s.type === "text") return s.value;
   if (s.type === "pdf") return (await runPython(p.llmPython, [`${p.scriptsDir}/extract_pdf.py`, "--file", s.value])).trim();

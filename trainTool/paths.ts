@@ -1,6 +1,8 @@
 /**
- * Where the training tools live on this PC. The heavy parts (FluxGym with kohya sd-scripts, the Unsloth virtual environment, base models)
- * stay where they were set up; this app drives them. Every path can be changed in the page and is saved in config.json.
+ * Where the training tools live on this PC - all inside the app's own train/ folder: llm_finetune/ (the Unsloth
+ * environment), speech/, and lora/ (kohya sd-scripts, its own Python environment, datasets, outputs). The Flux weights
+ * a LoRA is trained on are read from ComfyUI's models folder, so they are not kept twice. Every path can be changed
+ * in the page and is saved in config.json.
  */
 import fs from "fs";
 import path from "path";
@@ -8,12 +10,13 @@ import path from "path";
 export interface TrainConfig {
   /** The folder that holds llm_finetune/ (the Unsloth venv, models, datasets, outputs). */
   trainRoot?: string;
-  /** FluxGym's folder (kohya sd-scripts, its venv, Flux weights). */
+  /** The LoRA trainer's folder (kohya sd-scripts, its env, datasets, outputs); default train/lora. */
   fluxgymRoot?: string;
+  /** ComfyUI's install (its models folder holds the Flux weights). */
+  comfyuiPath?: string;
 }
 
 const DEFAULT_TRAIN_ROOT = "D:\\Claude\\In_Progress\\Before_The_Dragons\\Train_LORA";
-const DEFAULT_FLUXGYM = "C:\\pinokio\\api\\fluxgym.git";
 
 export interface TrainPaths {
   trainRoot: string;
@@ -46,7 +49,14 @@ export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
   // The app's own train/ folder (Python environment, base models, datasets, outputs) wins; the old folder is only a fallback.
   const own = path.join(appRoot, "train");
   const trainRoot = cfg.trainRoot || (fs.existsSync(path.join(own, "llm_finetune")) || !fs.existsSync(DEFAULT_TRAIN_ROOT) ? own : DEFAULT_TRAIN_ROOT);
-  const fluxgymRoot = cfg.fluxgymRoot || DEFAULT_FLUXGYM;
+  const fluxgymRoot = cfg.fluxgymRoot || path.join(trainRoot, "lora");
+  // Flux weights: ComfyUI's models folder (unet / clip / vae), or a models/ folder inside the trainer's own folder.
+  const comfyModels = cfg.comfyuiPath ? path.join(cfg.comfyuiPath, "ComfyUI", "models") : "";
+  const model = (kind: string, ...names: string[]) => {
+    for (const dir of [comfyModels && path.join(comfyModels, kind), path.join(fluxgymRoot, "models", kind)].filter(Boolean) as string[])
+      for (const n of names) if (fs.existsSync(path.join(dir, n))) return path.join(dir, n);
+    return path.join(comfyModels ? path.join(comfyModels, kind) : path.join(fluxgymRoot, "models", kind), names[0]);
+  };
   const llmRoot = path.join(trainRoot, "llm_finetune");
   const win = process.platform === "win32";
   const py = (root: string) => path.join(root, "env", win ? "Scripts" : "bin", win ? "python.exe" : "python");
@@ -59,13 +69,13 @@ export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
     fluxPython: py(fluxgymRoot),
     fluxAccelerate: path.join(fluxgymRoot, "env", win ? "Scripts" : "bin", win ? "accelerate.exe" : "accelerate"),
     sdScripts: path.join(fluxgymRoot, "sd-scripts"),
-    fluxUnet: path.join(fluxgymRoot, "models", "unet", "flux1-dev.sft"),
-    fluxClipL: path.join(fluxgymRoot, "models", "clip", "clip_l.safetensors"),
-    fluxT5: path.join(fluxgymRoot, "models", "clip", "t5xxl_fp16.safetensors"),
-    fluxVae: path.join(fluxgymRoot, "models", "vae", "ae.sft"),
+    fluxUnet: model("unet", "flux1-dev.safetensors", "flux1-dev.sft"),
+    fluxClipL: model("clip", "clip_l.safetensors"),
+    fluxT5: model("clip", "t5xxl_fp16.safetensors"),
+    fluxVae: model("vae", "ae.safetensors", "ae.sft"),
     fluxDatasetsDir: path.join(fluxgymRoot, "datasets"),
     fluxOutputDir: path.join(fluxgymRoot, "outputs"),
-    fluxUnetDir: path.join(fluxgymRoot, "models", "unet"),
+    fluxUnetDir: comfyModels ? path.join(comfyModels, "unet") : path.join(fluxgymRoot, "models", "unet"),
     scriptsDir: path.join(appRoot, "trainTool", "scripts"),
     speechRoot: path.join(trainRoot, "speech"),
     speechDatasetsDir: path.join(trainRoot, "speech", "datasets"),

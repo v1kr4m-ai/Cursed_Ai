@@ -22,7 +22,7 @@ const DEFAULTS: Form = {
 
 interface Img { name: string; path: string; caption: string }
 
-/** Train a character LoRA for Flux: build the image dataset, caption it, train it. Drives FluxGym's kohya sd-scripts. */
+/** Train a character LoRA for Flux: build the image dataset, caption it, train it. Runs kohya sd-scripts from the app's own train/lora folder. */
 export function TrainLoraView() {
   const [guide, setGuide] = React.useState(false);
   const [status, reload] = useTrainStatus();
@@ -109,8 +109,8 @@ End it now?`)) throw e;
   const savePaths = () => guard(async () => { await api("/api/train/paths", paths); setSetupOpen(false); reload(); notify({ message: "Paths saved", tab: "trainlora" }); });
 
   const ready = status?.lora.ready;
-  const trainReason = !f.trigger ? "Give the character a trigger word." : !f.datasetDir ? "Choose a dataset folder." : !images.length ? "The dataset folder has no images yet." : !ready ? "FluxGym is not fully set up (see Setup)." : "";
-  const captioners = [{ value: "florence", label: "Florence-2 (FluxGym's environment)" }, ...(status?.ollama.vision || []).map(m => ({ value: m, label: `${m} (Ollama vision)` }))];
+  const trainReason = !f.trigger ? "Give the character a trigger word." : !f.datasetDir ? "Choose a dataset folder." : !images.length ? "The dataset folder has no images yet." : !ready ? "The LoRA trainer is not fully set up (see Setup)." : "";
+  const captioners = [{ value: "florence", label: "Florence-2 (the trainer's environment)" }, ...(status?.ollama.vision || []).map(m => ({ value: m, label: `${m} (Ollama vision)` }))];
   const uncaptioned = images.filter(i => !i.caption).length;
   const busy = lora.running || sketch.running || caption.running;
 
@@ -127,7 +127,7 @@ End it now?`)) throw e;
         <div className="flex shrink-0 items-center gap-3">
           <GuideButton onClick={() => setGuide(true)} />
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: "dataset", label: "1  Dataset", busy: sketch.running || caption.running }, { id: "train", label: "2  Train", busy: lora.running }]} />
-          <Badge ok={ready ?? null} title={ready ? "FluxGym, kohya and the Flux files were found" : "Missing: " + status.lora.missing.join(", ")}>{ready ? "FluxGym ready" : "FluxGym missing"}</Badge>
+          <Badge ok={ready ?? null} title={ready ? "The trainer, kohya and the Flux files were found" : "Missing: " + status.lora.missing.join(", ")}>{ready ? "LoRA trainer ready" : "LoRA trainer missing"}</Badge>
           <Badge ok={status.comfy.running} title="Used for the character sketch">ComfyUI {status.comfy.running ? "on" : "off"}</Badge>
           <button onClick={() => setSetupOpen(v => !v)} title="Folders" className={`p-2 transition-colors ${setupOpen ? "text-violet-400" : "text-zinc-500 hover:text-white"}`}><Settings2 size={18} /></button>
         </div>
@@ -137,7 +137,7 @@ End it now?`)) throw e;
 
       {setupOpen && (
         <div className="grid shrink-0 gap-3 border-b border-white/5 bg-white/[0.02] px-8 py-4 md:grid-cols-3">
-          <FolderField label="FluxGym folder" value={paths.fluxgymRoot} onChange={v => setPaths({ ...paths, fluxgymRoot: v })} hint="Holds kohya sd-scripts, its Python environment and the Flux files." />
+          <FolderField label="LoRA trainer folder" value={paths.fluxgymRoot} onChange={v => setPaths({ ...paths, fluxgymRoot: v })} hint="Holds kohya sd-scripts, its Python environment and the Flux files." />
           <FolderField label="Training folder" value={paths.trainRoot} onChange={v => setPaths({ ...paths, trainRoot: v })} hint="The folder with llm_finetune (used by FineTune LLM)." />
           <div className="flex items-end"><button onClick={savePaths} className={btnPrimary}><Check size={14} />Save</button></div>
           {!ready && <p className="text-[11px] text-amber-400 md:col-span-3">Missing: {status.lora.missing.join(", ")}</p>}
@@ -212,8 +212,8 @@ End it now?`)) throw e;
                 <Card title="What to train" icon={<Palette size={15} />}>
                   <TextField label="Character / trigger word" value={f.trigger} onChange={v => set({ trigger: v.replace(/[^\w-]/g, "") })} placeholder="e.g. richie01" />
                   <SelectField label="Dataset" value={status.lora.datasets.find(d => d.path === f.datasetDir)?.path || ""} onChange={v => set({ datasetDir: v })} options={status.lora.datasets.map(d => ({ value: d.path, label: `${d.name} (${d.images} images)` }))} hint={f.datasetDir ? `${images.length} pictures, ${uncaptioned} without a caption` : undefined} />
-                  <SelectField label="Base model (the checkpoint the LoRA is trained on)" value={f.baseModelPath} onChange={v => set({ baseModelPath: v })} options={status.lora.baseModels.map(m => ({ value: m.path, label: `${m.name} (${fmtBytes(m.bytes)})` }))} empty="No Flux checkpoint found" hint="Add another .sft / .safetensors to FluxGym's models/unet folder and it shows up here." />
-                  <FolderField label="Save the LoRA to" value={f.outputDir} onChange={v => set({ outputDir: v })} placeholder={outDir || "defaults to FluxGym's outputs folder"} />
+                  <SelectField label="Base model (the checkpoint the LoRA is trained on)" value={f.baseModelPath} onChange={v => set({ baseModelPath: v })} options={status.lora.baseModels.map(m => ({ value: m.path, label: `${m.name} (${fmtBytes(m.bytes)})` }))} empty="No Flux checkpoint found" hint="Add another .sft / .safetensors to the LoRA trainer's models/unet folder and it shows up here." />
+                  <FolderField label="Save the LoRA to" value={f.outputDir} onChange={v => set({ outputDir: v })} placeholder={outDir || "defaults to the trainer's outputs folder"} />
                 </Card>
                 <Card title="Settings" icon={<Settings2 size={15} />} note="The defaults suit an 8 GB card: fp8 weights with transformer blocks swapped through system RAM. Close other heavy programs while it runs.">
                   <SelectField label="GPU memory" value={f.vramPreset} onChange={v => set({ vramPreset: v })} options={[{ value: "8G", label: "8 GB (fp8 + block swap)" }, { value: "12G", label: "12 GB (fp8 + light swap)" }, { value: "16G", label: "16 GB (fp8)" }, { value: "20G", label: "20 GB or more (full precision)" }]} />

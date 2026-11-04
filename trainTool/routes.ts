@@ -61,7 +61,8 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
       paths: p, jobs,
       lora: {
         ready: !missing.length, missing,
-        baseModels: listFiles(p.fluxUnetDir, [".sft", ".safetensors", ".gguf"]),
+        // ComfyUI's unet folder also holds other models; the trainer takes Flux weights as .sft/.safetensors.
+        baseModels: listFiles(p.fluxUnetDir, [".sft", ".safetensors"]).filter(f => /flux/i.test(f.name)),
         datasets: listDirs(p.fluxDatasetsDir).map(n => ({ name: n, path: path.join(p.fluxDatasetsDir, n), images: imageEntries(path.join(p.fluxDatasetsDir, n), 5000).length })),
         outputDir: p.fluxOutputDir,
       },
@@ -103,7 +104,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     if (!cfg.datasetDir || !exists(cfg.datasetDir)) return bad(res, 400, "Choose a dataset folder that exists.");
     if (!imageEntries(cfg.datasetDir, 1).length) return bad(res, 400, "That dataset folder has no images.");
     if (!cfg.outputDir) cfg.outputDir = path.join(p.fluxOutputDir, cfg.triggerWord);
-    for (const [label, f] of [["FluxGym's accelerate", p.fluxAccelerate], ["kohya sd-scripts", p.sdScripts]] as const) if (!exists(f)) return bad(res, 400, `${label} was not found at ${f}. Set the FluxGym folder in the page.`);
+    for (const [label, f] of [["The LoRA trainer's accelerate", p.fluxAccelerate], ["kohya sd-scripts", p.sdScripts]] as const) if (!exists(f)) return bad(res, 400, `${label} was not found at ${f}. Set the LoRA trainer folder in the page.`);
     fs.mkdirSync(cfg.outputDir, { recursive: true });
     // A crashed earlier run can leave its workers hung on the graphics card; starting into that only runs out of memory.
     const left = await leftoverTrainers("flux_train_network.py");
@@ -188,7 +189,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     res.json({ path: target });
   });
 
-  /** Captions for every image that has none: Florence-2 (FluxGym's environment) or an Ollama vision model. */
+  /** Captions for every image that has none: Florence-2 (the LoRA trainer's environment) or an Ollama vision model. */
   app.post("/api/train/caption/start", (req, res) => {
     if (isRunning("caption")) return bad(res, 409, "Captioning is already running.");
     const dir = String(req.body?.datasetDir || "");
@@ -216,7 +217,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
         return { done: n };
       }));
     }
-    if (!exists(p.fluxPython)) return bad(res, 400, `FluxGym's Python was not found at ${p.fluxPython}. Pick an Ollama vision model instead, or set the FluxGym folder.`);
+    if (!exists(p.fluxPython)) return bad(res, 400, `The LoRA trainer's Python was not found at ${p.fluxPython}. Pick an Ollama vision model instead, or set the trainer folder.`);
     const args = [`${p.scriptsDir}/caption_images.py`, "--dir", dir, "--trigger", trigger];
     if (overwrite) args.push("--overwrite");
     res.json(startProcess("caption", "Captioning with Florence-2", p.fluxPython, args));
