@@ -1,3 +1,4 @@
+import { tagList } from "../../../../seriesTool/formats";
 /**
  * Checks that the ComfyUI workflows a series uses can do what the series needs.
  *
@@ -43,7 +44,7 @@ export const findWorkflow = (list: WfInfo[], path: string) => list.find(w => nor
 
 /** Does this series feed a person's photo into its stills? Attached photos or an on-camera style say yes. */
 export function wantsPhoto(project: Project): boolean {
-  const onCamera = project.format === "ugc" || project.format === "vlog";
+  const onCamera = tagList(project.format).some(f => f === "ugc" || f === "vlog");
   return onCamera || project.episodes.some(e => e.refs.some(r => r.file && !r.prompt.trim()));
 }
 

@@ -56,7 +56,7 @@ export interface Scene {
 }
 
 import type { Subtitles } from "./subtitlesCore";
-import { projectFormat, sceneFields, type VoiceMode } from "./formats";
+import { projectFormat, sceneFields } from "./formats";
 import { kindOf, refKindInfo, REF_KINDS } from "./refKinds";
 import type { AudioMix, Output } from "./finishCore";
 
@@ -140,7 +140,7 @@ export interface Project {
   /** What kind of video this is (see formats.ts). Missing means narration. */
   format?: string;
   /** Voice in the clips: the style's own choice (auto), none (off, clean for your own music) or always talking (on). */
-  voice?: VoiceMode;
+  voice?: string;
   /** Burn each scene's text card into the picture. Off by default: captions are added later in Assemble. */
   allowTextCards?: boolean;
   /** People who get a picture generated from their photos. Everyone else appears as their own photo, used as it is. */

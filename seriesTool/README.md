@@ -8,6 +8,8 @@ Open it from the **Series** tab in the sidebar.
 
 ## The flow
 
+Develop steps are Story, Look and voice, Episodes, Reference photos; the last step ends in a "Go to Produce" button (off until an episode is planned). Look and voice are tag lists stored as one comma-separated string (`format: "ugc,vlog"`, `voice: "on,warm"`); an old single value is a list of one. The first look tag is the main style, the rest add their camera phrase; voice has one mode (auto/off/on) plus descriptor tags. In Produce a reference card can be renamed (a person is renamed in every episode, scenes' cast, shot, line and prompt included; the picture stays) and new empty references added (`src/components/tools/series/refRename.ts`).
+
 ```
 Dashboard          every series, with a progress bar and where its folder is
    |  start or open

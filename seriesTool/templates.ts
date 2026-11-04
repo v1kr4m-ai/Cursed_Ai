@@ -10,7 +10,6 @@ import fs from "fs";
 import path from "path";
 import { createSeriesStore } from "./store";
 import { DEFAULT_SETTINGS, DEFAULT_STYLE_LOCK, DEFAULT_VOICE_LOCK, newId, type Project, type ProjectSettings } from "./model";
-import type { VoiceMode } from "./formats";
 
 export interface SeriesTemplate {
   id: string;
@@ -19,7 +18,7 @@ export interface SeriesTemplate {
   builtin: boolean;
   savedAt: string;
   format: string;
-  voice: VoiceMode;
+  voice: string;
   allowTextCards: boolean;
   styleLock: string;
   voiceLock: string;

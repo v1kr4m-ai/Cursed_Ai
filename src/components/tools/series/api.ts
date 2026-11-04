@@ -58,7 +58,7 @@ export interface Project {
   /** What kind of video this is: narration, vlog, ugc, singing, dancing... (seriesTool/formats.ts). */
   format?: string;
   /** Voice in the clips: auto (the style decides), off (no talking, clean for your own music) or on (talks to the camera). */
-  voice?: "auto" | "off" | "on";
+  voice?: string;
   /** Burn each scene's text card into the picture. Off by default. */
   allowTextCards?: boolean;
   stillPeople?: string[];
@@ -72,7 +72,7 @@ export interface Project {
 
 /** A saved way of making a series: style, voice, look, workflows and size, with none of the story. */
 export interface SeriesTemplate {
-  id: string; name: string; note: string; builtin: boolean; format: string; voice: "auto" | "off" | "on";
+  id: string; name: string; note: string; builtin: boolean; format: string; voice: string;
   /** What a new project takes from it (a body for the project patch). */
   patch: Partial<Project>;
 }

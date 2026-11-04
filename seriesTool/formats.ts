@@ -197,7 +197,26 @@ export const SERIES_FORMATS: SeriesFormat[] = [
   },
 ];
 
-export const formatOf = (id?: string): SeriesFormat => SERIES_FORMATS.find(f => f.id === id) || SERIES_FORMATS[0];
+/**
+ * Look and voice are tag lists stored as one comma-separated string ("ugc,vlog"): an old single value is a list of one.
+ * The first look tag is the main style; the others add their camera phrase.
+ */
+export const tagList = (s?: string): string[] => [...new Set((s || "").split(",").map(x => x.trim()).filter(Boolean))];
+export const tagString = (tags: string[]): string => [...new Set(tags)].join(",");
+/** Adds the tag when missing, removes it when present. */
+export const toggleTag = (s: string | undefined, tag: string): string => { const t = tagList(s); return tagString(t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]); };
+export const formatOf = (id?: string): SeriesFormat => { const ids = tagList(id); return SERIES_FORMATS.find(f => f.id === ids[0]) || SERIES_FORMATS[0]; };
+
+/** Extra voice descriptors that can be combined with the voice mode (auto / off / on). */
+export const VOICE_TAGS = ["warm", "calm", "deep", "bright", "playful", "energetic", "whispery", "authoritative"];
+/** The voice value with its mode replaced (auto is stored as nothing) and the descriptor tags kept. */
+export const setVoiceMode = (v: string | undefined, mode: VoiceMode): string => tagString([...(mode === "auto" ? [] : [mode]), ...voiceParts(v).tags]);
+/** The mode part of a voice value ("off" beats "on"; none means auto) and the descriptor tags. */
+export function voiceParts(v?: string): { mode: VoiceMode; tags: string[] } {
+  const t = tagList(v);
+  const mode: VoiceMode = t.includes("off") ? "off" : t.includes("on") ? "on" : "auto";
+  return { mode, tags: t.filter(x => x !== "auto" && x !== "on" && x !== "off") };
+}
 
 /** Words that make a video model paint captions into the picture; they are dropped from the look. */
 const CAPTION_WORDS = /\b(captions?|subtitles?|text overlays?|on-?screen text|watermarks?)\b/i;
@@ -238,8 +257,14 @@ export function sceneFields(opts: { format: SeriesFormat; look: string; voice: s
  * The style as this project uses it. The voice switch can silence any style (no speech, no generated music, so the
  * clips are clean for your own soundtrack) or make a silent style talk to the camera.
  */
-export function projectFormat(p: { format?: string; voice?: VoiceMode }): SeriesFormat {
-  const f = formatOf(p.format);
+export function projectFormat(p: { format?: string; voice?: string }): SeriesFormat {
+  let f = formatOf(p.format);
+  const extra = tagList(p.format).slice(1).map(id => SERIES_FORMATS.find(x => x.id === id)).filter((x): x is SeriesFormat => !!x && x.id !== f.id);
+  if (extra.length) f = { ...f, label: [f, ...extra].map(x => x.label).join(" + "), look: [f.look, ...extra.map(x => x.look)].filter(Boolean).join("; "), blurb: f.blurb + " Also: " + extra.map(x => x.label.toLowerCase()).join(", ") + "." };
+  const vp = voiceParts(p.voice);
+  const baseVoice = f.voice || (vp.mode === "on" ? "a young creator with a natural, conversational voice" : "");
+  if (vp.tags.length && baseVoice) f = { ...f, voice: [baseVoice, ...vp.tags].join(", ") };
+  p = { ...p, voice: vp.mode };
   if (p.voice === "off") {
     if (f.speech === "none") return { ...f, music: "N/A" };
     return { ...f, speech: "none", lineLabel: "Action note", lineHint: "What happens in this clip (not spoken).", lineWords: "8-14", voice: "", sound: "Natural ambience and the sounds of the action. No speech.", music: "N/A", plan: f.plan + " In this series nobody talks: the line is only a short note for the editor about what happens." };

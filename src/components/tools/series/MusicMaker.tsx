@@ -1,4 +1,5 @@
 import React from "react";
+import { tagList } from "../../../../seriesTool/formats";
 import { ChevronRight, Loader2, Music } from "lucide-react";
 import { api, type Episode, type Project } from "./api";
 import { notify, notifyError } from "../../../lib/notify";
@@ -17,7 +18,7 @@ export function MusicMaker({ project, episode, length, startAt, onChanged }: { p
   const [open, setOpen] = React.useState(false);
   const [wfs, setWfs] = React.useState<Wf[] | null>(null);
   const [path, setPath] = React.useState("");
-  const [tags, setTags] = React.useState(() => ["instrumental background music", project.idea?.tone, project.format === "ugc" || project.format === "vlog" ? "upbeat, light, modern" : "cinematic"].filter(Boolean).join(", "));
+  const [tags, setTags] = React.useState(() => ["instrumental background music", project.idea?.tone, tagList(project.format).some(f => f === "ugc" || f === "vlog") ? "upbeat, light, modern" : "cinematic"].filter(Boolean).join(", "));
   const [lyrics, setLyrics] = React.useState("");
   const [seconds, setSeconds] = React.useState(Math.max(5, Math.round(length)));
   const [note, setNote] = React.useState("");

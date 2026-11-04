@@ -1,8 +1,9 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Send, Sparkles, Loader2, FileJson, Lightbulb, Users, Palette, StickyNote, Bot, User, ImagePlus, FileText, Wand2, Cpu, Cloud, Tag, Type, Brush, Clapperboard, Plus, Check, ChevronDown, ChevronRight, Paperclip, Download, X } from "lucide-react";
-import { SERIES_FORMATS, projectFormat, type SeriesFormat } from "../../../../seriesTool/formats";
+import { SERIES_FORMATS, VOICE_TAGS, projectFormat, setVoiceMode, tagList, toggleTag, voiceParts, type SeriesFormat } from "../../../../seriesTool/formats";
 import type { AIModel } from "../../../types";
+import { goProduceBlockedWhy } from "./developSteps";
 import { MicStatus } from "../../voice/MicStatus";
 import { MicModeButton } from "../../voice/MicModeButton";
 import { useDictation } from "../../../services/useDictation";
@@ -170,7 +171,7 @@ function StepRail({ steps, current, onPick }: { steps: { n: number; label: strin
 /** One step: a numbered header that shows a one-line summary while closed, and the controls while open. */
 function StepCard({ n, title, summary, done, open, onOpen, optional, next, children }: {
   n: number; title: string; summary: string; done: boolean; open: boolean; onOpen: () => void; optional?: boolean;
-  next?: { label: string; go: () => void }; children: React.ReactNode;
+  next?: { label: string; go: () => void; disabledWhy?: string }; children: React.ReactNode;
 }) {
   return (
     <div className={"overflow-hidden rounded-xl border transition-colors " + (open ? "border-neutral-600 bg-neutral-900/50" : "border-neutral-800 bg-neutral-900/30")}>
@@ -186,7 +187,10 @@ function StepCard({ n, title, summary, done, open, onOpen, optional, next, child
         <div className="space-y-3 border-t border-neutral-800 px-4 pb-4 pt-3">
           {children}
           {next && (
-            <button onClick={next.go} className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-600 bg-neutral-800/60 px-4 py-2 text-xs font-medium text-neutral-100 transition hover:bg-neutral-700/70">{next.label} <ChevronRight size={14} /></button>
+            <>
+              <button onClick={next.go} disabled={!!next.disabledWhy} title={next.disabledWhy} className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-600 bg-neutral-800/60 px-4 py-2 text-xs font-medium text-neutral-100 transition hover:bg-neutral-700/70 disabled:opacity-40 disabled:hover:bg-neutral-800/60">{next.label} <ChevronRight size={14} /></button>
+              {next.disabledWhy && <p className="text-[11px] text-amber-300/80">{next.disabledWhy}</p>}
+            </>
           )}
         </div>
       )}
@@ -253,10 +257,10 @@ function Fold({ title, hint, children }: { title: string; hint?: string; childre
   );
 }
 
-export function Develop({ project, modelId, models, onSaved, focusAdd }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void; focusAdd?: boolean }) {
+export function Develop({ project, modelId, models, onSaved, focusAdd, onGoProduce }: { project: Project; modelId?: string; models?: AIModel[]; onSaved: (p: Project) => void; focusAdd?: boolean; onGoProduce?: () => void }) {
   const episodesCard = React.useRef<HTMLDivElement>(null);
   // Arriving from "Add the next episode" on the Produce board: bring that card into view.
-  React.useEffect(() => { if (focusAdd) setStep(4); }, [focusAdd]);
+  React.useEffect(() => { if (focusAdd) setStep(3); }, [focusAdd]);
   React.useEffect(() => { if (focusAdd) setTimeout(() => episodesCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350); }, [focusAdd]);
   const [talkModel, setTalkModel] = React.useState<string>(() => { try { return localStorage.getItem(TALK_MODEL_KEY) || ""; } catch { return ""; } });
   const ready = (models || []).filter(m => m.isDownloaded && isChatModel(m));
@@ -338,7 +342,7 @@ export function Develop({ project, modelId, models, onSaved, focusAdd }: { proje
   const clampW = (w: number) => Math.round(Math.min(Math.max(300, w), Math.max(300, (layoutRef.current?.clientWidth || 1200) - 240)));
   const saveW = (w: number) => { const c = clampW(w); setLeftW(c); try { localStorage.setItem(WIDTH_KEY, String(c)); } catch { /* storage blocked */ } };
   const dragFrom = React.useRef<{ x: number; w: number } | null>(null);
-  const [step, setStep] = React.useState<number>(() => (project.episodes.length ? 4 : project.idea.logline.trim() ? 2 : 1));
+  const [step, setStep] = React.useState<number>(() => (project.episodes.length ? 3 : project.idea.logline.trim() ? 2 : 1));
   /** Opens the Reference photos card and brings it into view. */
   /** Builds a training dataset from one person's photos, then opens Train LoRA with it chosen and the trigger word filled in. */
   const trainPerson = async (name: string) => {
@@ -354,7 +358,7 @@ Open Train LoRA anyway? You can add more pictures there first.`)) return;
       notify({ message: `${name}: dataset ready (${d.total} photos, ${d.added} new). Trigger word ${d.name}.`, tab: "trainlora" });
     } catch (e: any) { notify({ message: e?.message || String(e), kind: "error", tab: "series" }); }
   };
-  const goToPhotos = () => { setStep(3); setShowAttach(true); setTimeout(() => photosCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150); };
+  const goToPhotos = () => { setStep(4); setShowAttach(true); setTimeout(() => photosCard.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150); };
   const [showStory, setShowStory] = React.useState(true);
   const [digesting, setDigesting] = React.useState<{ name: string; done: number; total: number } | null>(null);
   const [voicePref, setVoicePref] = React.useState(() => savedSetting("voiceEngine", "auto" as const));
@@ -695,7 +699,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
   }
 
   // One line per step, shown while it is closed.
-  const voiceText = project.voice === "off" ? ", no voice" : project.voice === "on" ? ", she talks" : "";
+  const vp = voiceParts(project.voice);
+  const voiceText = (vp.mode === "off" ? ", no voice" : vp.mode === "on" ? ", she talks" : "") + (vp.tags.length ? ` (${vp.tags.join(", ")})` : "");
   const storySummary = [title.trim() || project.title, idea.logline.trim()].filter(Boolean).join(" - ") || "Start here";
   const lookSummary = `${fmt.label}${voiceText}`;
   const photoCount = seriesPhotos(project).length + pendingPhotos.length;
@@ -705,8 +710,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
   const steps = [
     { n: 1, label: "Story", done: !!(idea.logline.trim() || project.episodes.length) },
     { n: 2, label: "Look", done: !!project.format },
-    { n: 3, label: "Photos", done: photoCount > 0 },
-    { n: 4, label: "Episodes", done: project.episodes.length > 0 },
+    { n: 3, label: "Episodes", done: project.episodes.length > 0 },
+    { n: 4, label: "Photos", done: photoCount > 0 },
   ];
 
   return (
@@ -770,7 +775,7 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
         </StepCard>
 
         <StepCard n={2} title="Look and voice" summary={lookSummary} done={!!project.format} open={step === 2} onOpen={() => setStep(step === 2 ? 0 : 2)}
-          next={{ label: "Next: add people and photos", go: () => setStep(3) }}>
+          next={{ label: "Next: write the episodes", go: () => setStep(3) }}>
           <p className="text-[11px] leading-relaxed text-neutral-500">Pick the kind of video, and whether anyone talks in it.</p>
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
           className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
@@ -782,23 +787,31 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
               <div className="text-[10px] uppercase tracking-wider text-neutral-500">{group}</div>
               <div className="flex flex-wrap gap-1.5">
                 {SERIES_FORMATS.filter(f => f.group === group).map(f => (
-                  <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: f.id, ...threadPatch(messages) }))} title={f.blurb}
-                    className={"rounded-full border px-3 py-1 text-xs transition " + (fmt.id === f.id ? "border-sky-500 bg-sky-500/15 text-sky-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
+                  <button key={f.id} onClick={async () => onSaved(await api.patch(project.id, { format: toggleTag(project.format, f.id), ...threadPatch(messages) }))} title={f.blurb + " (click to add or remove; the first one picked is the main style)"}
+                    className={"rounded-full border px-3 py-1 text-xs transition " + ((tagList(project.format).length ? tagList(project.format).includes(f.id) : fmt.id === f.id) ? "border-sky-500 bg-sky-500/15 text-sky-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
                     {f.label}
                   </button>
                 ))}
               </div>
             </div>
           ))}
+          {tagList(project.format).length > 0 && <button onClick={async () => onSaved(await api.patch(project.id, { format: "", ...threadPatch(messages) }))} className="text-[11px] text-neutral-500 hover:text-neutral-200">Clear styles (back to narration)</button>}
           <div className="space-y-1">
             <div className="text-[10px] uppercase tracking-wider text-neutral-500">Voice in the clips</div>
             <div className="flex flex-wrap gap-1.5">
               {([["auto", "Style default"], ["off", "No voice (I add music later)"], ["on", "She talks to the camera"]] as const).map(([v, label]) => (
-                <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voice: v, ...threadPatch(messages) }))}
-                  className={"rounded-full border px-3 py-1 text-xs transition " + ((project.voice || "auto") === v ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
+                <button key={v} onClick={async () => onSaved(await api.patch(project.id, { voice: setVoiceMode(project.voice, v), ...threadPatch(messages) }))}
+                  className={"rounded-full border px-3 py-1 text-xs transition " + (voiceParts(project.voice).mode === v ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>
                   {label}
                 </button>
               ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {VOICE_TAGS.map(t => (
+                <button key={t} onClick={async () => onSaved(await api.patch(project.id, { voice: toggleTag(project.voice, t), ...threadPatch(messages) }))}
+                  className={"rounded-full border px-2.5 py-0.5 text-[11px] transition " + (voiceParts(project.voice).tags.includes(t) ? "border-emerald-500 bg-emerald-500/15 text-emerald-200" : "border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500")}>{t}</button>
+              ))}
+              {voiceParts(project.voice).tags.length > 0 && <button onClick={async () => onSaved(await api.patch(project.id, { voice: setVoiceMode("", voiceParts(project.voice).mode), ...threadPatch(messages) }))} className="text-[11px] text-neutral-500 hover:text-neutral-200">Clear voice tags</button>}
             </div>
           </div>
           <p className="text-[11px] leading-relaxed text-neutral-500">{fmt.blurb} Each scene has one <span className="text-neutral-300">{fmt.lineLabel.toLowerCase()}</span>. Change the style, then build the plan again (renders you already made are kept).</p>
@@ -807,8 +820,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
               <div>{PHOTO_STYLES[fmt.id]}</div>
               <button onClick={goToPhotos} className="flex items-center gap-1.5 rounded-md bg-sky-600/25 px-2.5 py-1 text-[11px] font-medium text-sky-100 hover:bg-sky-600/40"><ImagePlus size={12} /> Add reference photos</button>
               <ol className="list-decimal space-y-0.5 pl-4 text-sky-200/70">
-                <li>Add the photos in the <b>Reference photos</b> card (the button above takes you there) and pick what each one is: person, outfit, product...</li>
                 <li>Build the episode plan.</li>
+                <li>Add the photos in the <b>Reference photos</b> card (the button above takes you there) and pick what each one is: person, outfit, product...</li>
                 <li>On Produce, render the stills first (they are made from your photos), then the clips.</li>
               </ol>
             </div>
@@ -824,67 +837,8 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
           </Labeled>
         </StepCard>
 
-        <StepCard n={3} title="People and photos" optional summary={photosSummary} done={seriesPhotos(project).length > 0} open={step === 3} onOpen={() => setStep(step === 3 ? 0 : 3)}
-          next={{ label: seriesPhotos(project).length ? "Next: write the episodes" : "Skip: no photos", go: () => setStep(4) }}>
-                  <motion.div ref={photosCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
-          <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
-            <ImagePlus size={14} className="text-pink-400" /> Reference photos
-            <span className="ml-auto text-[11px] text-neutral-500">{seriesPhotos(project).length + pendingPhotos.length} attached</span>
-          </button>
-          <p className="text-[11px] leading-relaxed text-neutral-500">Attach the person's photo (or a look to match) once. It is copied into every episode, also the ones you add later, and used wherever a still or clip needs it.</p>
-          <AnimatePresence initial={false}>
-            {(showAttach || seriesPhotos(project).length + pendingPhotos.length === 0) && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-3 overflow-hidden">
-                {firstEpisode ? (
-                  <RefDrop project={project} people={peopleOf(project).map(x => x.name)} episodeId={firstEpisode.id} onChanged={async p => { onSaved(p); const r = await syncPhotos(p); if (r.copied || r.wired) onSaved(r.project); }} />
-                ) : (
-                  <label className="block cursor-pointer rounded-lg border border-dashed border-neutral-600 bg-neutral-900/40 p-4 text-center text-xs text-neutral-400 hover:bg-neutral-900/70">
-                    Choose photos now - they are attached as soon as the plan exists
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={e => { setPendingPhotos(p => [...p, ...Array.from(e.target.files || [])]); e.target.value = ""; }} />
-                  </label>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {(seriesPhotos(project).length > 0 || pendingPhotos.length > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {seriesPhotos(project).slice(0, 12).map(r => (
-                <div key={r.id} className={"photo-tile w-16 text-center " + (r.skip ? "opacity-40" : "")}>
-                  <ZoomImage src={fileUrl(r.file!)} alt={r.name + (r.person ? " - " + r.person : "")} className="h-16 w-16 rounded object-cover border border-neutral-700" />
-                  <div className="truncate text-[9px] text-neutral-400" title={refKindInfo(kindOf(r))!.label + (r.person ? ": " + r.person : "")}>{r.person || refKindInfo(kindOf(r))!.label.split(" ")[0]}</div>
-                  <label className="flex items-center justify-center gap-1 text-[9px] text-neutral-500" title="Leave this picture out of every prompt and workflow slot"><input type="checkbox" checked={!!r.skip} onChange={async e => onSaved(await api.patch(project.id, { episodes: setSkip(project, r, e.target.checked) }))} />skip</label>
-                </div>
-              ))}
-              {pendingPhotos.map((f, i) => (
-                <button key={i} onClick={() => setPendingPhotos(p => p.filter((_, j) => j !== i))} title={f.name + " - click to remove"} className="h-12 w-12 overflow-hidden rounded border border-dashed border-sky-500">
-                  <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-          {peopleOf(project).length > 0 && (
-            <div className="space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-2.5">
-              <div className="text-[10px] uppercase tracking-wider text-neutral-500">People in this series</div>
-              {peopleOf(project).map(person => (
-                <div key={person.name} className="flex items-center gap-2 text-xs text-neutral-300">
-                  <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
-                  <span className="shrink-0 text-[10px] text-neutral-500">{person.photos.length} photo{person.photos.length === 1 ? "" : "s"}</span>
-                  <label className="flex shrink-0 items-center gap-1 text-[10px] text-neutral-400" title="Off: this person appears as their own photo, used as it is. On: ComfyUI first makes a new picture from the photos and the scenes use that."><input type="checkbox" checked={wantsStill(project, person.name)} onChange={async e => { const stillPeople = e.target.checked ? [...(project.stillPeople || []), person.name] : (project.stillPeople || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()); const next = { ...project, stillPeople }; onSaved(await api.patch(project.id, { stillPeople, episodes: ensureCast(next) })); }} />make a picture</label>
-                  <button onClick={() => trainPerson(person.name)} title="Build a LoRA dataset from this person's photos and open Train LoRA with their trigger word" className="shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-[10px] text-neutral-300 hover:border-violet-500 hover:text-violet-200">Train a LoRA</button>
-                </div>
-              ))}
-              <p className="text-[10px] leading-relaxed text-neutral-600">Each person appears as their own photo, used as it is. Tick "make a picture" only if you want ComfyUI to make a new picture of them first. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
-            </div>
-          )}
-          {project.episodes.length > 1 && seriesPhotos(project).length > 0 && (
-            <button onClick={async () => { const r = await syncPhotos(project); onSaved(r.project); notify({ message: `Photos placed: ${r.copied} copied, ${r.wired} scenes wired`, tab: "series" }); }} className="text-[11px] text-sky-300 hover:underline">Put the photos in every episode and scene now</button>
-          )}
-          <WorkflowCheck project={project} onChanged={onSaved} />
-        </motion.div>
-
-        </StepCard>
-
-        <StepCard n={4} title="Write the episodes" summary={planSummary} done={project.episodes.length > 0} open={step === 4} onOpen={() => setStep(step === 4 ? 0 : 4)}>
+        <StepCard n={3} title="Write the episodes" summary={planSummary} done={project.episodes.length > 0} open={step === 3} onOpen={() => setStep(step === 3 ? 0 : 3)}
+          next={{ label: "Next: add reference photos", go: () => setStep(4) }}>
           <div className="space-y-1">
             <div className="text-[11px] text-neutral-500">Written by</div>
             <select value={known ? talkModel : ""} onChange={e => pickModel(e.target.value)} className="w-full rounded-lg border border-neutral-700 bg-transparent px-2 py-1.5 text-xs focus:outline-none [&_*]:bg-white [&_*]:text-black">
@@ -1004,6 +958,66 @@ ${(s.digest || s.text).slice(0, 12000)}` })),
             </motion.div>
           )}
         </AnimatePresence>
+        </StepCard>
+
+        <StepCard n={4} title="Reference photos" optional summary={photosSummary} done={seriesPhotos(project).length > 0} open={step === 4} onOpen={() => setStep(step === 4 ? 0 : 4)}
+          next={{ label: seriesPhotos(project).length ? "Done: go to Produce" : "Skip photos: go to Produce", go: () => onGoProduce?.(), disabledWhy: goProduceBlockedWhy(project.episodes.length) }}>
+                  <motion.div ref={photosCard} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+          <button onClick={() => setShowAttach(s => !s)} className="flex w-full items-center gap-2 text-sm font-medium text-neutral-200">
+            <ImagePlus size={14} className="text-pink-400" /> Reference photos
+            <span className="ml-auto text-[11px] text-neutral-500">{seriesPhotos(project).length + pendingPhotos.length} attached</span>
+          </button>
+          <p className="text-[11px] leading-relaxed text-neutral-500">Attach the person's photo (or a look to match) once. It is copied into every episode, also the ones you add later, and used wherever a still or clip needs it.</p>
+          <AnimatePresence initial={false}>
+            {(showAttach || seriesPhotos(project).length + pendingPhotos.length === 0) && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-3 overflow-hidden">
+                {firstEpisode ? (
+                  <RefDrop project={project} people={peopleOf(project).map(x => x.name)} episodeId={firstEpisode.id} onChanged={async p => { onSaved(p); const r = await syncPhotos(p); if (r.copied || r.wired) onSaved(r.project); }} />
+                ) : (
+                  <label className="block cursor-pointer rounded-lg border border-dashed border-neutral-600 bg-neutral-900/40 p-4 text-center text-xs text-neutral-400 hover:bg-neutral-900/70">
+                    Choose photos now - they are attached as soon as the plan exists
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={e => { setPendingPhotos(p => [...p, ...Array.from(e.target.files || [])]); e.target.value = ""; }} />
+                  </label>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {(seriesPhotos(project).length > 0 || pendingPhotos.length > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {seriesPhotos(project).slice(0, 12).map(r => (
+                <div key={r.id} className={"photo-tile w-16 text-center " + (r.skip ? "opacity-40" : "")}>
+                  <ZoomImage src={fileUrl(r.file!)} alt={r.name + (r.person ? " - " + r.person : "")} className="h-16 w-16 rounded object-cover border border-neutral-700" />
+                  <div className="truncate text-[9px] text-neutral-400" title={refKindInfo(kindOf(r))!.label + (r.person ? ": " + r.person : "")}>{r.person || refKindInfo(kindOf(r))!.label.split(" ")[0]}</div>
+                  <label className="flex items-center justify-center gap-1 text-[9px] text-neutral-500" title="Leave this picture out of every prompt and workflow slot"><input type="checkbox" checked={!!r.skip} onChange={async e => onSaved(await api.patch(project.id, { episodes: setSkip(project, r, e.target.checked) }))} />skip</label>
+                </div>
+              ))}
+              {pendingPhotos.map((f, i) => (
+                <button key={i} onClick={() => setPendingPhotos(p => p.filter((_, j) => j !== i))} title={f.name + " - click to remove"} className="h-12 w-12 overflow-hidden rounded border border-dashed border-sky-500">
+                  <img src={URL.createObjectURL(f)} alt={f.name} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+          {peopleOf(project).length > 0 && (
+            <div className="space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-neutral-500">People in this series</div>
+              {peopleOf(project).map(person => (
+                <div key={person.name} className="flex items-center gap-2 text-xs text-neutral-300">
+                  <input defaultValue={person.name} onBlur={async e => { const to = e.target.value.trim(); if (to && to !== person.name) onSaved(await api.patch(project.id, { episodes: renamePerson(project, person.name, to) })); }} className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-transparent px-2 py-1 text-xs focus:outline-none focus:border-sky-600" title="Rename this person everywhere" />
+                  <span className="shrink-0 text-[10px] text-neutral-500">{person.photos.length} photo{person.photos.length === 1 ? "" : "s"}</span>
+                  <label className="flex shrink-0 items-center gap-1 text-[10px] text-neutral-400" title="Off: this person appears as their own photo, used as it is. On: ComfyUI first makes a new picture from the photos and the scenes use that."><input type="checkbox" checked={wantsStill(project, person.name)} onChange={async e => { const stillPeople = e.target.checked ? [...(project.stillPeople || []), person.name] : (project.stillPeople || []).filter(n => n.toLowerCase() !== person.name.toLowerCase()); const next = { ...project, stillPeople }; onSaved(await api.patch(project.id, { stillPeople, episodes: ensureCast(next) })); }} />make a picture</label>
+                  <button onClick={() => trainPerson(person.name)} title="Build a LoRA dataset from this person's photos and open Train LoRA with their trigger word" className="shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-[10px] text-neutral-300 hover:border-violet-500 hover:text-violet-200">Train a LoRA</button>
+                </div>
+              ))}
+              <p className="text-[10px] leading-relaxed text-neutral-600">Each person appears as their own photo, used as it is. Tick "make a picture" only if you want ComfyUI to make a new picture of them first. The planner says who is in each scene, and you can change it on the scene card in Produce.</p>
+            </div>
+          )}
+          {project.episodes.length > 1 && seriesPhotos(project).length > 0 && (
+            <button onClick={async () => { const r = await syncPhotos(project); onSaved(r.project); notify({ message: `Photos placed: ${r.copied} copied, ${r.wired} scenes wired`, tab: "series" }); }} className="text-[11px] text-sky-300 hover:underline">Put the photos in every episode and scene now</button>
+          )}
+          <WorkflowCheck project={project} onChanged={onSaved} />
+        </motion.div>
+
         </StepCard>
       </div>
 

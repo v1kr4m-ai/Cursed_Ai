@@ -454,7 +454,7 @@ export function SeriesStudioView({ modelId, models, look }: { modelId?: string; 
                       ) : stage === "dashboard" ? (
                         <ProjectDashboard project={project} onChanged={setProject} onGo={(st, episodeId) => { setFocusEpisode(episodeId || null); setStage(st); }} />
                       ) : stage === "develop" ? (
-                        <Develop project={project} modelId={modelId} models={models} onSaved={setProject} focusAdd={addFocus} />
+                        <Develop project={project} modelId={modelId} models={models} onSaved={setProject} focusAdd={addFocus} onGoProduce={() => { setFocusEpisode(null); setAddFocus(false); setStage("produce"); }} />
                       ) : stage === "produce" ? (
                         <Board project={project} onChanged={setProject} onOpenSettings={() => setStage("settings")} focusEpisodeId={focusEpisode} onAddEpisode={() => { setAddFocus(true); setStage("develop"); }} />
                       ) : stage === "assemble" ? (

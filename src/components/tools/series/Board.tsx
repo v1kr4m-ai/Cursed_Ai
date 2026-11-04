@@ -1,4 +1,5 @@
-import React from "react";
+import React from "react";
+
 import { adoptPlannedPeople, ensureCast, peopleOf, placeCast } from "./people";
 import { syncPhotos } from "./photos";
 import { markSeen, useSeen } from "./seen";
@@ -20,6 +21,7 @@ import { api, fileUrl, type Episode, type Project, type Ref, type Scene, type St
 /** Same file, whatever the slashes or letter case (Windows paths). */
 const sameFile = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
 import { RefDrop } from "./RefDrop";
+import { newRef, renameRef } from "./refRename";
 
 /**
  * Stage 2. The production board: every episode, its reference stills and its scenes, each with a
@@ -74,6 +76,13 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
     onChanged(await api.patch(project.id, { episodes }));
   };
 
+  const [nameDraft, setNameDraft] = React.useState(ref_.name);
+  React.useEffect(() => setNameDraft(ref_.name), [ref_.name]);
+  const rename = async () => {
+    const name = nameDraft.trim();
+    if (!name || name === ref_.name) { setNameDraft(ref_.name); return; }
+    onChanged(await api.patch(project.id, { episodes: renameRef(project.episodes, episode.id, ref_.id, name) }));
+  };
   const picker = React.useRef<HTMLInputElement>(null);
   const [swapping, setSwapping] = React.useState(false);
   const isPerson = kindOf(ref_) === "person";
@@ -142,6 +151,10 @@ function RefCard({ project, episode, ref_, running, onChanged }: {
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden border-t border-neutral-800">
             <div className="space-y-2 p-3">
+              <div>
+                <label className="text-[11px] text-neutral-500">Name (renaming updates the scenes and prompts that use it; the picture stays attached)</label>
+                <input className={`${field} text-xs`} value={nameDraft} onChange={e => setNameDraft(e.target.value)} onBlur={rename} onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+              </div>
               <textarea className={`${field} h-24 resize-none text-xs`} value={draft.prompt} onChange={e => setDraft({ ...draft, prompt: e.target.value })} onBlur={() => save({ prompt: draft.prompt })} placeholder="Image prompt" />
               <textarea className={`${field} h-16 resize-none text-xs`} value={draft.negative} onChange={e => setDraft({ ...draft, negative: e.target.value })} onBlur={() => save({ negative: draft.negative })} placeholder="Negative prompt" />
               <label className="flex items-center gap-2 text-[11px] text-neutral-400"><input type="checkbox" checked={!!draft.skip} onChange={e => save({ skip: e.target.checked })} />Skip this picture: leave it out of every prompt and workflow slot (nothing is deleted)</label>
@@ -578,6 +591,10 @@ export function Board({ project, onChanged, focusEpisodeId, onAddEpisode, onOpen
                       <AnimatePresence initial={false}>
                         {ep.refs.map(r => <RefCard key={r.id} project={project} episode={ep} ref_={r} running={running} onChanged={onChanged} />)}
                       </AnimatePresence>
+                      <button onClick={async () => { const made = newRef(ep, "person"); onChanged(await api.patch(project.id, { episodes: project.episodes.map(e => (e.id === ep.id ? { ...e, refs: [...e.refs, made] } : e)) })); }}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-700 px-3 py-1.5 text-[11px] text-neutral-300 hover:border-neutral-500 hover:text-white" title="Adds an empty reference you can name, describe and render (or replace with a photo)">
+                        <Plus size={12} /> Add a reference
+                      </button>
                       <RefDrop project={project} episodeId={ep.id} onChanged={onChanged} compact />
                     </div>
                     <div className="space-y-2">
