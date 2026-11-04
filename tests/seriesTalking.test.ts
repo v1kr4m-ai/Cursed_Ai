@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MAX_TALK_SECONDS, TURN_GAP, isMultiSpeaker, turnsMatchVoice, pieceLengths, planTurnRenders, pickTurnPicture, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingSize, talkingStale, type PicRef } from "../seriesTool/talking";
+import { MAX_TALK_SECONDS, TURN_GAP, isMultiSpeaker, turnsMatchVoice, pieceLengths, planTurnRenders, pickTurnPicture, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingSize, talkingStale, plainRenderError, failedRenderState, joinWarnings, type PicRef } from "../seriesTool/talking";
 import { buildFilter, buildTalkingTrimArgs, buildTalkingPieceArgs, buildTalkingConcatArgs } from "../seriesTool/ffmpeg";
 import { keepVoices } from "../seriesTool/voiceTrack";
 import { unusedTakes } from "../seriesTool/takes";
@@ -180,5 +180,24 @@ describe("several speakers in one talking scene", () => {
     const total = cuts.reduce((a, b) => a + b, 0);
     expect(Math.abs(total - (secs.reduce((a, b) => a + b, 0) + TURN_GAP * 5 + 0.25))).toBeLessThan(1 / 16);
     cuts.forEach(c => expect(Math.abs(c * 16 - Math.round(c * 16))).toBeLessThan(1e-9));
+  });
+});
+
+describe("failed render visibility", () => {
+  it("maps memory errors to plain words, trims others", () => {
+    for (const m of ["MemoryError: VBAR allocation failed", "CUDA out of memory", "x".repeat(0) + "VBAR"]) expect(plainRenderError(m)).toMatch(/ran out of memory.*restart ComfyUI.*try again/);
+    expect(plainRenderError("  boom  ")).toBe("boom");
+    expect(plainRenderError("y".repeat(500)).length).toBe(403);
+  });
+  it("keeps the old clip done with the message; no clip fails; cancel is silent", () => {
+    expect(failedRenderState(true, false, "MemoryError")).toMatchObject({ status: "done", error: expect.stringContaining("out of memory") });
+    expect(failedRenderState(false, false, "boom")).toEqual({ status: "failed", error: "boom" });
+    expect(failedRenderState(true, true, "x")).toEqual({ status: "done", error: null });
+    expect(failedRenderState(false, true, "x")).toEqual({ status: "pending", error: null });
+  });
+  it("join warnings name only scenes with an out-of-date talking clip", () => {
+    const s = (number: number, o = {}) => ({ number, clipPath: "a.mp4", talkingClip: "a.mp4", voiceText: "new", talkingVoice: "new", ...o });
+    expect(joinWarnings([s(1, { talkingVoice: "old" }), s(2), s(3, { talkingClip: null })])).toEqual(["Scene 1: the talking clip was made with an earlier voice - make the talking video again."]);
+    expect(joinWarnings([{ number: 1, clipPath: "a.mp4" }])).toEqual([]);
   });
 });

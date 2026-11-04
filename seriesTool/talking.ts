@@ -139,3 +139,21 @@ export function planTurnRenders(turns: VoiceTurn[]): { renders: TurnRender[]; ch
 export function pickTurnPicture(refs: PicRef[], scene: TalkScene, speaker: string, exists: (file: string) => boolean): { ref: PicRef } | { reason: string } {
   return pickTalkingPicture(refs, { refIds: scene.refIds, cast: scene.cast, lines: speaker.trim() ? [{ speaker, text: "" }] : undefined }, exists);
 }
+
+/** ComfyUI's error in plain words: a memory failure says what to do, anything else is the raw message trimmed. */
+export function plainRenderError(message: string): string {
+  const m = (message || "").trim();
+  if (/out of memory|MemoryError|VBAR|OOM/i.test(m)) return "ComfyUI ran out of memory while making this. Free memory (close other GPU programs) or restart ComfyUI, then try again. The earlier clip is still in place.";
+  return m.length > 400 ? `${m.slice(0, 400)}...` : m;
+}
+
+/** What a failed render leaves on its scene or picture: one that already had a usable file keeps it (and stays done, so joining is not blocked) but now carries the reason; a cancel leaves no message. */
+export function failedRenderState(had: boolean, aborted: boolean, message: string): { status: "done" | "pending" | "failed"; error: string | null } {
+  if (aborted) return { status: had ? "done" : "pending", error: null };
+  return { status: had ? "done" : "failed", error: plainRenderError(message) };
+}
+
+/** Warnings for a join: scenes whose talking clip carries an earlier voice than the scene has now. */
+export function joinWarnings(scenes: { number: number; talkingClip?: string | null; clipPath: string | null; voiceText?: string; talkingVoice?: string }[]): string[] {
+  return scenes.filter(talkingStale).map(s => `Scene ${s.number}: the talking clip was made with an earlier voice - make the talking video again.`);
+}

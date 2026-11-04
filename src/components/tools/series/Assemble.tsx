@@ -44,7 +44,8 @@ function EpisodeRow({ project, episode, onChanged, open, onToggle }: { project: 
     setError(null);
     try {
       onChanged(await api.get(project.id));
-      await api.stitch(project.id, episode.id);
+      const r = await api.stitch(project.id, episode.id);
+      for (const w of r.warnings ?? []) notify({ message: `${episode.title}: ${w}`, tab: "series" });
       onChanged(await api.get(project.id));
     } catch (err: any) {
       setError(err?.message || String(err));
@@ -224,7 +225,7 @@ export function Assemble({ project, onChanged }: { project: Project; onChanged: 
   const joined = eps.filter(e => !!e.exportPath);
   const joinAll = async () => {
     try {
-      for (const [i, e] of joinable.entries()) { setJoining(`Joining ${i + 1} of ${joinable.length}...`); await api.stitch(project.id, e.id); }
+      for (const [i, e] of joinable.entries()) { setJoining(`Joining ${i + 1} of ${joinable.length}...`); const r = await api.stitch(project.id, e.id); for (const w of r.warnings ?? []) notify({ message: `${e.title}: ${w}`, tab: "series" }); }
       onChanged(await api.get(project.id));
     } catch (err: any) { notifyError(err?.message || String(err), "series"); }
     finally { setJoining(""); }

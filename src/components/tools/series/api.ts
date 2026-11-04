@@ -158,7 +158,7 @@ export const api = {
   generateEpisode: (id: string, episodeId: string, redo = false) =>
     call<{ queued: number }>(`/api/series/projects/${id}/episodes/${episodeId}/generate`, { method: "POST", body: JSON.stringify({ redo }) }),
   cancel: (id: string) => call(`/api/series/projects/${id}/cancel`, { method: "POST" }),
-  stitch: (id: string, episodeId: string) => call<{ file: string }>(`/api/series/projects/${id}/episodes/${episodeId}/stitch`, { method: "POST" }),
+  stitch: (id: string, episodeId: string) => call<{ file: string; warnings?: string[] }>(`/api/series/projects/${id}/episodes/${episodeId}/stitch`, { method: "POST" }),
   generateSubtitles: (id: string, episodeId: string, source: string) =>
     call<Project>(`/api/series/projects/${id}/episodes/${episodeId}/subtitles/generate`, { method: "POST", body: JSON.stringify({ source }) }),
   saveSubtitles: (id: string, episodeId: string, body: { cues?: Cue[]; style?: SubStyle }) =>

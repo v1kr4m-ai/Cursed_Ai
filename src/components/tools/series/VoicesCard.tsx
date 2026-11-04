@@ -207,6 +207,7 @@ Make the talking video for this scene?`)) return;
                     {isTalking(sc) && sc.clipBeforeTalking && <button disabled={working} onClick={() => backToNormal(x.sceneId)} className="rounded border border-neutral-700 px-1.5 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-40">Back to normal clip</button>}
                     {working && sc.promptId !== undefined && <span className="text-sky-300"><Loader2 size={10} className="mr-1 inline animate-spin" />{sc.status === "queued" ? "waiting for the graphics card" : "making the clip (see the scene card for progress)"}</span>}
                     {why && !working && <span className="text-neutral-500">{why}</span>}
+                    {sc.error && !working && <span className="text-rose-300">{sc.error}</span>}
                     {!why && manySpeakers(sc) && !turnPlan(sc) && <span className="text-amber-300/80">several speakers in one talking clip need XTTS voices (per-turn timing): only the first speaker's picture is used{xt ? "; redo the voice to keep the turns" : ""}</span>}
                     {!why && !!turnPlan(sc) && <span className="text-neutral-500">{renderNote(sc)}</span>}
                   </>;

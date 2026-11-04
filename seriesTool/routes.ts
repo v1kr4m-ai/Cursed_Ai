@@ -15,7 +15,7 @@ import path from "path";
 import { loadApiWorkflow, loadWorkflowInfo, type WorkflowInfo } from "../comfyTool/registry";
 import { runWorkflow, cancelPrompt, uniqueDestination, type RunEvent } from "../comfyTool/runner";
 import { probeDuration, stitch, buildTalkingTrimArgs, buildTalkingPieceArgs, buildTalkingConcatArgs, buildJoinArgs, runFfmpeg } from "./ffmpeg";
-import { MAX_CHUNKS, TALK_TAIL, TALK_WARNING, TALK_WORKFLOW, MAX_TALK_SECONDS, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingPrompt, talkingSize, isMultiSpeaker, turnsMatchVoice, pieceLengths, planTurnRenders, pickTurnPicture, TURN_GAP, type TurnRender } from "./talking";
+import { MAX_CHUNKS, TALK_TAIL, TALK_WARNING, TALK_WORKFLOW, MAX_TALK_SECONDS, isTalking, joinVoice, limitChunks, pickTalkingPicture, planTalking, talkingPrompt, talkingSize, isMultiSpeaker, turnsMatchVoice, pieceLengths, planTurnRenders, pickTurnPicture, TURN_GAP, failedRenderState, joinWarnings, type TurnRender } from "./talking";
 import { takesIn, unusedTakes } from "./takes";
 import { upsertOutput } from "./finishCore";
 import { extractUpload } from "../comfyTool/extract";
@@ -232,8 +232,8 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
         const item: any = cur && (full.kind === "scene" ? findScene(cur, full.targetId)?.scene : findRef(cur, full.targetId)?.ref);
         const had = item && (full.kind === "scene" ? item.clipPath : item.file);
         const keep = !!had && fs.existsSync(had);
-        mark(projectId, full.targetId, full.kind, { status: keep ? "done" : full.abort.signal.aborted ? "pending" : "failed", error: keep ? null : message });
-        emit(projectId, { type: "failed", targetId: full.targetId, error: message });
+        mark(projectId, full.targetId, full.kind, failedRenderState(keep, full.abort.signal.aborted, message));
+        emit(projectId, { type: "failed", targetId: full.targetId, error: failedRenderState(keep, full.abort.signal.aborted, message).error ?? message });
         if (!full.abort.signal.aborted) {
           const b = batch.get(projectId) || { done: 0, failed: 0 };
           batch.set(projectId, { ...b, failed: b.failed + 1 });
@@ -933,8 +933,10 @@ export function registerSeriesTool(app: express.Express, opts: SeriesOptions) {
       fep.outputs = upsertOutput(fep.outputs, "joined", outFile);
       if (fep.finalKind && fep.finalKind !== "joined") fep.finalKind = undefined;
       store.save(fresh);
+      const warnings = joinWarnings(ordered);
+      for (const w of warnings) emit(p.id, { type: "ffmpeg", text: `warning: ${w}` });
       emit(p.id, { type: "stitched", episodeId: ep.id, file: outFile });
-      res.json({ file: outFile });
+      res.json({ file: outFile, warnings });
     } catch (e: any) {
       bad(res, 500, e?.message || String(e));
     }
