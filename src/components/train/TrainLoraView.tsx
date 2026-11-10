@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowRight, Camera, Check, ExternalLink, ImagePlus, Loader2, Palette, Pencil, Play, Settings2, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { notify, notifyError } from "../../lib/notify";
 import { api, fmtBytes, imgUrl, useJob, useTrainStatus } from "./trainApi";
+import { BASE_NAME, loraNeeds } from "./loraInfo";
 import { GuideButton, LoraGuide } from "./Guide";
 import { Badge, btn, btnDanger, btnPrimary, Card, Check as CheckBox, Field, FolderField, inputCls, JobConsole, NumberField, SelectField, Tabs, TextField, TrainProgress } from "./ui";
 
@@ -70,6 +71,8 @@ export function TrainLoraView() {
   // Defaults that depend on what is installed.
   React.useEffect(() => {
     if (!status) return;
+    // First visit (nothing saved yet): start from the server's model type, not a fixed one.
+    try { if (!localStorage.getItem(KEY)) set(BASE_INFO[status.lora.base].defaults); } catch { /* storage blocked */ }
     if (!status.lora.baseModels.some(m => m.path === f.baseModelPath) && status.lora.baseModels[0]) set({ baseModelPath: status.lora.baseModels[0].path });
     if (!f.datasetDir && status.lora.datasets[0]) set({ datasetDir: status.lora.datasets[0].path });
   }, [status?.lora.base, status?.lora.baseModels.length, status?.lora.datasets.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -223,14 +226,23 @@ End it now?`)) throw e;
             </>
           ) : (
             <>
+              {lora.state?.info && (() => {
+                const i = lora.state.info, running = lora.running, st = lora.state;
+                const rows: [string, string][] = [["Trigger word", i.triggerWord], ["Model type", BASE_NAME[i.base as Base] || i.base], ["Base checkpoint", i.baseModelName], ["Epochs x repeats", `${i.epochs} x ${i.numRepeats}`], ["Resolution", String(i.resolution)], ["Rank / alpha", `${i.networkDim} / ${i.networkAlpha}`], ["Learning rate", i.learningRate], ["Dataset", `${i.datasetName} (${i.datasetImages} images)`], ["Saves to", `${i.outputDir}\\${i.outputName}`]];
+                return (
+                  <Card title={running ? "Running now" : st.stopped ? "Last run (stopped)" : st.failed ? "Last run (failed)" : "Last run"} icon={running ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} note={running ? `These are the settings this run is really using. ${lora.progress ? lora.progress.text + " (" + Math.round(lora.progress.pct) + "%)" : "Starting..."}` : "The settings of the most recent run, until the next one starts."}>
+                    <div className="grid gap-x-6 gap-y-1 text-xs md:grid-cols-2">{rows.map(([k, v]) => <div key={k} className="flex gap-2"><span className="w-32 shrink-0 text-zinc-500">{k}</span><span className="min-w-0 break-all text-zinc-200">{v}</span></div>)}</div>
+                  </Card>
+                );
+              })()}
               <div className="grid gap-4 lg:grid-cols-2">
-                <Card title="What to train" icon={<Palette size={15} />}>
+                <Card title={lora.running ? "Settings for the next run" : "What to train"} note={lora.running ? "A run is going now. Changes here only apply to the next one you start." : undefined} icon={<Palette size={15} />}>
                   <TextField label="Character / trigger word" value={f.trigger} onChange={v => set({ trigger: v.replace(/[^\w-]/g, "") })} placeholder="e.g. richie01" />
                   <SelectField label="Dataset" value={status.lora.datasets.find(d => d.path === f.datasetDir)?.path || ""} onChange={v => set({ datasetDir: v })} options={status.lora.datasets.map(d => ({ value: d.path, label: `${d.name} (${d.images} images)` }))} hint={f.datasetDir ? `${images.length} pictures, ${uncaptioned} without a caption` : undefined} />
                   <SelectField label="Model type" value={base} onChange={v => pickBase(v as Base)} options={(Object.keys(BASE_INFO) as Base[]).map(b => ({ value: b, label: BASE_INFO[b].label }))} hint={BASE_INFO[base].note} />
                   {!ready && <p className="text-[11px] text-amber-400">Missing for {BASE_INFO[base].label}: {status.lora.missing.join(", ")}</p>}
                   <SelectField label="Base model (the checkpoint the LoRA is trained on)" value={f.baseModelPath} onChange={v => set({ baseModelPath: v })} options={status.lora.baseModels.map(m => ({ value: m.path, label: `${m.name} (${fmtBytes(m.bytes)})` }))} empty="No checkpoint found" hint={base === "flux" ? "Add another .sft / .safetensors to the LoRA trainer's models/unet folder and it shows up here." : "Checkpoints come from ComfyUI's models/checkpoints folder. The LoRA file name ends in _sdxl_lora or _sd15_lora so you know which base it needs in ComfyUI."} />
-                  <FolderField label="Save the LoRA to" value={f.outputDir} onChange={v => set({ outputDir: v })} placeholder={outDir || "defaults to the trainer's outputs folder"} />
+                  <FolderField label="Save the LoRA to" value={f.outputDir} onChange={v => set({ outputDir: v })} placeholder={outDir || `${status.lora.outputDir}\\<trigger word>`} hint={`Default: ${status.lora.outputDir}\\<trigger word>. The file is named ${f.trigger || "<trigger word>"}_${base}_lora.safetensors.`} />
                 </Card>
                 <Card title="Settings" icon={<Settings2 size={15} />} note={base === "flux" ? "The defaults suit an 8 GB card: fp8 weights with transformer blocks swapped through system RAM. Close other heavy programs while it runs." : "Defaults suit an 8 GB card: half precision, gradient checkpointing and cached pictures. Close other heavy programs while it runs."}>
                   {base === "flux" && <SelectField label="GPU memory" value={f.vramPreset} onChange={v => set({ vramPreset: v })} options={[{ value: "8G", label: "8 GB (fp8 + block swap)" }, { value: "12G", label: "12 GB (fp8 + light swap)" }, { value: "16G", label: "16 GB (fp8)" }, { value: "20G", label: "20 GB or more (full precision)" }]} />}
@@ -251,7 +263,7 @@ End it now?`)) throw e;
                 {!files.length ? <p className="text-xs text-zinc-600">Nothing trained here yet.</p> : (
                   <div className="space-y-1.5">{files.map(file => (
                     <div key={file.path} className="flex items-center gap-3 rounded-xl border border-white/5 px-3 py-2 text-xs">
-                      <span className="min-w-0 flex-1 truncate font-mono text-zinc-300">{file.name}</span><span className="text-zinc-600">{fmtBytes(file.bytes)}</span>
+                      <span className="min-w-0 flex-1 truncate font-mono text-zinc-300">{file.name}</span>{loraNeeds(file.name) && <span className="text-[11px] text-violet-300">{loraNeeds(file.name)!.label}</span>}<span className="text-zinc-600">{fmtBytes(file.bytes)}</span>
                       <button onClick={() => install(file.path)} disabled={!status.comfyRoot} title={status.comfyRoot ? "Copy into ComfyUI's loras folder" : "Set ComfyUI's folder on the Image page first"} className={btn + " !py-1"}>Copy to ComfyUI</button>
                     </div>
                   ))}</div>

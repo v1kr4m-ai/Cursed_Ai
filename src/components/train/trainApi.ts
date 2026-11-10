@@ -6,6 +6,7 @@ export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "downloa
 export interface JobState {
   kind: JobKind; label: string; running: boolean; startedAt: number | null; endedAt: number | null; code: number | null;
   stopped: boolean; failed: boolean; progress: { pct: number; text: string } | null; result: any;
+  info?: any;
 }
 
 export interface TrainStatus {

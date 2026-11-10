@@ -150,6 +150,17 @@ export function promptPreview(ex: { instruction?: string; input?: string; output
   return `### Instruction:\n${(ex.instruction || "").trim()}\n${inp ? `\n### Input:\n${inp}\n` : ""}\n### Response:\n${(ex.output || "").trim()}`;
 }
 
+/** The settings a LoRA run really uses (after cleaning and defaults), for the page's "Running now" box. */
+export function loraRunInfo(cfg: LoraConfig, p: TrainPaths, datasetImages: number) {
+  const base: LoraBase = cfg.base || "flux";
+  const baseModel = cfg.baseModelPath || (base === "flux" ? p.fluxUnet : (base === "sdxl" ? p.sdxlBases : p.sd15Bases)[0]) || "";
+  return {
+    base, triggerWord: cfg.triggerWord, baseModel, baseModelName: path.basename(baseModel), epochs: cfg.epochs, numRepeats: cfg.numRepeats, resolution: cfg.resolution,
+    batchSize: cfg.batchSize, networkDim: cfg.networkDim, networkAlpha: cfg.networkAlpha, learningRate: String(cfg.learningRate),
+    datasetDir: cfg.datasetDir, datasetName: path.basename(cfg.datasetDir), datasetImages, outputDir: cfg.outputDir, outputName: `${cfg.triggerWord}_${base}_lora.safetensors`,
+  };
+}
+
 /** Whole numbers and sensible ranges only: these end up on a command line. */
 export function cleanLora(raw: any): LoraConfig {
   const n = (v: any, d: number, lo: number, hi: number) => { const x = Number(v); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, Math.round(x))) : d; };

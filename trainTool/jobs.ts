@@ -20,6 +20,8 @@ export interface JobState {
   failed: boolean;
   progress: { pct: number; text: string } | null;
   result: any;
+  /** What the job was started with (LoRA: the settings actually used), shown by the pages. */
+  info?: unknown;
 }
 
 interface Job {
@@ -87,8 +89,9 @@ export function jobState(kind: JobKind): JobState | null { return jobs.get(kind)
 export const isRunning = (kind: JobKind) => !!jobs.get(kind)?.state.running;
 
 /** Starts a program. The caller checks isRunning first. */
-export function startProcess(kind: JobKind, label: string, exe: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; onExit?: (code: number | null, job: JobState) => void } = {}): JobState {
+export function startProcess(kind: JobKind, label: string, exe: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; info?: unknown; onExit?: (code: number | null, job: JobState) => void } = {}): JobState {
   const job = fresh(kind, label);
+  if (opts.info !== undefined) job.state.info = opts.info;
   jobs.set(kind, job);
   addLine(job, `> ${label}`);
   const proc = spawn(exe, args, { cwd: opts.cwd, windowsHide: true, env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONIOENCODING: "utf-8", ...opts.env } });
