@@ -11,7 +11,7 @@ export interface JobState {
 export interface TrainStatus {
   paths: Record<string, string>;
   jobs: Record<string, JobState | null>;
-  lora: { ready: boolean; missing: string[]; baseModels: { name: string; path: string; bytes: number }[]; datasets: { name: string; path: string; images: number }[]; outputDir: string };
+  lora: { ready: boolean; missing: string[]; baseModels: { name: string; path: string; bytes: number }[]; base: "flux" | "sdxl" | "sd15"; bases: Record<"flux" | "sdxl" | "sd15", { ready: boolean; missing: string[]; baseModels: { name: string; path: string; bytes: number }[] }>; datasets: { name: string; path: string; images: number }[]; outputDir: string };
   llm: {
     ready: boolean; pythonFound: boolean; baseModels: { name: string; path: string }[];
     datasets: { name: string; path: string; bytes: number; examples: number }[]; outputDir: string;

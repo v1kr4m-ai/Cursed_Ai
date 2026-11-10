@@ -20,6 +20,13 @@ const DEFAULTS: Form = {
   vramPreset: "8G", resolution: 768, batchSize: 1, epochs: 16, numRepeats: 10, networkDim: 16, networkAlpha: 16, learningRate: "8e-4", seed: 42, captioner: "florence", redo: false,
 };
 
+type Base = "flux" | "sdxl" | "sd15";
+const BASE_INFO: Record<Base, { label: string; note: string; resolutions: string[]; defaults: Partial<Form> }> = {
+  sd15: { label: "SD 1.5 (fastest)", note: "Fastest and easiest, about 6 GB of video memory. Lower detail.", resolutions: ["512", "768"], defaults: { resolution: 512, learningRate: "1e-4", networkDim: 16, networkAlpha: 16, epochs: 10 } },
+  sdxl: { label: "SDXL (recommended on 8 GB)", note: "Best quality that fits an 8 GB card. Slower than SD 1.5.", resolutions: ["768", "1024"], defaults: { resolution: 1024, learningRate: "1e-4", networkDim: 32, networkAlpha: 16, epochs: 10 } },
+  flux: { label: "Flux (needs 12 GB+)", note: "Best quality, but needs 12 GB or more of video memory and the fp16 T5 file (t5xxl_fp16.safetensors).", resolutions: ["512", "768", "1024"], defaults: { resolution: 768, learningRate: "8e-4", networkDim: 16, networkAlpha: 16, epochs: 16 } },
+};
+
 interface Img { name: string; path: string; caption: string }
 
 /** Train a character LoRA for Flux: build the image dataset, caption it, train it. Runs kohya sd-scripts from the app's own train/lora folder. */
@@ -48,6 +55,12 @@ export function TrainLoraView() {
   const [editing, setEditing] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState("");
   const [busyUpload, setBusyUpload] = React.useState(false);
+  const base: Base = status?.lora.base || "flux";
+  const pickBase = (b: Base) => guard(async () => {
+    set({ ...BASE_INFO[b].defaults, baseModelPath: status?.lora.bases[b].baseModels[0]?.path || "" });
+    await api("/api/train/paths", { loraBase: b });
+    reload();
+  });
   const [consoleKind, setConsoleKind] = React.useState<"lora" | "sketch" | "caption">("sketch");
   const lora = useJob("lora"), sketch = useJob("sketch"), caption = useJob("caption");
   const jobs = { lora, sketch, caption };
@@ -57,9 +70,9 @@ export function TrainLoraView() {
   // Defaults that depend on what is installed.
   React.useEffect(() => {
     if (!status) return;
-    if (!f.baseModelPath && status.lora.baseModels[0]) set({ baseModelPath: status.lora.baseModels[0].path });
+    if (!status.lora.baseModels.some(m => m.path === f.baseModelPath) && status.lora.baseModels[0]) set({ baseModelPath: status.lora.baseModels[0].path });
     if (!f.datasetDir && status.lora.datasets[0]) set({ datasetDir: status.lora.datasets[0].path });
-  }, [status?.lora.baseModels.length, status?.lora.datasets.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status?.lora.base, status?.lora.baseModels.length, status?.lora.datasets.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshImages = React.useCallback(async () => {
     if (!f.datasetDir) { setImages([]); return; }
@@ -122,12 +135,12 @@ End it now?`)) throw e;
       <div className="flex h-20 shrink-0 items-center justify-between gap-4 border-b border-white/5 px-8">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5"><Palette size={22} className="text-violet-400" /></div>
-          <div className="min-w-0"><h1 className="text-lg font-bold leading-none tracking-tight text-white">Train LoRA</h1><p className="mt-1 truncate text-[11px] text-zinc-500">Character LoRA for Flux - from pictures to a trained .safetensors</p></div>
+          <div className="min-w-0"><h1 className="text-lg font-bold leading-none tracking-tight text-white">Train LoRA</h1><p className="mt-1 truncate text-[11px] text-zinc-500">Character LoRA for SD 1.5, SDXL or Flux - from pictures to a trained .safetensors</p></div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <GuideButton onClick={() => setGuide(true)} />
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: "dataset", label: "1  Dataset", busy: sketch.running || caption.running }, { id: "train", label: "2  Train", busy: lora.running }]} />
-          <Badge ok={ready ?? null} title={ready ? "The trainer, kohya and the Flux files were found" : "Missing: " + status.lora.missing.join(", ")}>{ready ? "LoRA trainer ready" : "LoRA trainer missing"}</Badge>
+          <Badge ok={ready ?? null} title={ready ? "The trainer, kohya and the files for the chosen base model were found" : "Missing: " + status.lora.missing.join(", ")}>{ready ? "LoRA trainer ready" : "LoRA trainer missing"}</Badge>
           <Badge ok={status.comfy.running} title="Used for the character sketch">ComfyUI {status.comfy.running ? "on" : "off"}</Badge>
           <button onClick={() => setSetupOpen(v => !v)} title="Folders" className={`p-2 transition-colors ${setupOpen ? "text-violet-400" : "text-zinc-500 hover:text-white"}`}><Settings2 size={18} /></button>
         </div>
@@ -137,7 +150,7 @@ End it now?`)) throw e;
 
       {setupOpen && (
         <div className="grid shrink-0 gap-3 border-b border-white/5 bg-white/[0.02] px-8 py-4 md:grid-cols-3">
-          <FolderField label="LoRA trainer folder" value={paths.fluxgymRoot} onChange={v => setPaths({ ...paths, fluxgymRoot: v })} hint="Holds kohya sd-scripts, its Python environment and the Flux files." />
+          <FolderField label="LoRA trainer folder" value={paths.fluxgymRoot} onChange={v => setPaths({ ...paths, fluxgymRoot: v })} hint="Holds kohya sd-scripts and its Python environment." />
           <FolderField label="Training folder" value={paths.trainRoot} onChange={v => setPaths({ ...paths, trainRoot: v })} hint="The folder with llm_finetune (used by FineTune LLM)." />
           <div className="flex items-end"><button onClick={savePaths} className={btnPrimary}><Check size={14} />Save</button></div>
           {!ready && <p className="text-[11px] text-amber-400 md:col-span-3">Missing: {status.lora.missing.join(", ")}</p>}
@@ -212,13 +225,15 @@ End it now?`)) throw e;
                 <Card title="What to train" icon={<Palette size={15} />}>
                   <TextField label="Character / trigger word" value={f.trigger} onChange={v => set({ trigger: v.replace(/[^\w-]/g, "") })} placeholder="e.g. richie01" />
                   <SelectField label="Dataset" value={status.lora.datasets.find(d => d.path === f.datasetDir)?.path || ""} onChange={v => set({ datasetDir: v })} options={status.lora.datasets.map(d => ({ value: d.path, label: `${d.name} (${d.images} images)` }))} hint={f.datasetDir ? `${images.length} pictures, ${uncaptioned} without a caption` : undefined} />
-                  <SelectField label="Base model (the checkpoint the LoRA is trained on)" value={f.baseModelPath} onChange={v => set({ baseModelPath: v })} options={status.lora.baseModels.map(m => ({ value: m.path, label: `${m.name} (${fmtBytes(m.bytes)})` }))} empty="No Flux checkpoint found" hint="Add another .sft / .safetensors to the LoRA trainer's models/unet folder and it shows up here." />
+                  <SelectField label="Model type" value={base} onChange={v => pickBase(v as Base)} options={(Object.keys(BASE_INFO) as Base[]).map(b => ({ value: b, label: BASE_INFO[b].label }))} hint={BASE_INFO[base].note} />
+                  {!ready && <p className="text-[11px] text-amber-400">Missing for {BASE_INFO[base].label}: {status.lora.missing.join(", ")}</p>}
+                  <SelectField label="Base model (the checkpoint the LoRA is trained on)" value={f.baseModelPath} onChange={v => set({ baseModelPath: v })} options={status.lora.baseModels.map(m => ({ value: m.path, label: `${m.name} (${fmtBytes(m.bytes)})` }))} empty="No checkpoint found" hint={base === "flux" ? "Add another .sft / .safetensors to the LoRA trainer's models/unet folder and it shows up here." : "Checkpoints come from ComfyUI's models/checkpoints folder. The LoRA file name ends in _sdxl_lora or _sd15_lora so you know which base it needs in ComfyUI."} />
                   <FolderField label="Save the LoRA to" value={f.outputDir} onChange={v => set({ outputDir: v })} placeholder={outDir || "defaults to the trainer's outputs folder"} />
                 </Card>
-                <Card title="Settings" icon={<Settings2 size={15} />} note="The defaults suit an 8 GB card: fp8 weights with transformer blocks swapped through system RAM. Close other heavy programs while it runs.">
-                  <SelectField label="GPU memory" value={f.vramPreset} onChange={v => set({ vramPreset: v })} options={[{ value: "8G", label: "8 GB (fp8 + block swap)" }, { value: "12G", label: "12 GB (fp8 + light swap)" }, { value: "16G", label: "16 GB (fp8)" }, { value: "20G", label: "20 GB or more (full precision)" }]} />
+                <Card title="Settings" icon={<Settings2 size={15} />} note={base === "flux" ? "The defaults suit an 8 GB card: fp8 weights with transformer blocks swapped through system RAM. Close other heavy programs while it runs." : "Defaults suit an 8 GB card: half precision, gradient checkpointing and cached pictures. Close other heavy programs while it runs."}>
+                  {base === "flux" && <SelectField label="GPU memory" value={f.vramPreset} onChange={v => set({ vramPreset: v })} options={[{ value: "8G", label: "8 GB (fp8 + block swap)" }, { value: "12G", label: "12 GB (fp8 + light swap)" }, { value: "16G", label: "16 GB (fp8)" }, { value: "20G", label: "20 GB or more (full precision)" }]} />}
                   <div className="grid grid-cols-3 gap-3">
-                    <SelectField label="Resolution" value={String(f.resolution)} onChange={v => set({ resolution: Number(v) })} options={["512", "768", "1024"].map(v => ({ value: v, label: v }))} />
+                    <SelectField label="Resolution" value={String(f.resolution)} onChange={v => set({ resolution: Number(v) })} options={BASE_INFO[base].resolutions.map(v => ({ value: v, label: v }))} />
                     <NumberField label="Batch" value={f.batchSize} onChange={v => set({ batchSize: v })} min={1} max={8} />
                     <NumberField label="Epochs" value={f.epochs} onChange={v => set({ epochs: v })} min={1} max={500} />
                     <NumberField label="Repeats / image" value={f.numRepeats} onChange={v => set({ numRepeats: v })} min={1} max={100} />
@@ -255,7 +270,7 @@ End it now?`)) throw e;
         )}
           {tab === "train" && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <button onClick={() => start("lora", "/api/train/lora/start", { triggerWord: f.trigger, datasetDir: f.datasetDir, outputDir: f.outputDir, baseModelPath: f.baseModelPath, resolution: f.resolution, batchSize: f.batchSize, numRepeats: f.numRepeats, networkDim: f.networkDim, networkAlpha: f.networkAlpha, learningRate: f.learningRate, epochs: f.epochs, vramPreset: f.vramPreset, seed: f.seed })} disabled={!!trainReason || busy} title={trainReason} className={btnPrimary}>{lora.running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}Start LoRA training</button>
+          <button onClick={() => start("lora", "/api/train/lora/start", { triggerWord: f.trigger, datasetDir: f.datasetDir, outputDir: f.outputDir, baseModelPath: f.baseModelPath, resolution: f.resolution, batchSize: f.batchSize, numRepeats: f.numRepeats, networkDim: f.networkDim, networkAlpha: f.networkAlpha, learningRate: f.learningRate, epochs: f.epochs, vramPreset: f.vramPreset, seed: f.seed, base })} disabled={!!trainReason || busy} title={trainReason} className={btnPrimary}>{lora.running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}Start LoRA training</button>
           {lora.running && <button onClick={lora.stop} className={btnDanger}>Stop</button>}
           {trainReason && <span className="text-[11px] text-amber-400">{trainReason}</span>}
           {!trainReason && <span className="text-[11px] text-zinc-500">ComfyUI's and Ollama's models are unloaded first so training has the GPU to itself.</span>}

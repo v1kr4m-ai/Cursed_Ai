@@ -14,7 +14,13 @@ export interface TrainConfig {
   fluxgymRoot?: string;
   /** ComfyUI's install (its models folder holds the Flux weights). */
   comfyuiPath?: string;
+  /** Which base model the LoRA trainer uses: flux (default), sdxl or sd15. */
+  loraBase?: "flux" | "sdxl" | "sd15";
 }
+
+/** Checkpoint file names the SDXL / SD 1.5 trainers accept, in order of preference. */
+export const SDXL_BASES = ["sd_xl_base_1.0.safetensors", "juggernautXL_ragnarokBy.safetensors"];
+export const SD15_BASES = ["dreamshaper_8.safetensors", "sd15.safetensors"];
 
 const DEFAULT_TRAIN_ROOT = "D:\\Claude\\In_Progress\\Before_The_Dragons\\Train_LORA";
 
@@ -33,6 +39,11 @@ export interface TrainPaths {
   fluxClipL: string;
   fluxT5: string;
   fluxVae: string;
+  /** Checkpoints (full .safetensors models) that exist for SDXL / SD 1.5 training, preferred first. */
+  sdxlBases: string[];
+  sd15Bases: string[];
+  /** True when bitsandbytes (8-bit AdamW) is installed in the trainer's environment. */
+  hasBnb: boolean;
   fluxDatasetsDir: string;
   fluxOutputDir: string;
   fluxUnetDir: string;
@@ -57,6 +68,10 @@ export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
       for (const n of names) if (fs.existsSync(path.join(dir, n))) return path.join(dir, n);
     return path.join(comfyModels ? path.join(comfyModels, kind) : path.join(fluxgymRoot, "models", kind), names[0]);
   };
+  const found = (kind: string, names: string[]) => {
+    const dirs = [comfyModels && path.join(comfyModels, kind), path.join(fluxgymRoot, "models", kind)].filter(Boolean) as string[];
+    return names.flatMap(n => dirs.map(d => path.join(d, n))).filter(f => fs.existsSync(f));
+  };
   const llmRoot = path.join(trainRoot, "llm_finetune");
   const win = process.platform === "win32";
   const py = (root: string) => path.join(root, "env", win ? "Scripts" : "bin", win ? "python.exe" : "python");
@@ -73,6 +88,9 @@ export function resolvePaths(cfg: TrainConfig, appRoot: string): TrainPaths {
     fluxClipL: model("clip", "clip_l.safetensors"),
     fluxT5: model("clip", "t5xxl_fp16.safetensors"),
     fluxVae: model("vae", "ae.safetensors", "ae.sft"),
+    sdxlBases: found("checkpoints", SDXL_BASES),
+    sd15Bases: found("checkpoints", SD15_BASES),
+    hasBnb: fs.existsSync(path.join(fluxgymRoot, "env", process.platform === "win32" ? path.join("Lib", "site-packages") : path.join("lib"), "bitsandbytes")) || process.platform !== "win32",
     fluxDatasetsDir: path.join(fluxgymRoot, "datasets"),
     fluxOutputDir: path.join(fluxgymRoot, "outputs"),
     fluxUnetDir: comfyModels ? path.join(comfyModels, "unet") : path.join(fluxgymRoot, "models", "unet"),

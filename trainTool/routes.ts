@@ -7,7 +7,7 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
-import { buildLlmArgs, buildLoraArgs, cleanLlm, cleanLora, writeLoraToml } from "./builders";
+import { buildLlmArgs, buildLoraArgs, cleanLlm, cleanLora, LORA_BASES, loraMissing, writeLoraToml, type LoraBase } from "./builders";
 import { endProcesses, freeVram, isRunning, jobState, leftoverTrainers, startProcess, startTask, stopJob, subscribeAll, type JobKind } from "./jobs";
 import { exists, listDirs, listFiles, listHfModels, resolvePaths, type TrainConfig } from "./paths";
 import { buildDataset, triggerFor } from "./personDataset";
@@ -53,16 +53,23 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
   app.get("/api/train/status", async (_req, res) => {
     const p = P();
     const models = await ollamaModels();
-    const missing: string[] = [];
-    for (const [label, f] of [["Flux checkpoint (flux1-dev.sft)", p.fluxUnet], ["clip_l", p.fluxClipL], ["t5xxl", p.fluxT5], ["VAE (ae.sft)", p.fluxVae], ["kohya sd-scripts", p.sdScripts], ["accelerate", p.fluxAccelerate]] as const) if (!exists(f)) missing.push(label);
+    const fileEntry = (f: string) => ({ name: path.basename(f), path: f, bytes: (() => { try { return fs.statSync(f).size; } catch { return 0; } })() });
+    const flux = { missing: loraMissing("flux", p, exists), baseModels: listFiles(p.fluxUnetDir, [".sft", ".safetensors"]).filter(f => /flux/i.test(f.name)) };
+    const bases = {
+      flux: { ...flux, ready: !flux.missing.length },
+      sdxl: { missing: loraMissing("sdxl", p, exists), baseModels: p.sdxlBases.map(fileEntry), ready: false },
+      sd15: { missing: loraMissing("sd15", p, exists), baseModels: p.sd15Bases.map(fileEntry), ready: false },
+    };
+    bases.sdxl.ready = !bases.sdxl.missing.length; bases.sd15.ready = !bases.sd15.missing.length;
+    // Saved choice; before one is saved, Flux when it is complete, otherwise SDXL.
+    const base: LoraBase = LORA_BASES.includes(opts.getConfig().loraBase as LoraBase) ? opts.getConfig().loraBase as LoraBase : bases.flux.ready ? "flux" : "sdxl";
     const jobs: Record<string, unknown> = {};
     for (const k of KINDS) jobs[k] = jobState(k);
     res.json({
       paths: p, jobs,
       lora: {
-        ready: !missing.length, missing,
-        // ComfyUI's unet folder also holds other models; the trainer takes Flux weights as .sft/.safetensors.
-        baseModels: listFiles(p.fluxUnetDir, [".sft", ".safetensors"]).filter(f => /flux/i.test(f.name)),
+        // ready / missing / baseModels describe the chosen base; bases has all three. (ComfyUI's unet folder also holds other models, so Flux files are filtered by name.)
+        base, bases, ready: bases[base].ready, missing: bases[base].missing, baseModels: bases[base].baseModels,
         datasets: listDirs(p.fluxDatasetsDir).map(n => ({ name: n, path: path.join(p.fluxDatasetsDir, n), images: imageEntries(path.join(p.fluxDatasetsDir, n), 5000).length })),
         outputDir: p.fluxOutputDir,
       },
@@ -83,6 +90,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
   app.post("/api/train/paths", (req, res) => {
     const cur = opts.getConfig();
     const next: TrainConfig = { ...cur };
+    if (LORA_BASES.includes(req.body?.loraBase)) next.loraBase = req.body.loraBase;
     for (const k of ["trainRoot", "fluxgymRoot"] as const) {
       const v = req.body?.[k];
       if (typeof v === "string") { if (v.trim() && !exists(v.trim())) return bad(res, 400, `That folder does not exist: ${v}`); next[k] = v.trim() || undefined; }
@@ -105,9 +113,13 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     if (!imageEntries(cfg.datasetDir, 1).length) return bad(res, 400, "That dataset folder has no images.");
     if (!cfg.outputDir) cfg.outputDir = path.join(p.fluxOutputDir, cfg.triggerWord);
     for (const [label, f] of [["The LoRA trainer's accelerate", p.fluxAccelerate], ["kohya sd-scripts", p.sdScripts]] as const) if (!exists(f)) return bad(res, 400, `${label} was not found at ${f}. Set the LoRA trainer folder in the page.`);
+    const miss = loraMissing(cfg.base || "flux", p, exists);
+    if (miss.length) return bad(res, 400, `Missing for this base model: ${miss.join(", ")}.`);
+    // A path left over from another base model is ignored; the builder then uses that base's default checkpoint.
+    if (cfg.base && cfg.baseModelPath && ![...p.sdxlBases, ...p.sd15Bases].includes(cfg.baseModelPath)) cfg.baseModelPath = undefined;
     fs.mkdirSync(cfg.outputDir, { recursive: true });
     // A crashed earlier run can leave its workers hung on the graphics card; starting into that only runs out of memory.
-    const left = await leftoverTrainers("flux_train_network.py");
+    const left = await leftoverTrainers("train_network.py");
     if (left.length) return res.status(409).json({ error: `A previous LoRA training is still running in the background (${left.length} process${left.length === 1 ? "" : "es"}, probably stuck after an error) and is holding the graphics card. End it, then start again.`, leftovers: left });
     const toml = writeLoraToml(cfg);
     // Free the GPU first and give it a moment: freeing it while training starts raced the first CUDA allocations
@@ -115,14 +127,14 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     await freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {});
     await new Promise(r => setTimeout(r, 2500));
     if (isRunning("lora")) return bad(res, 409, "A LoRA training run is already active.");
-    const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.epochs} epochs, ${cfg.vramPreset})`, p.fluxAccelerate, buildLoraArgs(cfg, p, toml), { cwd: p.sdScripts });
+    const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.base || "flux"}, ${cfg.epochs} epochs${cfg.base ? "" : ", " + cfg.vramPreset})`, p.fluxAccelerate, buildLoraArgs(cfg, p, toml), { cwd: p.sdScripts });
     res.json(state);
   });
 
   /** Ends the leftover trainer processes reported by a refused start (the person pressed End them). */
   app.post("/api/train/lora/end-leftovers", async (_req, res) => {
     if (isRunning("lora")) return bad(res, 409, "A LoRA run started from here is active - stop it instead.");
-    const left = await leftoverTrainers("flux_train_network.py");
+    const left = await leftoverTrainers("train_network.py");
     endProcesses(left);
     res.json({ ended: left.length });
   });
