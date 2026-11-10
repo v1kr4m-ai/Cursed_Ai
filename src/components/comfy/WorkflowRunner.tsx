@@ -419,9 +419,10 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   // Run the prompt(s) `count` times each. The first goes on screen when nothing is running; everything else just joins the queue.
   const notified = React.useRef(new Set<string>());
   const submit = async (texts: string[]) => {
-    if (!wf || !canRunBase) return;
-    const list = texts.filter(t => t.trim() || !wf.needsPrompt);
-    if (!list.length) return;
+    if (!wf) return;
+    if (!canRunBase) { notifyError("This workflow cannot run yet - fill in the missing pictures/files or roles shown above it.", kind); return; }
+    const list = texts.filter(t => t.trim() || !wf.needsPrompt || !!wf.builtInPrompt?.trim()); // empty box = the workflow's own prompt (same rule as canRun)
+    if (!list.length) { notifyError("Write a prompt first.", kind); return; }
     const jobs = list.flatMap(t => Array(count).fill(t) as string[]);
     const many = jobs.length > 1;
     setQueuing(true); setRunError(null);

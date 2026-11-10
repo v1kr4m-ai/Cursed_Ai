@@ -167,15 +167,29 @@ export async function freeVram(opts: { comfyUrl: string; ollamaUrl: string }, lo
   } catch { /* not running */ }
 }
 
+export type ProcInfo = { pid: number; name: string; cmd: string };
+
+/**
+ * Real trainer processes among `procs`: python/accelerate executables whose command line runs the kohya script.
+ * Shells and agents that merely mention the script name in their own command line (bash, powershell, node) never match.
+ */
+export function pickTrainers(procs: ProcInfo[], script: string, selfPid = process.pid): number[] {
+  const esc = script.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const mentions = new RegExp(String.raw`[\\/][\w.-]*${esc}(\s|"|'|$)`, "i");
+  return procs.filter(p => p.pid > 0 && p.pid !== selfPid && /^(python|pythonw|accelerate)(\d[\d.]*)?\.exe$/i.test(p.name) && mentions.test(p.cmd)).map(p => p.pid);
+}
+
 /**
  * Trainer processes left behind by an earlier run that crashed (CUDA "out of memory" leaves Python workers hung, and
  * they keep holding the graphics card). Windows only; elsewhere none are reported.
  */
 export function leftoverTrainers(script: string): Promise<number[]> {
   if (process.platform !== "win32") return Promise.resolve([]);
-  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*${script.replace(/'/g, "")}*' } | ForEach-Object { $_.ProcessId }`;
-  return new Promise(ok => execFile("powershell.exe", ["-NoProfile", "-Command", ps], { windowsHide: true, timeout: 15000 }, (_e, out) =>
-    ok(String(out || "").split(/\s+/).map(Number).filter(n => n > 0 && n !== process.pid))));
+  // The process list is filtered here, not in the PowerShell command, so that check's own command line cannot match itself.
+  const ps = "Get-CimInstance Win32_Process | Select-Object @{n='pid';e={$_.ProcessId}},@{n='name';e={$_.Name}},@{n='cmd';e={$_.CommandLine}} | ConvertTo-Json -Compress";
+  return new Promise(ok => execFile("powershell.exe", ["-NoProfile", "-Command", ps], { windowsHide: true, timeout: 20000, maxBuffer: 32 * 1024 * 1024 }, (_e, out) => {
+    try { ok(pickTrainers([].concat(JSON.parse(String(out || "[]"))).map((x: any) => ({ pid: Number(x.pid), name: String(x.name || ""), cmd: String(x.cmd || "") })), script)); } catch { ok([]); }
+  }));
 }
 
 /** Ends those leftovers - only when the person asks (the page's End them button). */
