@@ -53,7 +53,8 @@ export function tailLines(file: string, count = 300, maxAgeMs = Infinity): strin
 export function listeningPids(netstat: string, port: number): number[] {
   const pids = new Set<number>();
   for (const line of netstat.split(/\r?\n/)) {
-    const m = /^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)/i.exec(line);
+    // The LISTENING row can show owner 0 (seen on Windows 11 after a driver reset); the server side of an open connection (local port = the port) still names the real process.
+    const m = /^\s*TCP\s+\S+:(\d+)\s+\S+\s+(?:LISTENING|ESTABLISHED)\s+(\d+)/i.exec(line);
     if (m && Number(m[1]) === port && Number(m[2]) > 4) pids.add(Number(m[2]));
   }
   return [...pids];

@@ -4,6 +4,7 @@
  */
 import type { Response } from "express";
 import { spawn, execFile, type ChildProcess } from "child_process";
+import { listeningPids } from "../comfyLaunch";
 
 export type JobKind = "lora" | "llm" | "caption" | "sketch" | "pairs" | "download" | "stt" | "tts" | "speechprep" | "speechenv" | "mobile" | "faceswap" | "dia" | "xtts" | "seriesvoice";
 
@@ -165,6 +166,15 @@ export async function freeVram(opts: { comfyUrl: string; ollamaUrl: string }, lo
       log(`[setup] unloaded ${m.name} from Ollama.`);
     }
   } catch { /* not running */ }
+}
+
+/** Ends ComfyUI (whatever listens on its port, with its children) when it is running. LoRA training needs the whole 8 GB card; ComfyUI's own /free leaves too much behind. Returns the ended PIDs. */
+export async function stopComfyUi(comfyUrl: string): Promise<number[]> {
+  if (process.platform !== "win32") return [];
+  const run = (cmd: string, args: string[]) => new Promise<string>(ok => execFile(cmd, args, { windowsHide: true, timeout: 15000 }, (_e, out) => ok(String(out || ""))));
+  const pids = listeningPids(await run("netstat", ["-ano", "-p", "tcp"]), Number(new URL(comfyUrl).port || 8188));
+  for (const pid of pids) await run("taskkill", ["/PID", String(pid), "/T", "/F"]);
+  return pids;
 }
 
 export type ProcInfo = { pid: number; name: string; cmd: string };

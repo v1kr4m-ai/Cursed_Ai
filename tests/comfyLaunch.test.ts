@@ -52,6 +52,14 @@ describe("telling the assistant to start ComfyUI", () => {
     expect(listeningPids(out, 8188)).toEqual([9120]);
     expect(listeningPids(out, 9999)).toEqual([]);
   });
+  it("finds the process from its open connections when the LISTENING row shows owner 0", () => {
+    const out = [
+      "  TCP    127.0.0.1:8188   0.0.0.0:0   LISTENING   0",
+      "  TCP    127.0.0.1:8188   127.0.0.1:49308   ESTABLISHED   45980",
+      "  TCP    127.0.0.1:49308   127.0.0.1:8188   ESTABLISHED   3000",
+    ].join("\r\n");
+    expect(listeningPids(out, 8188)).toEqual([45980]);
+  });
   it("understands a question about it", () => {
     for (const t of ["is ComfyUI running?", "is comfy ui on", "check if ComfyUI is running"]) expect(parseComfyCommand(t), t).toBe("status");
   });

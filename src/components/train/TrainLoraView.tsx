@@ -88,7 +88,8 @@ export function TrainLoraView() {
   const guard = async (fn: () => Promise<any>) => { try { return await fn(); } catch (e: any) { notifyError(e?.message || String(e), "trainlora"); } };
   const start = (kind: "lora" | "sketch" | "caption", url: string, body: unknown) => guard(async () => {
     setConsoleKind(kind);
-    try { await api(url, body); }
+    let r: any;
+    try { r = await api(url, body); }
     catch (e: any) {
       // A crashed earlier run still holds the graphics card: offer to end it, then start.
       if (kind !== "lora" || !/still running in the background/.test(String(e?.message)) || !window.confirm(`${e.message}
@@ -96,8 +97,9 @@ export function TrainLoraView() {
 End it now?`)) throw e;
       await api("/api/train/lora/end-leftovers", {});
       await new Promise(r => setTimeout(r, 3000));
-      await api(url, body);
+      r = await api(url, body);
     }
+    if (r?.comfyStopped) notify({ message: "ComfyUI was closed to give training the whole graphics card. Start it again from the ComfyUI button when training is done.", tab: "trainlora" });
     reload();
   });
 

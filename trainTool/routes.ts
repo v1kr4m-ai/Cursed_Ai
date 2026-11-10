@@ -8,7 +8,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { buildLlmArgs, buildLoraArgs, cleanLlm, cleanLora, LORA_BASES, loraMissing, writeLoraToml, type LoraBase } from "./builders";
-import { endProcesses, freeVram, isRunning, jobState, leftoverTrainers, startProcess, startTask, stopJob, subscribeAll, type JobKind } from "./jobs";
+import { endProcesses, freeVram, isRunning, jobState, leftoverTrainers, startProcess, stopComfyUi, startTask, stopJob, subscribeAll, type JobKind } from "./jobs";
 import { exists, listDirs, listFiles, listHfModels, resolvePaths, type TrainConfig } from "./paths";
 import { buildDataset, triggerFor } from "./personDataset";
 import { createSeriesStore } from "../seriesTool/store";
@@ -125,10 +125,12 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     // Free the GPU first and give it a moment: freeing it while training starts raced the first CUDA allocations
     // (8 GB cards then ran out of memory while preparing the captions).
     await freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {});
+    // ComfyUI keeps part of the card even after /free, and training then crawls (161 s/step on an 8 GB card). End it; the page says so.
+    const comfyStopped = (await stopComfyUi(opts.comfyUrl)).length > 0;
     await new Promise(r => setTimeout(r, 2500));
     if (isRunning("lora")) return bad(res, 409, "A LoRA training run is already active.");
     const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.base || "flux"}, ${cfg.epochs} epochs${cfg.base ? "" : ", " + cfg.vramPreset})`, p.fluxPython, ["-m", "accelerate.commands.accelerate_cli", ...buildLoraArgs(cfg, p, toml)], { cwd: p.sdScripts });
-    res.json(state);
+    res.json({ ...state, comfyStopped });
   });
 
   /** Ends the leftover trainer processes reported by a refused start (the person pressed End them). */
