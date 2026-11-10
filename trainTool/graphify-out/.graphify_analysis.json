@@ -1,0 +1,360 @@
+{
+  "communities": {
+    "0": [
+      "scripts_convert_ct2",
+      "scripts_convert_ct2_main",
+      "scripts_convert_ct2_rationale_1",
+      "scripts_prepare_tts",
+      "scripts_prepare_tts_main",
+      "scripts_prepare_tts_rationale_1",
+      "scripts_speech_common",
+      "scripts_speech_common_edit_distance",
+      "scripts_speech_common_error_rate",
+      "scripts_speech_common_load_audio",
+      "scripts_speech_common_normalize",
+      "scripts_speech_common_rationale_1",
+      "scripts_speech_common_rationale_19",
+      "scripts_speech_common_rationale_31",
+      "scripts_speech_common_rationale_48",
+      "scripts_speech_common_rationale_56",
+      "scripts_speech_common_rationale_73",
+      "scripts_speech_common_rationale_88",
+      "scripts_speech_common_read_dataset",
+      "scripts_speech_common_say",
+      "scripts_speech_common_split_long",
+      "scripts_speech_common_split_rows",
+      "scripts_train_mobile",
+      "scripts_train_mobile_main",
+      "scripts_train_mobile_rationale_1",
+      "scripts_train_mobile_read_rows",
+      "scripts_train_whisper",
+      "scripts_train_whisper_main",
+      "scripts_train_whisper_rationale_1",
+      "scripts_train_xtts",
+      "scripts_train_xtts_main",
+      "scripts_train_xtts_rationale_1",
+      "scripts_transcribe_clips",
+      "scripts_transcribe_clips_main",
+      "scripts_transcribe_clips_rationale_1",
+      "scripts_transcribe_file",
+      "scripts_transcribe_file_main",
+      "scripts_transcribe_file_rationale_1"
+    ],
+    "1": [
+      "builders",
+      "builders_buildllmargs",
+      "builders_buildloraargs",
+      "builders_cleanllm",
+      "builders_cleanlora",
+      "builders_llmconfig",
+      "builders_loraconfig",
+      "builders_loradatasettoml",
+      "builders_promptpreview",
+      "builders_writeloratoml",
+      "jobs_endprocesses",
+      "jobs_freevram",
+      "jobs_leftovertrainers",
+      "jobs_stopjob",
+      "jobs_subscribeall",
+      "paths_trainpaths",
+      "persondataset",
+      "persondataset_builddataset",
+      "persondataset_datasetresult",
+      "persondataset_hashof",
+      "persondataset_triggerfor",
+      "routes",
+      "routes_bad",
+      "routes_comfymodelnames",
+      "routes_fluxworkflow",
+      "routes_kinds",
+      "routes_queuecomfy",
+      "routes_registertraintool",
+      "routes_trainoptions",
+      "routes_waitcomfy",
+      "sources_chunktext",
+      "sources_vision_hint"
+    ],
+    "2": [
+      "speech",
+      "speech_bad",
+      "speech_clipsin",
+      "speech_kinds",
+      "speech_probe",
+      "speech_readjson",
+      "speech_readtext",
+      "speech_registerspeechtool",
+      "speech_runstep",
+      "speech_speechoptions",
+      "speech_stemof",
+      "speech_vishleshandir",
+      "speechdata",
+      "speechdata_audio_re",
+      "speechdata_buildsttargs",
+      "speechdata_buildttsargs",
+      "speechdata_clamp",
+      "speechdata_cleanstt",
+      "speechdata_cleantts",
+      "speechdata_langof",
+      "speechdata_langs",
+      "speechdata_lrof",
+      "speechdata_matchclip",
+      "speechdata_parsemeta",
+      "speechdata_safename",
+      "speechdata_speechlang",
+      "speechdata_stripbom",
+      "speechdata_sttconfig",
+      "speechdata_ttsconfig",
+      "speechdata_whisper_models",
+      "speechdata_xtts_repo"
+    ],
+    "3": [
+      "jobs_isrunning",
+      "jobs_jobstate",
+      "mobile",
+      "mobile_bad",
+      "mobile_mobileoptions",
+      "mobile_paramsmillions",
+      "mobile_readjson",
+      "mobile_registermobiletool",
+      "mobiledata",
+      "mobiledata_buildmobileargs",
+      "mobiledata_chatcheck",
+      "mobiledata_checkchat",
+      "mobiledata_clamp",
+      "mobiledata_cleanmobile",
+      "mobiledata_ggufsizemb",
+      "mobiledata_lrof",
+      "mobiledata_mobile_models",
+      "mobiledata_mobileconfig",
+      "mobiledata_phone_presets",
+      "mobiledata_phonepreset",
+      "mobiledata_quants",
+      "paths",
+      "paths_exists",
+      "paths_listdirs",
+      "paths_listfiles",
+      "paths_listhfmodels",
+      "paths_resolvepaths",
+      "paths_trainconfig"
+    ],
+    "4": [
+      "jobs",
+      "jobs_addline",
+      "jobs_everyone",
+      "jobs_finish",
+      "jobs_fresh",
+      "jobs_job",
+      "jobs_jobkind",
+      "jobs_jobs",
+      "jobs_pushstate",
+      "jobs_readline",
+      "jobs_send",
+      "jobs_setprogress",
+      "jobs_startprocess",
+      "jobs_starttask"
+    ],
+    "5": [
+      "sources",
+      "sources_buildpairprompt",
+      "sources_describewithollama",
+      "sources_extractjsonarray",
+      "sources_finishpairs",
+      "sources_htmltotext",
+      "sources_lookslikefiller",
+      "sources_meta",
+      "sources_pair",
+      "sources_pairsfromchunk",
+      "sources_providers",
+      "sources_runpython",
+      "sources_source",
+      "sources_sourcetext"
+    ],
+    "6": [
+      "scripts_train_llm",
+      "scripts_train_llm_load_alpaca_jsonl",
+      "scripts_train_llm_main",
+      "scripts_train_llm_rationale_1",
+      "scripts_train_llm_to_text"
+    ],
+    "7": [
+      "scripts_caption_images",
+      "scripts_caption_images_main",
+      "scripts_caption_images_rationale_1"
+    ],
+    "8": [
+      "scripts_describe_image",
+      "scripts_describe_image_main",
+      "scripts_describe_image_rationale_1"
+    ],
+    "9": [
+      "scripts_extract_docx",
+      "scripts_extract_docx_main",
+      "scripts_extract_docx_rationale_1"
+    ],
+    "10": [
+      "scripts_extract_pdf",
+      "scripts_extract_pdf_main",
+      "scripts_extract_pdf_rationale_1"
+    ],
+    "11": [
+      "scripts_tts_speak",
+      "scripts_tts_speak_main",
+      "scripts_tts_speak_rationale_1"
+    ]
+  },
+  "cohesion": {
+    "0": 0.09672830725462304,
+    "1": 0.12298387096774194,
+    "2": 0.15268817204301074,
+    "3": 0.15608465608465608,
+    "4": 0.32967032967032966,
+    "5": 0.23076923076923078,
+    "6": 0.6,
+    "7": 0.6666666666666666,
+    "8": 0.6666666666666666,
+    "9": 0.6666666666666666,
+    "10": 0.6666666666666666,
+    "11": 0.6666666666666666
+  },
+  "gods": [
+    {
+      "id": "routes_registertraintool",
+      "label": "registerTrainTool()",
+      "degree": 33
+    },
+    {
+      "id": "speech_registerspeechtool",
+      "label": "registerSpeechTool()",
+      "degree": 27
+    },
+    {
+      "id": "mobile_registermobiletool",
+      "label": "registerMobileTool()",
+      "degree": 16
+    },
+    {
+      "id": "scripts_speech_common_say",
+      "label": "say()",
+      "degree": 13
+    },
+    {
+      "id": "jobs_startprocess",
+      "label": "startProcess()",
+      "degree": 12
+    },
+    {
+      "id": "jobs_starttask",
+      "label": "startTask()",
+      "degree": 10
+    },
+    {
+      "id": "paths_exists",
+      "label": "exists()",
+      "degree": 8
+    },
+    {
+      "id": "paths_listdirs",
+      "label": "listDirs()",
+      "degree": 8
+    },
+    {
+      "id": "scripts_speech_common_load_audio",
+      "label": "load_audio()",
+      "degree": 8
+    },
+    {
+      "id": "jobs_jobstate",
+      "label": "JobState",
+      "degree": 7
+    }
+  ],
+  "surprises": [
+    {
+      "source": "registerTrainTool()",
+      "target": "exists()",
+      "source_files": [
+        "routes.ts",
+        "paths.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "registerTrainTool()",
+      "target": "JobState",
+      "source_files": [
+        "routes.ts",
+        "jobs.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "registerSpeechTool()",
+      "target": "JobState",
+      "source_files": [
+        "speech.ts",
+        "jobs.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "registerTrainTool()",
+      "target": "isRunning()",
+      "source_files": [
+        "routes.ts",
+        "jobs.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "registerSpeechTool()",
+      "target": "isRunning()",
+      "source_files": [
+        "speech.ts",
+        "jobs.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `registerTrainTool()` connect `routes.ts` to `mobile.ts`, `jobs.ts`, `sources.ts`?",
+      "why": "High betweenness centrality (0.047) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `registerSpeechTool()` connect `speech.ts` to `routes.ts`, `mobile.ts`, `jobs.ts`?",
+      "why": "High betweenness centrality (0.038) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `startProcess()` connect `jobs.ts` to `routes.ts`, `speech.ts`, `mobile.ts`?",
+      "why": "High betweenness centrality (0.027) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `LoraConfig`, `LlmConfig`, `Job` to the rest of the system?",
+      "why": "15 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `speech_common.py` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09672830725462304 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `routes.ts` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.12298387096774194 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

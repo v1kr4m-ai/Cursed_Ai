@@ -127,7 +127,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     await freeVram({ comfyUrl: opts.comfyUrl, ollamaUrl: opts.ollamaUrl }, () => {});
     await new Promise(r => setTimeout(r, 2500));
     if (isRunning("lora")) return bad(res, 409, "A LoRA training run is already active.");
-    const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.base || "flux"}, ${cfg.epochs} epochs${cfg.base ? "" : ", " + cfg.vramPreset})`, p.fluxAccelerate, buildLoraArgs(cfg, p, toml), { cwd: p.sdScripts });
+    const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.base || "flux"}, ${cfg.epochs} epochs${cfg.base ? "" : ", " + cfg.vramPreset})`, p.fluxPython, ["-m", "accelerate.commands.accelerate_cli", ...buildLoraArgs(cfg, p, toml)], { cwd: p.sdScripts });
     res.json(state);
   });
 
