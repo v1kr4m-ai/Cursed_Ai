@@ -70,6 +70,7 @@ export function injectWorkflow(a: InjectArgs): Json {
   const known = new Map(info.fields.map(f => [f.id, f]));
   for (const [fieldId, value] of Object.entries(a.fieldValues || {})) {
     const spec = known.get(fieldId);
+    if (spec && spec.kind === "select" && (value === "" || value === null || value === undefined)) continue; // an emptied choice keeps the workflow's own value
     if (spec && spec.node in result) result[spec.node].inputs[spec.input] = coerce(value, spec.kind);
   }
 

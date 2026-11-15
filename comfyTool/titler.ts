@@ -377,7 +377,9 @@ export function describeFields(graph: Json, promptId: string | null, negativeId:
       if (nid === promptId && textKeys(node).includes(key)) continue;
       const entry = spec.required?.[key] || spec.optional?.[key];
       let kind: string, options: string[] | undefined;
-      const combo = entry && (Array.isArray(entry[0]) ? entry[0] : entry[0] === "COMBO" && Array.isArray(entry[1]?.options) ? entry[1].options : null);
+      // A dynamic combo (e.g. SaveVideo "codec") lists { key, inputs } choices; the value to send is the key. Shown as free text it could be emptied, and ComfyUI then fails with "missing required argument".
+      const dynamicKeys = entry && entry[0] === "COMFY_DYNAMICCOMBO_V3" && Array.isArray(entry[1]?.options) ? entry[1].options.map((o: any) => o?.key).filter((k: any) => typeof k === "string") : null;
+      const combo = entry && (Array.isArray(entry[0]) ? entry[0] : entry[0] === "COMBO" && Array.isArray(entry[1]?.options) ? entry[1].options : dynamicKeys);
       if (combo && combo.length) { kind = "select"; options = combo.map(String); }
       else if (typeof value === "boolean") kind = "bool";
       else if (typeof value === "number") kind = Number.isInteger(value) && entry?.[0] !== "FLOAT" ? "int" : "float";
