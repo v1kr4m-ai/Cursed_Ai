@@ -16,8 +16,11 @@ interface Props {
   usageKey?: number;
   /** Inside a collapsible panel: no card chrome or heading. */
   bare?: boolean;
-  /** Every prompt found in the file (spreadsheet column / document headings), for running them all. */
-  onCandidates?: (texts: string[]) => void;
+  /**
+   * The prompts "Run all" should queue: the ticked ones, else every one not hidden by "Hide already made", else all found in the
+   * file (spreadsheet column / document headings). `mode` says which of the three applies.
+   */
+  onCandidates?: (texts: string[], mode?: "all" | "shown" | "selected") => void;
   /** What the box asks for, when it is not a picture description (for example a song's style tags). */
   placeholder?: string;
   /** The name over the box ("Tags" for a song). */
@@ -59,7 +62,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
     setColumns(r.columns);
     const cands = r.columns.length ? r.columns[0].candidates : r.candidates;
     setCandidates(cands);
-    onCandidates?.(cands.map(c => c.text));
+    setSelected(new Set());
     setColIdx(0);
     setPicked(cands.length ? 0 : -1);
     if (fillPrompt) onPrompt(r.extractedPrompt);
@@ -113,12 +116,22 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
   }, [candidates, kind, usageKey]);
   const usedCount = usage.filter(n => n > 0).length;
 
+  // Ticked prompts (by index) win; otherwise "Hide already made" leaves out the made ones; otherwise every prompt runs.
+  const [selected, setSelected] = React.useState<Set<number>>(new Set());
+  const toggle = (i: number) => setSelected(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
+  React.useEffect(() => {
+    if (!onCandidates) return;
+    const hiding = hideUsed && usedCount > 0;
+    const list = candidates.filter((_, i) => (selected.size ? selected.has(i) : !(hiding && usage[i])));
+    onCandidates(list.map(c => c.text), selected.size ? "selected" : hiding ? "shown" : "all");
+  }, [candidates, selected, hideUsed, usage]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const pick = (i: number) => { setPicked(i); onPrompt(candidates[i].text); setOpen(false); setFilter(""); };
   const switchColumn = (idx: number) => {
     setColIdx(idx);
     const cands = columns[idx].candidates;
     setCandidates(cands);
-    onCandidates?.(cands.map(c => c.text));
+    setSelected(new Set());
     setPicked(cands.length ? 0 : -1);
     if (cands.length) onPrompt(cands[0].text);
   };
@@ -163,7 +176,7 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
       )}
 
       {fileName && !error && (
-        <p className="text-[11px] text-zinc-500 flex items-center gap-1.5"><FileText size={12} /> {fileName}{candidates.length > 0 ? ` - ${candidates.length} prompts found${usedCount ? `, ${usedCount} already made` : ""}` : ""}</p>
+        <p className="text-[11px] text-zinc-500 flex items-center gap-1.5"><FileText size={12} /> {fileName}{candidates.length > 0 ? ` - ${candidates.length} prompts found${usedCount ? `, ${usedCount} already made` : ""}${selected.size ? `, ${selected.size} ticked to run` : hideUsed && usedCount ? ", made ones hidden (not run)" : ""}` : ""}</p>
       )}
       {unmatched && <p className="text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={12} /> No "Prompt" marker found - showing the whole text. Edit it below.</p>}
       {error && <p className="text-[11px] text-red-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {error}</p>}
@@ -187,12 +200,20 @@ export function PromptSource({ kind, modelId, prompt, onPrompt, needsPrompt, onC
                   <input autoFocus value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search prompts..." className="flex-1 bg-transparent text-xs text-white focus:outline-none placeholder:text-zinc-600" />
                 </div>
                 {usedCount > 0 && <label className="flex items-center gap-2 px-4 py-2 border-b border-white/10 text-[11px] text-zinc-400 cursor-pointer select-none"><input type="checkbox" checked={hideUsed} onChange={e => setHideUsed(e.target.checked)} /> Hide the {usedCount} already made</label>}
+                <div className="flex items-center gap-3 px-4 py-2 border-b border-white/10 text-[11px] text-zinc-400">
+                  <button onClick={() => setSelected(s => new Set([...s, ...shown.map(x => x.i)]))} disabled={!shown.length} className="hover:text-white disabled:opacity-40">Tick all shown</button>
+                  {selected.size > 0 && <button onClick={() => setSelected(new Set())} className="hover:text-white">Clear ({selected.size} ticked)</button>}
+                  <span className="ml-auto text-zinc-600">Tick prompts to run only those</span>
+                </div>
                 {shown.length === 0 && <p className="px-4 py-3 text-xs text-zinc-500">No prompts match.</p>}
                 {shown.map(({ c, i }) => (
-                  <button key={i} onClick={() => pick(i)} className={`w-full text-left px-4 py-2 hover:bg-white/5 ${i === picked ? "bg-white/[0.07]" : ""}`}>
-                    <span className="flex items-center gap-2"><span className="block text-xs font-semibold text-zinc-100 truncate flex-1">{c.label}</span>{usage[i] > 0 && <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-500/15 rounded-full px-2 py-0.5" title="Already made - pick it to see the results">made ×{usage[i]}</span>}</span>
-                    <span className="block text-[11px] text-zinc-500 truncate">{c.text}</span>
-                  </button>
+                  <div key={i} className={`flex items-center gap-2 pl-3 hover:bg-white/5 ${i === picked ? "bg-white/[0.07]" : ""}`}>
+                    <input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} title="Tick to include in 'Run' (ticked prompts only)" className="shrink-0 cursor-pointer" />
+                    <button onClick={() => pick(i)} className="flex-1 min-w-0 text-left pr-4 py-2">
+                      <span className="flex items-center gap-2"><span className="block text-xs font-semibold text-zinc-100 truncate flex-1">{c.label}</span>{usage[i] > 0 && <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-500/15 rounded-full px-2 py-0.5" title="Already made - pick it to see the results">made ×{usage[i]}</span>}</span>
+                      <span className="block text-[11px] text-zinc-500 truncate">{c.text}</span>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

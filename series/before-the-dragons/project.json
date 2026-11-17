@@ -3,7 +3,7 @@
   "title": "Before the Dragons",
   "dir": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons",
   "createdAt": "2026-10-20T03:31:53.894573",
-  "updatedAt": "2026-10-20T06:09:27.254Z",
+  "updatedAt": "2026-10-21T14:40:45.634Z",
   "idea": {
     "logline": "The history of the known world before House Targaryen, from the Dawn Age to the Doom of Valyria.",
     "audience": "YouTube Shorts and Reels viewers who like dense narrated history",
@@ -15,8 +15,8 @@
   "voiceLock": "narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1)",
   "settings": {
     "comfyUrl": "http://127.0.0.1:8188",
-    "videoWorkflow": "F:\\ComfyUI\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows\\video_minimax_h3_r2v.json",
-    "imageWorkflow": "F:\\ComfyUI\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows\\Text to Image Creation by Juggernaut.json",
+    "videoWorkflow": "F:\\ComfyUI\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows\\Video - Up to 6 reference images to video (MiniMax H3).json",
+    "imageWorkflow": "F:\\ComfyUI\\ComfyUI_windows_portable\\ComfyUI\\user\\default\\workflows\\Image - Text to image (Juggernaut XL).json",
     "width": 544,
     "height": 928,
     "seconds": 7,
@@ -239,7 +239,286 @@
           "error": null
         }
       ],
-      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP01_the_world_before_men.mp4"
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP01_the_world_before_men.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7v4u833",
+            "start": 0,
+            "end": 2.03,
+            "text": "Twelve thousand years before"
+          },
+          {
+            "id": "cmvi7v4u834",
+            "start": 2.03,
+            "end": 3.77,
+            "text": "dragons ever crossed the"
+          },
+          {
+            "id": "cmvi7v4u835",
+            "start": 3.77,
+            "end": 4.56,
+            "text": "narrow sea,"
+          },
+          {
+            "id": "cmvi7v4u836",
+            "start": 4.56,
+            "end": 6.81,
+            "text": "this continent already belonged"
+          },
+          {
+            "id": "cmvi7v4u837",
+            "start": 6.81,
+            "end": 7.97,
+            "text": "to someone else."
+          },
+          {
+            "id": "cmvi7v4yl38",
+            "start": 8,
+            "end": 9.27,
+            "text": "They were small,"
+          },
+          {
+            "id": "cmvi7v4yl39",
+            "start": 9.27,
+            "end": 11.26,
+            "text": "dark-eyed, and older than"
+          },
+          {
+            "id": "cmvi7v4yl3a",
+            "start": 11.26,
+            "end": 13.09,
+            "text": "memory. Men would later"
+          },
+          {
+            "id": "cmvi7v4yl3b",
+            "start": 13.09,
+            "end": 14.84,
+            "text": "call them the children"
+          },
+          {
+            "id": "cmvi7v4yl3c",
+            "start": 14.84,
+            "end": 15.95,
+            "text": "of the forest."
+          },
+          {
+            "id": "cmvi7v5393d",
+            "start": 16,
+            "end": 17.74,
+            "text": "They shared the land"
+          },
+          {
+            "id": "cmvi7v5393e",
+            "start": 17.74,
+            "end": 18.78,
+            "text": "with giants,"
+          },
+          {
+            "id": "cmvi7v5393f",
+            "start": 18.78,
+            "end": 20.87,
+            "text": "who walked with mammoths"
+          },
+          {
+            "id": "cmvi7v5393g",
+            "start": 20.87,
+            "end": 22.87,
+            "text": "through snow that never"
+          },
+          {
+            "id": "cmvi7v5393h",
+            "start": 22.87,
+            "end": 24,
+            "text": "fully melted."
+          },
+          {
+            "id": "cmvi7v58b3i",
+            "start": 24,
+            "end": 25.71,
+            "text": "Into the pale trees"
+          },
+          {
+            "id": "cmvi7v58b3j",
+            "start": 25.71,
+            "end": 27.33,
+            "text": "they carved faces,"
+          },
+          {
+            "id": "cmvi7v58b3k",
+            "start": 27.33,
+            "end": 29.48,
+            "text": "and through those faces,"
+          },
+          {
+            "id": "cmvi7v58b3l",
+            "start": 29.48,
+            "end": 30.29,
+            "text": "they say,"
+          },
+          {
+            "id": "cmvi7v58b3m",
+            "start": 30.29,
+            "end": 32,
+            "text": "the forest watched."
+          },
+          {
+            "id": "cmvi7v5d83n",
+            "start": 32,
+            "end": 33.57,
+            "text": "Then, across a land"
+          },
+          {
+            "id": "cmvi7v5d83o",
+            "start": 33.57,
+            "end": 34.97,
+            "text": "bridge in the far"
+          },
+          {
+            "id": "cmvi7v5d83p",
+            "start": 34.97,
+            "end": 36.62,
+            "text": "south, the First Men"
+          },
+          {
+            "id": "cmvi7v5d83q",
+            "start": 36.62,
+            "end": 38.19,
+            "text": "came — with bronze,"
+          },
+          {
+            "id": "cmvi7v5d83r",
+            "start": 38.19,
+            "end": 39.18,
+            "text": "with horses,"
+          },
+          {
+            "id": "cmvi7v5d83s",
+            "start": 39.18,
+            "end": 40,
+            "text": "with axes."
+          },
+          {
+            "id": "cmvi7v5ib3t",
+            "start": 40,
+            "end": 41.97,
+            "text": "They did not come"
+          },
+          {
+            "id": "cmvi7v5ib3u",
+            "start": 41.97,
+            "end": 43.01,
+            "text": "to share."
+          },
+          {
+            "id": "cmvi7v5ib3v",
+            "start": 43.01,
+            "end": 45.57,
+            "text": "Every carved tree they"
+          },
+          {
+            "id": "cmvi7v5ib3w",
+            "start": 45.57,
+            "end": 48,
+            "text": "found, they cut down."
+          },
+          {
+            "id": "cmvi7v5mr3x",
+            "start": 48,
+            "end": 49.63,
+            "text": "So the children broke"
+          },
+          {
+            "id": "cmvi7v5mr3y",
+            "start": 49.63,
+            "end": 50.4,
+            "text": "the world."
+          },
+          {
+            "id": "cmvi7v5mr3z",
+            "start": 50.4,
+            "end": 52.42,
+            "text": "The land bridge shattered,"
+          },
+          {
+            "id": "cmvi7v5mr40",
+            "start": 52.42,
+            "end": 53.82,
+            "text": "and the sea poured"
+          },
+          {
+            "id": "cmvi7v5mr41",
+            "start": 53.82,
+            "end": 55.29,
+            "text": "through it forever."
+          },
+          {
+            "id": "cmvi7v5qw42",
+            "start": 55.29,
+            "end": 56.48,
+            "text": "It bought them nothing."
+          },
+          {
+            "id": "cmvi7v5qw43",
+            "start": 56.48,
+            "end": 57.73,
+            "text": "After two thousand years"
+          },
+          {
+            "id": "cmvi7v5qw44",
+            "start": 57.73,
+            "end": 58.09,
+            "text": "of war,"
+          },
+          {
+            "id": "cmvi7v5qw45",
+            "start": 58.09,
+            "end": 58.97,
+            "text": "both sides sat on"
+          },
+          {
+            "id": "cmvi7v5qw46",
+            "start": 58.97,
+            "end": 60.01,
+            "text": "an island and signed"
+          },
+          {
+            "id": "cmvi7v5qw47",
+            "start": 60.01,
+            "end": 60.42,
+            "text": "a peace."
+          },
+          {
+            "id": "cmvi7v5qw48",
+            "start": 60.42,
+            "end": 61.25,
+            "text": "But the dark was"
+          },
+          {
+            "id": "cmvi7v5qw49",
+            "start": 61.25,
+            "end": 62.44,
+            "text": "not finished with them."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:37:44.792Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP01_the_world_before_men_subtitled.mp4"
+      }
     },
     {
       "id": "4bm7emdn",
@@ -335,10 +614,10 @@
           "seed": 92490,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A medium shot frames a frozen village half-buried in snow drifts at night, timber roofs sagging under ice. A woman in heavy layered furs drags a bundle of firewood past frost-covered doorways, her breath clouding hard in the freezing air. The camera trucks left with small amplitude at slow speed, revealing a child watching her from behind a shuttered window. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Winter arrived and refused to leave. A generation was born and died without ever seeing summer.</d>\noverall_soundscape: Wind gusts between buildings, rattling a loose shutter twice. Boots compress dry snow in a slow dragging rhythm and firewood scrapes against ice.\nnon_diegetic_music: Sparse low piano notes at a very slow tempo over a faint sustained string bed, fading toward the end.",
           "promptEdited": true,
-          "status": "running",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": "15b3de34-207c-4e44-8b17-b7f1ac3691be",
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "0380da39-67b0-4697-8b36-3b108f09cc62",
           "error": null
         },
         {
@@ -353,10 +632,10 @@
           "seed": 68032,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the pale figure, preserving its translucent skin, mirror-like ice armour, luminous eyes and proportions.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot holds on a snowfield between dead trees in deep night. Blue-white light glints faintly between the trunks. A tall pale figure matching <Picture 2> moves slowly across the far treeline at the edge of visibility, its mirror-like armour catching the moonlight once, then is gone behind the trees. The camera pushes in with small amplitude at slow speed on the empty gap where it stood. Plain white text reading \"THE OTHERS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Crops failed. Herds froze. And in the darkness, something walked south that was not alive.</d>\noverall_soundscape: A low wind moves through dead branches with a dry rattle. A faint high crystalline ringing rises once and fades, followed by settling snow.\nnon_diegetic_music: A single high sustained string harmonic at a slow tempo over a deep low drone, growing quieter until it disappears.",
           "promptEdited": true,
-          "status": "queued",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "c69dd21d-f487-45ca-a769-49249f56b0b3",
           "error": null
         },
         {
@@ -372,10 +651,10 @@
           "seed": 74698,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the marching dead, preserving their frozen grey-blue flesh, torn furs, rusted mail and pale blue eyes.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A low tracking shot moves alongside a marching column of frost-covered corpses matching <Picture 2>, walking in complete silence through knee-deep snow, their pale blue eyes fixed forward and their faces blank. The camera trucks left with large amplitude at slow speed, the column continuing unbroken into the blizzard haze behind them. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Their dead rose and marched with them. Every village they took, they added to their column.</d>\noverall_soundscape: Many feet compress deep snow in an unsynchronised shuffling rhythm with no voices at all. Frozen leather and mail creak stiffly and wind drives snow across the frame.\nnon_diegetic_music: A low repeated percussion pulse at a slow steady tempo beneath a single sustained bass note, gradually increasing in volume.",
           "promptEdited": true,
-          "status": "queued",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene04_20261020_162928.mp4",
+          "durationS": 7.292,
+          "promptId": "fa65bacd-64b6-44be-a020-46017816d4e2",
           "error": null
         },
         {
@@ -391,10 +670,10 @@
           "seed": 22802,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the lone warrior, preserving the frost-caked furs, dented bronze scale armour and hooded silhouette.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot in a blizzard follows a lone armoured figure matching <Picture 2> leading an exhausted horse up a snow ridge, head down against the wind. Behind them, twelve dark human shapes are strung out across the slope, each further back than the last, two of them stopped and no longer moving. The camera tracks with the figure at slow speed as the whiteout closes over the stragglers. Plain white text reading \"THE LAST HERO\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] One man went north to find help, the Last Hero, with twelve companions, a horse and a dog.</d>\noverall_soundscape: A heavy blizzard wind roars continuously across the ridge. Boots and hooves break through crusted snow and the horse breathes hard in long ragged pulls.\nnon_diegetic_music: Low strings at a slow tempo playing a single rising line that swells and then drops away sharply.",
           "promptEdited": true,
-          "status": "queued",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene05_20261020_164304.mp4",
+          "durationS": 7.292,
+          "promptId": "8ea9ea49-81cb-4313-80cc-d98f8ba6c064",
           "error": null
         },
         {
@@ -409,10 +688,10 @@
           "seed": 50885,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the kneeling warrior. Use <Picture 3> as the exact appearance reference for the small forest beings who emerge from the snow.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A medium wide shot frames the warrior from <Picture 2> alone at a snowbound treeline, his horse gone and his sword broken at the hilt. He sinks to his knees in the drift. Three small hooded figures matching <Picture 3> step out from between the trees without sound and stand facing him, close enough to touch. The camera pushes in with small amplitude at slow speed as neither side moves. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] He lost every one of them. What he found, and what he traded for it, no story agrees.</d>\noverall_soundscape: The blizzard drops to a low steady hiss at the treeline. Snow compresses under knees, a broken blade drops into powder, and small feet crust the snow with almost no weight.\nnon_diegetic_music: A single low bowed note held at a very slow tempo, joined near the end by a faint high sustained tone.",
           "promptEdited": true,
-          "status": "queued",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene06_20261020_165624.mp4",
+          "durationS": 7.292,
+          "promptId": "5e150a52-4d04-4c3a-a717-c998c0b12e49",
           "error": null
         },
         {
@@ -428,10 +707,10 @@
           "seed": 88724,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the scale, surface and colour of the ice wall.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A high aerial shot looks down on an enormous wall of ice under construction, matching the surface and scale of <Picture 2>. Thousands of tiny human figures haul cut ice blocks up long timber ramps along its face while the barrier stretches away to both horizons. The camera pulls out with large amplitude at slow speed until the full span fills the frame and the workers become specks. Plain white text reading \"THE WALL\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The dead were broken in one last battle, and men decided they would never trust the north again.</d>\noverall_soundscape: A steady high wind crosses the open face of the wall. Ropes strain, timber creaks under load, and distant voices call in rhythm as blocks grind into place.\nnon_diegetic_music: A slow deep drum pattern joined by low brass at a moderate tempo, building steadily in volume.",
           "promptEdited": true,
-          "status": "queued",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene07_20261020_170908.mp4",
+          "durationS": 7.292,
+          "promptId": "7076a6e9-d0da-4ea7-a17b-5719978a86bd",
           "error": null
         },
         {
@@ -447,14 +726,281 @@
           "seed": 3578,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the finished ice wall.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade crushed toward blue and black, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A close shot on the sheer weathered face of the finished ice wall from <Picture 2>. The camera pedestals up with large amplitude at slow speed along the ice, travelling hundreds of feet upward, until it clears the top edge and reveals a line of men in heavy black cloaks standing on the walkway, all facing away from camera into an empty white nothing. Plain white text reading \"PART 3 — THE EMPIRE OF CHAINS\" appears low in the frame at the end of the shot. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Seven hundred feet of ice, three hundred miles long, and a brotherhood sworn to hold it. Eight thousand quiet years followed. They would not last.</d>\noverall_soundscape: Wind rises steadily in pitch and force as the camera climbs the ice face, peaking at the top edge. Heavy wool cloaks snap in the gusts and boots shift on packed snow.\nnon_diegetic_music: Sustained low strings at a slow tempo joined by a single deep drum strike as the top edge is cleared, then thinning to one held note.",
           "promptEdited": true,
-          "status": "queued",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep02_scene08_20261020_172229.mp4",
+          "durationS": 7.292,
+          "promptId": "75b2bcb0-8810-483c-b0ae-9f52da3febe9",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP02_the_long_night.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7v8xz4a",
+            "start": 0,
+            "end": 1.36,
+            "text": "For four thousand years,"
+          },
+          {
+            "id": "cmvi7v8xz4b",
+            "start": 1.36,
+            "end": 2.5,
+            "text": "men and the children"
+          },
+          {
+            "id": "cmvi7v8xz4c",
+            "start": 2.5,
+            "end": 3.35,
+            "text": "kept the peace."
+          },
+          {
+            "id": "cmvi7v8xz4d",
+            "start": 3.35,
+            "end": 4.43,
+            "text": "Then the sun failed"
+          },
+          {
+            "id": "cmvi7v8xz4e",
+            "start": 4.43,
+            "end": 5.17,
+            "text": "to come back."
+          },
+          {
+            "id": "cmvi7v94q4f",
+            "start": 5.17,
+            "end": 7.25,
+            "text": "Winter arrived and refused"
+          },
+          {
+            "id": "cmvi7v94q4g",
+            "start": 7.25,
+            "end": 7.97,
+            "text": "to leave."
+          },
+          {
+            "id": "cmvi7v94q4h",
+            "start": 7.97,
+            "end": 9.65,
+            "text": "A generation was born"
+          },
+          {
+            "id": "cmvi7v94q4i",
+            "start": 9.65,
+            "end": 11.34,
+            "text": "and died without ever"
+          },
+          {
+            "id": "cmvi7v94q4j",
+            "start": 11.34,
+            "end": 12.46,
+            "text": "seeing summer."
+          },
+          {
+            "id": "cmvi7v9ac4k",
+            "start": 12.46,
+            "end": 13.56,
+            "text": "Crops failed."
+          },
+          {
+            "id": "cmvi7v9ac4l",
+            "start": 13.56,
+            "end": 14.58,
+            "text": "Herds froze."
+          },
+          {
+            "id": "cmvi7v9ac4m",
+            "start": 14.58,
+            "end": 16.27,
+            "text": "And in the darkness,"
+          },
+          {
+            "id": "cmvi7v9ac4n",
+            "start": 16.27,
+            "end": 18.56,
+            "text": "something walked south that"
+          },
+          {
+            "id": "cmvi7v9ac4o",
+            "start": 18.56,
+            "end": 19.75,
+            "text": "was not alive."
+          },
+          {
+            "id": "cmvi7v9fn4p",
+            "start": 19.75,
+            "end": 21.33,
+            "text": "Their dead rose and"
+          },
+          {
+            "id": "cmvi7v9fn4q",
+            "start": 21.33,
+            "end": 22.82,
+            "text": "marched with them."
+          },
+          {
+            "id": "cmvi7v9fn4r",
+            "start": 22.82,
+            "end": 24.81,
+            "text": "Every village they took,"
+          },
+          {
+            "id": "cmvi7v9fn4s",
+            "start": 24.81,
+            "end": 27.04,
+            "text": "they added to their column."
+          },
+          {
+            "id": "cmvi7v9lp4t",
+            "start": 27.04,
+            "end": 28.55,
+            "text": "One man went north"
+          },
+          {
+            "id": "cmvi7v9lp4u",
+            "start": 28.55,
+            "end": 29.73,
+            "text": "to find help —"
+          },
+          {
+            "id": "cmvi7v9lp4v",
+            "start": 29.73,
+            "end": 30.9,
+            "text": "the Last Hero,"
+          },
+          {
+            "id": "cmvi7v9lp4w",
+            "start": 30.9,
+            "end": 32.83,
+            "text": "with twelve companions,"
+          },
+          {
+            "id": "cmvi7v9lp4x",
+            "start": 32.83,
+            "end": 34.34,
+            "text": "a horse and a dog."
+          },
+          {
+            "id": "cmvi7v9re4y",
+            "start": 34.34,
+            "end": 35.88,
+            "text": "He lost every one"
+          },
+          {
+            "id": "cmvi7v9re4z",
+            "start": 35.88,
+            "end": 36.61,
+            "text": "of them."
+          },
+          {
+            "id": "cmvi7v9re50",
+            "start": 36.61,
+            "end": 37.89,
+            "text": "What he found,"
+          },
+          {
+            "id": "cmvi7v9re51",
+            "start": 37.89,
+            "end": 39.53,
+            "text": "and what he traded"
+          },
+          {
+            "id": "cmvi7v9re52",
+            "start": 39.53,
+            "end": 40.17,
+            "text": "for it,"
+          },
+          {
+            "id": "cmvi7v9re53",
+            "start": 40.17,
+            "end": 41.63,
+            "text": "no story agrees."
+          },
+          {
+            "id": "cmvi7v9vs54",
+            "start": 41.63,
+            "end": 43.21,
+            "text": "The dead were broken"
+          },
+          {
+            "id": "cmvi7v9vs55",
+            "start": 43.21,
+            "end": 44.72,
+            "text": "in one last battle,"
+          },
+          {
+            "id": "cmvi7v9vs56",
+            "start": 44.72,
+            "end": 46.3,
+            "text": "and men decided they"
+          },
+          {
+            "id": "cmvi7v9vs57",
+            "start": 46.3,
+            "end": 47.97,
+            "text": "would never trust the"
+          },
+          {
+            "id": "cmvi7v9vs58",
+            "start": 47.97,
+            "end": 48.92,
+            "text": "north again."
+          },
+          {
+            "id": "cmvi7va1559",
+            "start": 48.92,
+            "end": 49.99,
+            "text": "Seven hundred feet of"
+          },
+          {
+            "id": "cmvi7va155a",
+            "start": 49.99,
+            "end": 51.21,
+            "text": "ice, three hundred miles"
+          },
+          {
+            "id": "cmvi7va155b",
+            "start": 51.21,
+            "end": 52.39,
+            "text": "long, and a brotherhood"
+          },
+          {
+            "id": "cmvi7va155c",
+            "start": 52.39,
+            "end": 53.25,
+            "text": "sworn to hold it."
+          },
+          {
+            "id": "cmvi7va155d",
+            "start": 53.25,
+            "end": 54.58,
+            "text": "Eight thousand quiet years"
+          },
+          {
+            "id": "cmvi7va155e",
+            "start": 54.58,
+            "end": 56.11,
+            "text": "followed. They would not last."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:37:50.345Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP02_the_long_night_subtitled.mp4"
+      }
     },
     {
       "id": "yaflpynh",
@@ -470,8 +1016,8 @@
           "prompt": "",
           "negative": "",
           "seed": 94123,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -488,10 +1034,10 @@
           "seed": 58579,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the city, preserving its stepped brick pyramids, brick colour and scale.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A high aerial shot at golden hour crosses a harsh red-brown coastline toward a colossal walled city of stepped brick pyramids matching <Picture 2>, its terraces stacked above a wide harbour. The camera pushes in with large amplitude at slow speed as the scale of the pyramids resolves against the tiny figures on the streets below. Plain white text reading \"OLD GHIS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] While Westeros froze, the first true empire in the world was being built on the other side of the sea.</d>\noverall_soundscape: A dry wind carries over open water toward the city. Distant crowd noise, harbour bells and the creak of moored hulls rise gradually as the shot closes in.\nnon_diegetic_music: A low bowed string drone at a slow tempo joined by a struck metal tone that rings and decays.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "d538bd36-87fd-427f-9362-3face783d7e6",
           "error": null
         },
         {
@@ -506,10 +1052,10 @@
           "seed": 88301,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the chained labourers, preserving their clothing, iron collars, build and skin condition.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A high overhead shot looks down into an enormous brick quarry cut in terraces under a white midday sun. Hundreds of chained labourers matching <Picture 2> move cut stone along ordered lines, each line moving at the same forced pace, with overseers spaced along the rim. The camera pulls out with large amplitude at slow speed until the lines become a pattern and individual figures disappear into it. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Ghis did not invent cruelty. It industrialised it.</d>\noverall_soundscape: Stone grinds against stone in a relentless overlapping rhythm across the quarry. Chains drag and clink, tools strike rock, and a whip cracks twice in the distance.\nnon_diegetic_music: A low repeated percussive pulse at a steady moderate tempo beneath a single held bass note, unchanging in volume.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "70420c21-6869-4e5e-a760-96ab64f73b10",
           "error": null
         },
         {
@@ -524,10 +1070,10 @@
           "seed": 64928,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the collared people, preserving their clothing, iron collars and bearing.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A ground-level shot tracks slowly down a market row of brick stalls in hard afternoon light. An iron collar is fitted and hammered closed around a man's neck in the foreground while a clerk beside him marks a wax tablet without looking up. Behind them a long line of people matching <Picture 2> waits in the sun with no expression at all. The camera trucks right with small amplitude at slow speed past the full length of the line. Plain white text reading \"THE FIRST SLAVE EMPIRE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Its wealth was people. Bought, bred, counted, and worked until they were replaced.</d>\noverall_soundscape: A busy market hum of voices and footsteps carries under the shot. A hammer strikes iron three times, a stylus scratches wax, and chains shift as the line moves forward one pace.\nnon_diegetic_music: Sparse low string notes at a slow tempo with long gaps between them, holding at a constant quiet level.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "036d86bf-a4a2-4f37-a82a-dca7dd3a7c15",
           "error": null
         },
         {
@@ -542,10 +1088,10 @@
           "seed": 47229,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the soldiers, preserving their bronze scale armour, tall shields, helmets and spears.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A low-angle shot sits close to the ground as a legion of soldiers matching <Picture 2> marches past in lockstep, bronze scale armour and tall shields filling the frame, spears rising and falling in perfect unison. Dust boils around their feet and blows across the lens. The camera pans right with small amplitude at slow speed, holding the marching rhythm as rank after identical rank crosses the frame. Plain white text reading \"THE GHISCARI LEGIONS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Its power was the legion, lockstep, disciplined, and utterly without mercy.</d>\noverall_soundscape: Hundreds of boots strike the ground in one unified beat that dominates everything. Bronze scales rattle, shield rims knock together, and a hoarse cadence is called in the distance.\nnon_diegetic_music: A hard low drum on the marching beat at a moderate tempo, joined by flat brass notes that hold and cut off sharply.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "9363a5c2-851b-45a7-9fc6-452fc3779d94",
           "error": null
         },
         {
@@ -560,10 +1106,10 @@
           "seed": 67491,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the soldiers in the shield wall.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty red-brown tones and deep shadows, heavy heat haze, handheld-stabilized documentary realism, shallow depth of field. A wide battlefield shot frames a shield wall of soldiers matching <Picture 2> grinding forward across broken ground in thick dust, stepping over bodies without breaking formation. Enemy banners at the far edge of the frame lean, collapse and go down under the advance. The camera tracks backward with large amplitude at slow speed, staying ahead of the wall as it comes on. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] For centuries nothing on the continent could stand against that formation. Nothing needed to be.</d>\noverall_soundscape: A dense wall of shouting, clashing bronze and shields grinding together moves steadily forward. Feet drag through loose earth and a horn sounds twice above the noise.\nnon_diegetic_music: Low strings at a driving moderate tempo under repeated deep drum strikes, sustaining without resolution.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "bc1692c1-5b08-45b7-92cd-f0e390dccae6",
           "error": null
         },
         {
@@ -578,10 +1124,10 @@
           "seed": 95514,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the volcanic landscape, preserving its black lava rock, ash slopes and smoking peaks.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated sun-bleached color grade with dusty tones and deep shadows, heavy haze, handheld-stabilized documentary realism, shallow depth of field. A wide shot at dawn frames a bleak volcanic slope of black lava rock matching <Picture 2>, thin smoke rising from the peaks behind. Two ragged shepherds in dusty wool climb between the broken rocks, stopping to call out into the wind and listen for an answer that does not come. The camera arcs slowly around them with small amplitude at slow speed, revealing a dark cave mouth in the rock below their path. Plain white text reading \"THE FOURTEEN FLAMES\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then, far to the west, on a peninsula of volcanoes, some shepherds went looking for lost sheep.</d>\noverall_soundscape: A dry wind scours bare rock with loose scree sliding underfoot. Two voices call out in short bursts and the calls return as faint echoes off the slope.\nnon_diegetic_music: A single low woodwind tone at a slow tempo over a faint sustained drone, holding quietly throughout.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "c5b1effd-92ae-4236-a67c-1f29302f4d05",
           "error": null
         },
         {
@@ -596,10 +1142,10 @@
           "seed": 60233,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the appearance reference for the volcanic rock and cave surfaces. Use <Picture 3> as the exact appearance reference for the sleeping creature, preserving its scale texture, colour, horn shape and size.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated color grade lit almost entirely by a deep red glow from below, heavy haze, handheld-stabilized documentary realism, shallow depth of field. A slow shot moves into a vast cave of black volcanic rock matching <Picture 2>, the only light a dull red glow from a fissure in the floor. A huge scaled flank matching <Picture 3> fills the right of the frame, rising and falling with slow steady breathing. Two small torch flames enter from the left as the shepherds edge forward, and the torchlight travels across the scales until it finds an enormous closed eye. The camera pushes in with small amplitude at slow speed on the eye. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They found caves. In the caves they found something sleeping that had never been tamed.</d>\noverall_soundscape: A deep slow breathing sound fills the cave, with a low resonant rumble beneath it. Torch flames gutter, small stones fall, and two people breathe fast and shallow.\nnon_diegetic_music: A very low sustained bass note at a slow tempo that rises almost imperceptibly in volume throughout.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "9d165b2c-ed65-4b4c-8c0d-481cd487e8a3",
           "error": null
         },
         {
@@ -614,14 +1160,227 @@
           "seed": 75827,
           "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character. Use <Picture 2> as the exact appearance reference for the creature, preserving its scale texture, colour, horn shape and eye.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated color grade lit by a deep red glow from below, heavy haze, handheld-stabilized documentary realism, shallow depth of field. An extreme close-up holds on the enormous closed eye of the creature from <Picture 2> in torchlight. The eye opens, the slit pupil contracting hard in the light. The camera pulls out with large amplitude at fast speed to a wide shot as a shepherd stands frozen in the foreground and vast wings unfold behind him, filling the cave and blocking the red glow. Plain white text reading \"PART 4 — FOURTEEN FLAMES\" appears low in the frame at the end of the shot. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Ghis had legions. Valyria was about to have dragons. That fight was only going to end one way.</d>\noverall_soundscape: A wet membranous sound as the eye opens, followed by an enormous intake of breath. Huge wings unfold with a heavy leathery crack and displaced air moves through the cave.\nnon_diegetic_music: A rising low brass swell at a slow tempo that cuts off abruptly on the wings opening, leaving a single held bass note.",
           "promptEdited": true,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep03_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "a79eaded-a7c1-498a-b4f4-bf695660bb74",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP03_the_empire_of_chains.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7vvc387",
+            "start": 1.34,
+            "end": 2.62,
+            "text": "While Westeros froze,"
+          },
+          {
+            "id": "cmvi7vvc388",
+            "start": 2.62,
+            "end": 3.89,
+            "text": "the first true empire"
+          },
+          {
+            "id": "cmvi7vvc389",
+            "start": 3.89,
+            "end": 4.86,
+            "text": "in the world was"
+          },
+          {
+            "id": "cmvi7vvc38a",
+            "start": 4.86,
+            "end": 5.96,
+            "text": "being built on the"
+          },
+          {
+            "id": "cmvi7vvc38b",
+            "start": 5.96,
+            "end": 7.29,
+            "text": "other side of the sea."
+          },
+          {
+            "id": "cmvi7vvfj8c",
+            "start": 7.29,
+            "end": 10.12,
+            "text": "Ghis did not invent"
+          },
+          {
+            "id": "cmvi7vvfj8d",
+            "start": 10.12,
+            "end": 14.58,
+            "text": "cruelty. It industrialised it."
+          },
+          {
+            "id": "cmvi7vvit8e",
+            "start": 14.58,
+            "end": 16.59,
+            "text": "Its wealth was people."
+          },
+          {
+            "id": "cmvi7vvit8f",
+            "start": 16.59,
+            "end": 17.78,
+            "text": "Bought, bred,"
+          },
+          {
+            "id": "cmvi7vvit8g",
+            "start": 17.78,
+            "end": 20.06,
+            "text": "counted, and worked until"
+          },
+          {
+            "id": "cmvi7vvit8h",
+            "start": 20.06,
+            "end": 21.79,
+            "text": "they were replaced."
+          },
+          {
+            "id": "cmvi7vvmd8i",
+            "start": 21.88,
+            "end": 23.55,
+            "text": "Its power was the"
+          },
+          {
+            "id": "cmvi7vvmd8j",
+            "start": 23.55,
+            "end": 25.32,
+            "text": "legion — lockstep,"
+          },
+          {
+            "id": "cmvi7vvmd8k",
+            "start": 25.32,
+            "end": 29.17,
+            "text": "disciplined, and utterly without mercy."
+          },
+          {
+            "id": "cmvi7vvpt8l",
+            "start": 29.17,
+            "end": 31.05,
+            "text": "For centuries nothing on"
+          },
+          {
+            "id": "cmvi7vvpt8m",
+            "start": 31.05,
+            "end": 33.01,
+            "text": "the continent could stand"
+          },
+          {
+            "id": "cmvi7vvpt8n",
+            "start": 33.01,
+            "end": 34.81,
+            "text": "against that formation."
+          },
+          {
+            "id": "cmvi7vvpt8o",
+            "start": 34.81,
+            "end": 36.46,
+            "text": "Nothing needed to be."
+          },
+          {
+            "id": "cmvi7vvt18p",
+            "start": 36.46,
+            "end": 37.74,
+            "text": "Then, far to the"
+          },
+          {
+            "id": "cmvi7vvt18q",
+            "start": 37.74,
+            "end": 39.34,
+            "text": "west, on a peninsula"
+          },
+          {
+            "id": "cmvi7vvt18r",
+            "start": 39.34,
+            "end": 40.39,
+            "text": "of volcanoes,"
+          },
+          {
+            "id": "cmvi7vvt18s",
+            "start": 40.39,
+            "end": 42.55,
+            "text": "some shepherds went looking"
+          },
+          {
+            "id": "cmvi7vvt18t",
+            "start": 42.55,
+            "end": 43.75,
+            "text": "for lost sheep."
+          },
+          {
+            "id": "cmvi7vvw58u",
+            "start": 43.75,
+            "end": 45.22,
+            "text": "They found caves."
+          },
+          {
+            "id": "cmvi7vvw58v",
+            "start": 45.22,
+            "end": 46.69,
+            "text": "In the caves they"
+          },
+          {
+            "id": "cmvi7vvw58w",
+            "start": 46.69,
+            "end": 49.19,
+            "text": "found something sleeping that"
+          },
+          {
+            "id": "cmvi7vvw58x",
+            "start": 49.19,
+            "end": 51,
+            "text": "had never been tamed."
+          },
+          {
+            "id": "cmvi7vvz78y",
+            "start": 51.04,
+            "end": 52.42,
+            "text": "Ghis had legions."
+          },
+          {
+            "id": "cmvi7vvz78z",
+            "start": 52.42,
+            "end": 54.04,
+            "text": "Valyria was about to"
+          },
+          {
+            "id": "cmvi7vvz790",
+            "start": 54.04,
+            "end": 55.1,
+            "text": "have dragons."
+          },
+          {
+            "id": "cmvi7vvz791",
+            "start": 55.1,
+            "end": 56.63,
+            "text": "That fight was only"
+          },
+          {
+            "id": "cmvi7vvz792",
+            "start": 56.63,
+            "end": 58.34,
+            "text": "going to end one way."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:38:18.787Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP03_the_empire_of_chains_subtitled.mp4"
+      }
     },
     {
       "id": "8b6kzj00",
@@ -637,8 +1396,8 @@
           "prompt": "",
           "negative": "",
           "seed": 48333,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261020_204916.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -653,12 +1412,12 @@
             "lyqoadzq"
           ],
           "seed": 51821,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial through cloud onto a peninsula of black volcanic mountains ringed by white marble towers, dragons circling the peaks like birds. Plain white text reading \"VALYRIA\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Valyria had no kings. It had families, forty of them, and every one of them owned dragons.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "d82eac1e-8369-4b7e-97a2-462ab4a218e7",
           "error": null
         },
         {
@@ -671,12 +1430,12 @@
             "lyqoadzq"
           ],
           "seed": 72599,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A young rider in scaled armour walks slowly toward a chained hatchling in a torchlit pit, one hand extended, saying nothing. Plain white text reading \"THE DRAGONLORDS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They learned to bind a dragon to a rider while both were young, and they never shared how.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "db595ccd-832f-4c2e-80b7-fdb9a343d643",
           "error": null
         },
         {
@@ -689,12 +1448,12 @@
             "lyqoadzq"
           ],
           "seed": 7931,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A formal marriage rite in a mirrored marble hall; a silver-haired pair of near-identical appearance stand facing each other before robed witnesses. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They kept the bloodline inside the family, because they believed the fire was in the blood.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "6fa6d1dc-97ad-4aef-88e0-0bfe57e7aad6",
           "error": null
         },
         {
@@ -707,12 +1466,12 @@
             "lyqoadzq"
           ],
           "seed": 12075,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Descending shot down a shaft into a glowing mine: chained figures with picks working ledges above open magma, overseers on the rim. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Beneath their cities, chained men cut the mountains open so the sorcerers could work the flame.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "97e2a5da-dcf5-443d-b2e0-0c9c93a774e0",
           "error": null
         },
         {
@@ -725,12 +1484,12 @@
             "lyqoadzq"
           ],
           "seed": 14242,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Extreme close-up of a smith folding a rippling dark blade in a furnace as another figure speaks over it in a low unbroken chant. Plain white text reading \"VALYRIAN STEEL\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] With fire and spells they folded steel that would never dull and never break.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "7928612f-f21b-4d17-8a8e-f08d2f405bf0",
           "error": null
         },
         {
@@ -743,12 +1502,12 @@
             "lyqoadzq"
           ],
           "seed": 20730,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Low aerial skimming along a perfectly straight fused-stone road running dead straight over hills to the horizon. Plain white text reading \"THE DRAGONROADS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They laid straight black roads across a continent, and the roads never cracked.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "2c4c2eac-161b-4780-860b-ee44cdf4ad76",
           "error": null
         },
         {
@@ -761,12 +1520,12 @@
             "lyqoadzq"
           ],
           "seed": 16211,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Time-lapse-style push out from a single stone hut to a vast marble city sprawling across the volcanic slopes. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] In two hundred years they went from herding goats to owning the largest empire men had ever built.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "58d11d94-d3ac-4647-9308-97494e39507a",
           "error": null
         },
         {
@@ -779,16 +1538,241 @@
             "lyqoadzq"
           ],
           "seed": 27590,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Cut to the walls of Ghis at dusk; sentries turn to look west as a shadow crosses the sun above them. Plain white text reading \"PART 5 — FIVE WARS, ONE ASH FIELD\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Only one power stood in their way. It had been standing there for five thousand years.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep04_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "428694a5-ed82-4aa4-8ac8-fbfdd54867ec",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP04_fourteen_flames.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7vjf76d",
+            "start": 0,
+            "end": 1.77,
+            "text": "Valyria had no kings."
+          },
+          {
+            "id": "cmvi7vjf76e",
+            "start": 1.77,
+            "end": 3.11,
+            "text": "It had families,"
+          },
+          {
+            "id": "cmvi7vjf76f",
+            "start": 3.11,
+            "end": 4.29,
+            "text": "forty of them,"
+          },
+          {
+            "id": "cmvi7vjf76g",
+            "start": 4.29,
+            "end": 5.63,
+            "text": "and every one of"
+          },
+          {
+            "id": "cmvi7vjf76h",
+            "start": 5.63,
+            "end": 7.23,
+            "text": "them owned dragons."
+          },
+          {
+            "id": "cmvi7vjij6i",
+            "start": 9.09,
+            "end": 10.37,
+            "text": "They learned to bind"
+          },
+          {
+            "id": "cmvi7vjij6j",
+            "start": 10.37,
+            "end": 11.2,
+            "text": "a dragon to a"
+          },
+          {
+            "id": "cmvi7vjij6k",
+            "start": 11.2,
+            "end": 12.54,
+            "text": "rider while both were"
+          },
+          {
+            "id": "cmvi7vjij6l",
+            "start": 12.54,
+            "end": 13.88,
+            "text": "young, and they never"
+          },
+          {
+            "id": "cmvi7vjij6m",
+            "start": 13.88,
+            "end": 14.58,
+            "text": "shared how."
+          },
+          {
+            "id": "cmvi7vjli6n",
+            "start": 14.58,
+            "end": 16.49,
+            "text": "They kept the bloodline"
+          },
+          {
+            "id": "cmvi7vjli6o",
+            "start": 16.49,
+            "end": 17.98,
+            "text": "inside the family,"
+          },
+          {
+            "id": "cmvi7vjli6p",
+            "start": 17.98,
+            "end": 20.05,
+            "text": "because they believed the"
+          },
+          {
+            "id": "cmvi7vjli6q",
+            "start": 20.05,
+            "end": 21.88,
+            "text": "fire was in the blood."
+          },
+          {
+            "id": "cmvi7vjof6r",
+            "start": 21.88,
+            "end": 23.54,
+            "text": "Beneath their cities,"
+          },
+          {
+            "id": "cmvi7vjof6s",
+            "start": 23.54,
+            "end": 25.05,
+            "text": "chained men cut the"
+          },
+          {
+            "id": "cmvi7vjof6t",
+            "start": 25.05,
+            "end": 26.71,
+            "text": "mountains open so the"
+          },
+          {
+            "id": "cmvi7vjof6u",
+            "start": 26.71,
+            "end": 29.17,
+            "text": "sorcerers could work the flame."
+          },
+          {
+            "id": "cmvi7vjrn6v",
+            "start": 29.17,
+            "end": 31.14,
+            "text": "With fire and spells"
+          },
+          {
+            "id": "cmvi7vjrn6w",
+            "start": 31.14,
+            "end": 33.31,
+            "text": "they folded steel that"
+          },
+          {
+            "id": "cmvi7vjrn6x",
+            "start": 33.31,
+            "end": 35.28,
+            "text": "would never dull and"
+          },
+          {
+            "id": "cmvi7vjrn6y",
+            "start": 35.28,
+            "end": 36.46,
+            "text": "never break."
+          },
+          {
+            "id": "cmvi7vjur6z",
+            "start": 36.46,
+            "end": 38.69,
+            "text": "They laid straight black"
+          },
+          {
+            "id": "cmvi7vjur70",
+            "start": 38.69,
+            "end": 41.01,
+            "text": "roads across a continent,"
+          },
+          {
+            "id": "cmvi7vjur71",
+            "start": 41.01,
+            "end": 43.61,
+            "text": "and the roads never cracked."
+          },
+          {
+            "id": "cmvi7vjxt72",
+            "start": 45.21,
+            "end": 46.45,
+            "text": "In two hundred years"
+          },
+          {
+            "id": "cmvi7vjxt73",
+            "start": 46.45,
+            "end": 47.82,
+            "text": "they went from herding"
+          },
+          {
+            "id": "cmvi7vjxt74",
+            "start": 47.82,
+            "end": 49,
+            "text": "goats to owning the"
+          },
+          {
+            "id": "cmvi7vjxt75",
+            "start": 49,
+            "end": 50.36,
+            "text": "largest empire men had"
+          },
+          {
+            "id": "cmvi7vjxt76",
+            "start": 50.36,
+            "end": 51.04,
+            "text": "ever built."
+          },
+          {
+            "id": "cmvi7vk0p77",
+            "start": 51.04,
+            "end": 52.8,
+            "text": "Only one power stood"
+          },
+          {
+            "id": "cmvi7vk0p78",
+            "start": 52.8,
+            "end": 53.94,
+            "text": "in their way."
+          },
+          {
+            "id": "cmvi7vk0p79",
+            "start": 53.94,
+            "end": 55.7,
+            "text": "It had been standing"
+          },
+          {
+            "id": "cmvi7vk0p7a",
+            "start": 55.7,
+            "end": 58.34,
+            "text": "there for five thousand years."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:38:03.289Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP04_fourteen_flames_subtitled.mp4"
+      }
     },
     {
       "id": "d31zmdss",
@@ -804,8 +1788,8 @@
           "prompt": "",
           "negative": "",
           "seed": 83668,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261021_093222.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -820,12 +1804,12 @@
             "fgdb0e5k"
           ],
           "seed": 30107,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Split-horizon wide: a legion in perfect formation on a plain, and above the ridge behind them, three dragons rising. Plain white text reading \"FIVE WARS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Ghis and Valyria fought five wars. Ghis won none of them.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "a8c2c6d1-3543-411a-86da-b45af0607d70",
           "error": null
         },
         {
@@ -838,12 +1822,12 @@
             "fgdb0e5k"
           ],
           "seed": 60622,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Ground-level in the shield wall as officers dress the line; men lock shields and brace, eyes on the sky rather than the front. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The legions did everything correctly. That was the problem — they stood in ranks.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "168b59bb-a372-4b97-b892-9e5e708dea65",
           "error": null
         },
         {
@@ -856,12 +1840,12 @@
             "fgdb0e5k"
           ],
           "seed": 98492,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A wall of dragonfire rolls the length of the formation; shields blacken and men scatter as the line disintegrates. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Ranks are hard to break with cavalry. They are very easy to burn.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "247639c4-a0cd-4c9a-8815-2d3a9014db49",
           "error": null
         },
         {
@@ -874,12 +1858,12 @@
             "fgdb0e5k"
           ],
           "seed": 60922,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial over a burned coastal city, its brick pyramids slumped and glassy, smoke drifting over an empty harbour. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] War after war, the empire shrank. Cities changed hands, then changed shape.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "7f937fd1-45d8-424e-a8c8-cd516b7e7f68",
           "error": null
         },
         {
@@ -892,12 +1876,12 @@
             "fgdb0e5k"
           ],
           "seed": 26694,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Night raid: repeated fire passes over a walled city, each pass leaving a wider ring of flame until the walls glow. Plain white text reading \"THE FIFTH WAR\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] In the fifth war Valyria stopped taking territory and started removing it.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "13ba737b-9fdb-4b0f-9a21-95ac65561b96",
           "error": null
         },
         {
@@ -910,12 +1894,12 @@
             "fgdb0e5k"
           ],
           "seed": 46585,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Dawn over the ruin field: teams of chained labourers dragging ploughs through ash and broken brick where a city stood. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They burned Ghis to the ground, tore down what was left, and ploughed the ruin under.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "9ef5ae6d-fb71-4d51-9392-8b6df93f2e91",
           "error": null
         },
         {
@@ -928,12 +1912,12 @@
             "fgdb0e5k"
           ],
           "seed": 71780,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Close on hands scattering coarse white salt into black ash; camera pulls back to reveal the scale of the dead ground. Plain white text reading \"SOWN WITH SALT\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then they sowed the fields with salt, so that nothing would grow there again.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "7891ae04-e0e3-46bd-a9cb-3f085c2eae40",
           "error": null
         },
         {
@@ -946,16 +1930,229 @@
             "fgdb0e5k"
           ],
           "seed": 88353,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Slow aerial pull-back from the salted plain to a horizon of circling dragons under a red sky. Plain white text reading \"PART 6 — THE FREEHOLD\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The oldest empire in the world ended in a single afternoon. Nothing now stood between Valyria and everything else.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep05_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "a6b3ea2a-3eaa-4aac-886d-6bb65bf395ca",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP05_five_wars_one_ash_field.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7vrcv7b",
+            "start": 0,
+            "end": 3.05,
+            "text": "Ghis and Valyria fought"
+          },
+          {
+            "id": "cmvi7vrcv7c",
+            "start": 3.05,
+            "end": 4.38,
+            "text": "five wars."
+          },
+          {
+            "id": "cmvi7vrcv7d",
+            "start": 4.38,
+            "end": 7.29,
+            "text": "Ghis won none of them."
+          },
+          {
+            "id": "cmvi7vrfv7e",
+            "start": 7.29,
+            "end": 9.69,
+            "text": "The legions did everything"
+          },
+          {
+            "id": "cmvi7vrfv7f",
+            "start": 9.69,
+            "end": 11.81,
+            "text": "correctly. That was the"
+          },
+          {
+            "id": "cmvi7vrfv7g",
+            "start": 11.81,
+            "end": 13.65,
+            "text": "problem — they stood"
+          },
+          {
+            "id": "cmvi7vrfv7h",
+            "start": 13.65,
+            "end": 14.48,
+            "text": "in ranks."
+          },
+          {
+            "id": "cmvi7vriz7i",
+            "start": 14.58,
+            "end": 16.58,
+            "text": "Ranks are hard to"
+          },
+          {
+            "id": "cmvi7vriz7j",
+            "start": 16.58,
+            "end": 18.82,
+            "text": "break with cavalry."
+          },
+          {
+            "id": "cmvi7vriz7k",
+            "start": 18.82,
+            "end": 20.94,
+            "text": "They are very easy"
+          },
+          {
+            "id": "cmvi7vriz7l",
+            "start": 20.94,
+            "end": 21.88,
+            "text": "to burn."
+          },
+          {
+            "id": "cmvi7vrm87m",
+            "start": 21.88,
+            "end": 23.29,
+            "text": "War after war,"
+          },
+          {
+            "id": "cmvi7vrm87n",
+            "start": 23.29,
+            "end": 25.12,
+            "text": "the empire shrank."
+          },
+          {
+            "id": "cmvi7vrm87o",
+            "start": 25.12,
+            "end": 27.24,
+            "text": "Cities changed hands,"
+          },
+          {
+            "id": "cmvi7vrm87p",
+            "start": 27.24,
+            "end": 29.17,
+            "text": "then changed shape."
+          },
+          {
+            "id": "cmvi7vrpa7q",
+            "start": 29.81,
+            "end": 31.28,
+            "text": "In the fifth war"
+          },
+          {
+            "id": "cmvi7vrpa7r",
+            "start": 31.28,
+            "end": 34.21,
+            "text": "Valyria stopped taking territory"
+          },
+          {
+            "id": "cmvi7vrpa7s",
+            "start": 34.21,
+            "end": 36.42,
+            "text": "and started removing it."
+          },
+          {
+            "id": "cmvi7vrsg7t",
+            "start": 36.46,
+            "end": 38.17,
+            "text": "They burned Ghis to"
+          },
+          {
+            "id": "cmvi7vrsg7u",
+            "start": 38.17,
+            "end": 39.16,
+            "text": "the ground,"
+          },
+          {
+            "id": "cmvi7vrsg7v",
+            "start": 39.16,
+            "end": 40.78,
+            "text": "tore down what was"
+          },
+          {
+            "id": "cmvi7vrsg7w",
+            "start": 40.78,
+            "end": 42.76,
+            "text": "left, and ploughed the"
+          },
+          {
+            "id": "cmvi7vrsg7x",
+            "start": 42.76,
+            "end": 43.75,
+            "text": "ruin under."
+          },
+          {
+            "id": "cmvi7vrvj7y",
+            "start": 43.75,
+            "end": 45.62,
+            "text": "Then they sowed the"
+          },
+          {
+            "id": "cmvi7vrvj7z",
+            "start": 45.62,
+            "end": 47.3,
+            "text": "fields with salt,"
+          },
+          {
+            "id": "cmvi7vrvj80",
+            "start": 47.3,
+            "end": 49.37,
+            "text": "so that nothing would"
+          },
+          {
+            "id": "cmvi7vrvj81",
+            "start": 49.37,
+            "end": 51.04,
+            "text": "grow there again."
+          },
+          {
+            "id": "cmvi7vryk82",
+            "start": 51.58,
+            "end": 52.8,
+            "text": "The oldest empire in"
+          },
+          {
+            "id": "cmvi7vryk83",
+            "start": 52.8,
+            "end": 53.9,
+            "text": "the world ended in"
+          },
+          {
+            "id": "cmvi7vryk84",
+            "start": 53.9,
+            "end": 55.05,
+            "text": "a single afternoon."
+          },
+          {
+            "id": "cmvi7vryk85",
+            "start": 55.05,
+            "end": 56.57,
+            "text": "Nothing now stood between"
+          },
+          {
+            "id": "cmvi7vryk86",
+            "start": 56.57,
+            "end": 58.27,
+            "text": "Valyria and everything else."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:38:13.580Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP05_five_wars_one_ash_field_subtitled.mp4"
+      }
     },
     {
       "id": "hqbso0fg",
@@ -971,8 +2168,8 @@
           "prompt": "",
           "negative": "",
           "seed": 69208,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261021_111016.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -987,12 +2184,12 @@
             "1ay1ouui"
           ],
           "seed": 29536,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Vast aerial at dawn over marble cities, aqueducts and volcanic peaks, dragons distant against a pale sky. Plain white text reading \"THE VALYRIAN FREEHOLD\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] At its height, Valyria ruled from the far east to the narrow sea, and answered to no one.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "37d660c7-3931-4c70-bb82-2d7673e72f0b",
           "error": null
         },
         {
@@ -1005,12 +2202,12 @@
             "1ay1ouui"
           ],
           "seed": 8514,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Interior of a domed marble assembly: hundreds of silver-haired figures arguing on tiered benches, no throne anywhere in frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] It called itself a freehold, not an empire. Any freeborn landholder had a voice.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "08f58a24-8651-402a-98db-6d3502a8f468",
           "error": null
         },
         {
@@ -1023,12 +2220,12 @@
             "1ay1ouui"
           ],
           "seed": 92667,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Slow pan from the polished assembly floor down through a grate to a torchlit tunnel of chained workers beneath it. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The word freeborn was doing a great deal of work in that sentence.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "906699b2-414e-4de4-9b94-9961a1ee0212",
           "error": null
         },
         {
@@ -1041,12 +2238,12 @@
             "1ay1ouui"
           ],
           "seed": 13074,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Push in on a colossal seamless black stone wall; the surface is glassy and jointless, reflecting torchlight. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Their sorcerers built with fire and stone fused together, and left no seams for us to study.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "fa83b3c5-44a2-43bb-b4bd-94a0ad4a8b23",
           "error": null
         },
         {
@@ -1059,12 +2256,12 @@
             "1ay1ouui"
           ],
           "seed": 85096,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Busy harbour at golden hour: ranked galleys unloading crates, clerks tallying, a slave column boarding a hull. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Their ships carried their language, their gods, and their prices to every coast worth reaching.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "80d28111-4eaa-4f60-83d7-2208bc7c8e04",
           "error": null
         },
         {
@@ -1077,12 +2274,12 @@
             "1ay1ouui"
           ],
           "seed": 71473,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Wide static on the Fourteen Flames at dusk, thin smoke rising from every summit; a single figure on a balcony turns away from the view. Plain white text reading \"THE FOURTEEN FLAMES\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Nothing threatened them. So they stopped watching the mountains that had made them.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "f0e30e83-8ddf-4fdc-8018-1cb0bf3311c3",
           "error": null
         },
         {
@@ -1095,12 +2292,12 @@
             "1ay1ouui"
           ],
           "seed": 6111,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Cut to a cold rocky shore across the sea: bearded men in mail loading longships, seven-pointed stars carved into the prows. Plain white text reading \"THE ANDALS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Meanwhile, in the west, another people were loading their ships.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "b680b01a-0964-43da-871a-c0fe870a7802",
           "error": null
         },
         {
@@ -1113,16 +2310,223 @@
             "1ay1ouui"
           ],
           "seed": 94318,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Return to the assembly dome, camera craning up past it to the smoking volcanoes behind. Plain white text reading \"PART 7 — THE ANDAL TIDE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Every empire mistakes its peak for its permanence. Valyria had four hundred years left.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep06_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "e0491195-3d70-4dc5-9353-78b81e23a6fa",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP06_the_freehold.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7wbv693",
+            "start": 0,
+            "end": 1.2,
+            "text": "At its height,"
+          },
+          {
+            "id": "cmvi7wbv694",
+            "start": 1.2,
+            "end": 3.09,
+            "text": "Valyria ruled from the"
+          },
+          {
+            "id": "cmvi7wbv695",
+            "start": 3.09,
+            "end": 4.38,
+            "text": "far east to the"
+          },
+          {
+            "id": "cmvi7wbv696",
+            "start": 4.38,
+            "end": 5.32,
+            "text": "narrow sea,"
+          },
+          {
+            "id": "cmvi7wbv697",
+            "start": 5.32,
+            "end": 7.29,
+            "text": "and answered to no one."
+          },
+          {
+            "id": "cmvi7wbyt98",
+            "start": 7.29,
+            "end": 8.98,
+            "text": "It called itself a"
+          },
+          {
+            "id": "cmvi7wbyt99",
+            "start": 8.98,
+            "end": 11.24,
+            "text": "freehold, not an empire."
+          },
+          {
+            "id": "cmvi7wbyt9a",
+            "start": 11.24,
+            "end": 13.77,
+            "text": "Any freeborn landholder had"
+          },
+          {
+            "id": "cmvi7wbyt9b",
+            "start": 13.77,
+            "end": 14.52,
+            "text": "a voice."
+          },
+          {
+            "id": "cmvi7wc1y9c",
+            "start": 14.58,
+            "end": 16.91,
+            "text": "The word freeborn was"
+          },
+          {
+            "id": "cmvi7wc1y9d",
+            "start": 16.91,
+            "end": 18.9,
+            "text": "doing a great deal"
+          },
+          {
+            "id": "cmvi7wc1y9e",
+            "start": 18.9,
+            "end": 21.67,
+            "text": "of work in that sentence."
+          },
+          {
+            "id": "cmvi7wc5f9f",
+            "start": 21.88,
+            "end": 24.01,
+            "text": "Their sorcerers built with"
+          },
+          {
+            "id": "cmvi7wc5f9g",
+            "start": 24.01,
+            "end": 25.64,
+            "text": "fire and stone fused"
+          },
+          {
+            "id": "cmvi7wc5f9h",
+            "start": 25.64,
+            "end": 27.37,
+            "text": "together, and left no"
+          },
+          {
+            "id": "cmvi7wc5f9i",
+            "start": 27.37,
+            "end": 29.17,
+            "text": "seams for us to study."
+          },
+          {
+            "id": "cmvi7wc8y9j",
+            "start": 29.17,
+            "end": 31.15,
+            "text": "Their ships carried their"
+          },
+          {
+            "id": "cmvi7wc8y9k",
+            "start": 31.15,
+            "end": 32.81,
+            "text": "language, their gods,"
+          },
+          {
+            "id": "cmvi7wc8y9l",
+            "start": 32.81,
+            "end": 34.32,
+            "text": "and their prices to"
+          },
+          {
+            "id": "cmvi7wc8y9m",
+            "start": 34.32,
+            "end": 36.46,
+            "text": "every coast worth reaching."
+          },
+          {
+            "id": "cmvi7wcci9n",
+            "start": 36.46,
+            "end": 38.59,
+            "text": "Nothing threatened them."
+          },
+          {
+            "id": "cmvi7wcci9o",
+            "start": 38.59,
+            "end": 40.71,
+            "text": "So they stopped watching"
+          },
+          {
+            "id": "cmvi7wcci9p",
+            "start": 40.71,
+            "end": 42.66,
+            "text": "the mountains that had"
+          },
+          {
+            "id": "cmvi7wcci9q",
+            "start": 42.66,
+            "end": 43.55,
+            "text": "made them."
+          },
+          {
+            "id": "cmvi7wcfz9r",
+            "start": 43.75,
+            "end": 46.44,
+            "text": "Meanwhile, in the west,"
+          },
+          {
+            "id": "cmvi7wcfz9s",
+            "start": 46.44,
+            "end": 49.6,
+            "text": "another people were loading"
+          },
+          {
+            "id": "cmvi7wcfz9t",
+            "start": 49.6,
+            "end": 51,
+            "text": "their ships."
+          },
+          {
+            "id": "cmvi7wcj79u",
+            "start": 51.04,
+            "end": 53.21,
+            "text": "Every empire mistakes its"
+          },
+          {
+            "id": "cmvi7wcj79v",
+            "start": 53.21,
+            "end": 55.3,
+            "text": "peak for its permanence."
+          },
+          {
+            "id": "cmvi7wcj79w",
+            "start": 55.3,
+            "end": 57.38,
+            "text": "Valyria had four hundred"
+          },
+          {
+            "id": "cmvi7wcj79x",
+            "start": 57.38,
+            "end": 58.34,
+            "text": "years left."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:38:40.243Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP06_the_freehold_subtitled.mp4"
+      }
     },
     {
       "id": "o3ogb2mv",
@@ -1138,8 +2542,8 @@
           "prompt": "",
           "negative": "",
           "seed": 79998,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261021_125526.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -1154,12 +2558,12 @@
             "gus3z47s"
           ],
           "seed": 99933,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial over a fleet of longships crossing a grey sea toward a green coastline at dawn. Plain white text reading \"THE ANDAL INVASION\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Six thousand years ago, Westeros was invaded again — and this time it stuck.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "be4fa1c7-6055-400f-8b3e-a95cdc02efdf",
           "error": null
         },
         {
@@ -1172,12 +2576,12 @@
             "gus3z47s"
           ],
           "seed": 44420,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Close combat: an iron blade shears through a bronze sword and the bronze buckles; the bearer falls back. Plain white text reading \"IRON vs BRONZE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The Andals came out of the east with iron, and iron beats bronze every single time.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "41e50615-bad5-4bd4-bc62-637f44074043",
           "error": null
         },
         {
@@ -1190,12 +2594,12 @@
             "gus3z47s"
           ],
           "seed": 26359,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A hillside baptism at dawn: robed septons marking foreheads with oil before a seven-pointed star raised on a pole. Plain white text reading \"THE FAITH OF THE SEVEN\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They also came with a new religion, and they did not consider it optional.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "bc6aa99e-199c-4f4a-9693-5baf646c30b5",
           "error": null
         },
         {
@@ -1208,12 +2612,12 @@
             "gus3z47s"
           ],
           "seed": 43306,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Axes at the base of a carved white tree; the face is hacked away before the trunk falls into a cleared grove. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Where they landed, the weirwoods came down and the old gods went quiet.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "98dd6453-198f-455a-b77d-30498ddb3935",
           "error": null
         },
         {
@@ -1226,12 +2630,12 @@
             "gus3z47s"
           ],
           "seed": 88120,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Two shots in one move: a formal wedding in a hall, camera trucks right through a doorway into a burning yard of bodies. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Kingdom by kingdom, the First Men lost the south. Marriage where it worked, slaughter where it did not.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "fcd9695b-ee80-48f2-862f-e24669c55b70",
           "error": null
         },
         {
@@ -1244,12 +2648,12 @@
             "gus3z47s"
           ],
           "seed": 49823,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Wide on a foggy causeway through endless bog; an armoured column halts at the water's edge and turns back. Plain white text reading \"THE NORTH HELD\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Six kingdoms fell or converted. The seventh looked at the Neck and decided not to bother.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "5f495aa2-04b3-44bb-951c-1e328e5c6c4b",
           "error": null
         },
         {
@@ -1262,12 +2666,12 @@
             "gus3z47s"
           ],
           "seed": 99557,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Slow push in on a snow-covered weirwood in a northern grove, red leaves against grey sky, an armed man kneeling beneath it. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The North kept its trees, its gods, and its grudge. It kept all three for six thousand years.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "d8dc67c3-aa90-468d-aea8-a4959c0e903f",
           "error": null
         },
         {
@@ -1280,16 +2684,259 @@
             "gus3z47s"
           ],
           "seed": 29289,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Cut to a river delta far to the east: an immense fleet of small ships massing at dusk under an unfamiliar banner. Plain white text reading \"PART 8 — TEN THOUSAND SHIPS\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Six kingdoms, and one that would not bend. The seventh had not been invented yet — and it was coming by sea.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep07_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "d7612c95-a9e5-46c9-8b03-30731e17b149",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP07_the_andal_tide.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7wftu9y",
+            "start": 0,
+            "end": 2.3,
+            "text": "Six thousand years ago,"
+          },
+          {
+            "id": "cmvi7wftu9z",
+            "start": 2.3,
+            "end": 4.89,
+            "text": "Westeros was invaded again"
+          },
+          {
+            "id": "cmvi7wftua0",
+            "start": 4.89,
+            "end": 6.39,
+            "text": "— and this time"
+          },
+          {
+            "id": "cmvi7wftua1",
+            "start": 6.39,
+            "end": 7.29,
+            "text": "it stuck."
+          },
+          {
+            "id": "cmvi7wfyga2",
+            "start": 7.29,
+            "end": 9.02,
+            "text": "The Andals came out"
+          },
+          {
+            "id": "cmvi7wfyga3",
+            "start": 9.02,
+            "end": 10.48,
+            "text": "of the east with"
+          },
+          {
+            "id": "cmvi7wfyga4",
+            "start": 10.48,
+            "end": 12.31,
+            "text": "iron, and iron beats"
+          },
+          {
+            "id": "cmvi7wfyga5",
+            "start": 12.31,
+            "end": 14.58,
+            "text": "bronze every single time."
+          },
+          {
+            "id": "cmvi7wg1ta6",
+            "start": 14.58,
+            "end": 16.54,
+            "text": "They also came with"
+          },
+          {
+            "id": "cmvi7wg1ta7",
+            "start": 16.54,
+            "end": 18.08,
+            "text": "a new religion,"
+          },
+          {
+            "id": "cmvi7wg1ta8",
+            "start": 18.08,
+            "end": 19.72,
+            "text": "and they did not"
+          },
+          {
+            "id": "cmvi7wg1ta9",
+            "start": 19.72,
+            "end": 21.88,
+            "text": "consider it optional."
+          },
+          {
+            "id": "cmvi7wg5daa",
+            "start": 21.88,
+            "end": 23.81,
+            "text": "Where they landed,"
+          },
+          {
+            "id": "cmvi7wg5dab",
+            "start": 23.81,
+            "end": 26.27,
+            "text": "the weirwoods came down"
+          },
+          {
+            "id": "cmvi7wg5dac",
+            "start": 26.27,
+            "end": 27.99,
+            "text": "and the old gods"
+          },
+          {
+            "id": "cmvi7wg5dad",
+            "start": 27.99,
+            "end": 29.17,
+            "text": "went quiet."
+          },
+          {
+            "id": "cmvi7wg8kae",
+            "start": 30.21,
+            "end": 31.41,
+            "text": "Kingdom by kingdom,"
+          },
+          {
+            "id": "cmvi7wg8kaf",
+            "start": 31.41,
+            "end": 32.54,
+            "text": "the First Men lost"
+          },
+          {
+            "id": "cmvi7wg8kag",
+            "start": 32.54,
+            "end": 33.18,
+            "text": "the south."
+          },
+          {
+            "id": "cmvi7wg8kah",
+            "start": 33.18,
+            "end": 34.75,
+            "text": "Marriage where it worked,"
+          },
+          {
+            "id": "cmvi7wg8kai",
+            "start": 34.75,
+            "end": 36.46,
+            "text": "slaughter where it did not."
+          },
+          {
+            "id": "cmvi7wgbmaj",
+            "start": 36.46,
+            "end": 38.16,
+            "text": "Six kingdoms fell or"
+          },
+          {
+            "id": "cmvi7wgbmak",
+            "start": 38.16,
+            "end": 40.61,
+            "text": "converted. The seventh looked"
+          },
+          {
+            "id": "cmvi7wgbmal",
+            "start": 40.61,
+            "end": 41.89,
+            "text": "at the Neck and"
+          },
+          {
+            "id": "cmvi7wgbmam",
+            "start": 41.89,
+            "end": 43.75,
+            "text": "decided not to bother."
+          },
+          {
+            "id": "cmvi7wgevan",
+            "start": 43.75,
+            "end": 45.21,
+            "text": "The North kept its"
+          },
+          {
+            "id": "cmvi7wgevao",
+            "start": 45.21,
+            "end": 46.51,
+            "text": "trees, its gods,"
+          },
+          {
+            "id": "cmvi7wgevap",
+            "start": 46.51,
+            "end": 47.73,
+            "text": "and its grudge."
+          },
+          {
+            "id": "cmvi7wgevaq",
+            "start": 47.73,
+            "end": 49.11,
+            "text": "It kept all three"
+          },
+          {
+            "id": "cmvi7wgevar",
+            "start": 49.11,
+            "end": 50.98,
+            "text": "for six thousand years."
+          },
+          {
+            "id": "cmvi7wghyas",
+            "start": 51.04,
+            "end": 51.97,
+            "text": "Six kingdoms,"
+          },
+          {
+            "id": "cmvi7wghyat",
+            "start": 51.97,
+            "end": 53.26,
+            "text": "and one that would"
+          },
+          {
+            "id": "cmvi7wghyau",
+            "start": 53.26,
+            "end": 53.9,
+            "text": "not bend."
+          },
+          {
+            "id": "cmvi7wghyav",
+            "start": 53.9,
+            "end": 55.26,
+            "text": "The seventh had not"
+          },
+          {
+            "id": "cmvi7wghyaw",
+            "start": 55.26,
+            "end": 56.62,
+            "text": "been invented yet —"
+          },
+          {
+            "id": "cmvi7wghyax",
+            "start": 56.62,
+            "end": 57.84,
+            "text": "and it was coming"
+          },
+          {
+            "id": "cmvi7wghyay",
+            "start": 57.84,
+            "end": 58.34,
+            "text": "by sea."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:38:45.382Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP07_the_andal_tide_subtitled.mp4"
+      }
     },
     {
       "id": "s9g5p6t5",
@@ -1305,8 +2952,8 @@
           "prompt": "",
           "negative": "",
           "seed": 99291,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261021_143939.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -1321,12 +2968,12 @@
             "d98o8209"
           ],
           "seed": 94782,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial along an immense slow river at golden hour, terraced water-cities and painted boats crowding both banks. Plain white text reading \"THE RHOYNAR\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The Rhoynar lived along the greatest river in the world, and they had done it for a very long time.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "cda7eaa9-8fc9-411f-89bf-378468d7494b",
           "error": null
         },
         {
@@ -1339,12 +2986,12 @@
             "d98o8209"
           ],
           "seed": 49270,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. River-level shot: robed figures raise their hands and the river visibly swells against a stone wall, holding it. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They were traders, not conquerors, and their water wizards kept their cities from ever being taken.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "9795fb33-041d-4e94-a010-8b45b1b40f76",
           "error": null
         },
         {
@@ -1357,12 +3004,12 @@
             "d98o8209"
           ],
           "seed": 52033,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Wide on dragons crossing the river at low altitude while painted barges scatter beneath them. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then Valyria wanted their trade routes, and being peaceful stopped being an option.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "1b4c5a40-0d43-45f7-ac85-ce311c1d1f28",
           "error": null
         },
         {
@@ -1375,12 +3022,12 @@
             "d98o8209"
           ],
           "seed": 75485,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Enormous ground-level tracking shot down a river bank packed with assembled spearmen stretching past the horizon. Plain white text reading \"GARIN THE GREAT\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Prince Garin raised a quarter of a million men. It was the largest army the Rhoyne had ever seen.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "cf813c57-6ed5-4006-aaad-658630f1106d",
           "error": null
         },
         {
@@ -1393,12 +3040,12 @@
             "d98o8209"
           ],
           "seed": 47276,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A gilded cage suspended from a high stone arch above a smoking city; a figure inside watches the water below. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Valyria burned it in an afternoon, then hung him in a golden cage above his own city.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "4c0f5c3f-2acb-4cab-b8ad-08fc5bf69c69",
           "error": null
         },
         {
@@ -1411,12 +3058,12 @@
             "d98o8209"
           ],
           "seed": 63662,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Flooding shot: dark water climbing marble steps, palaces sinking, mist closing over rooftops until nothing is left. Plain white text reading \"GARIN'S CURSE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] He cursed them from that cage. Within days the river rose and swallowed the city whole.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "a872de6f-0237-491a-811c-599eb7bb9394",
           "error": null
         },
         {
@@ -1429,12 +3076,12 @@
             "d98o8209"
           ],
           "seed": 73409,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial over a colossal ragged fleet at dawn, decks crowded with people, sails patched, all pointed the same way. Plain white text reading \"NYMERIA\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] One princess refused to die there. Nymeria loaded ten thousand ships and sailed west with the survivors.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "70b16407-cbeb-4821-9d47-41c949773aee",
           "error": null
         },
         {
@@ -1447,16 +3094,277 @@
             "d98o8209"
           ],
           "seed": 57512,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Night: the entire fleet burning on a dark shoreline, a woman standing on the sand watching, back to camera. Plain white text reading \"PART 9 — THE DREAM OF FIRE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] She burned the ships on a desert shore so no one could go back. Out of that came Dorne.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep08_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "71152aea-d257-471d-8457-15e3112812a4",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP08_ten_thousand_ships.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi643900",
+            "start": 0,
+            "end": 1.78,
+            "text": "The Rhoynar lived along"
+          },
+          {
+            "id": "cmvi643901",
+            "start": 1.78,
+            "end": 3.41,
+            "text": "the greatest river in"
+          },
+          {
+            "id": "cmvi643902",
+            "start": 3.41,
+            "end": 4.19,
+            "text": "the world,"
+          },
+          {
+            "id": "cmvi643903",
+            "start": 4.19,
+            "end": 5.51,
+            "text": "and they had done"
+          },
+          {
+            "id": "cmvi643904",
+            "start": 5.51,
+            "end": 6.52,
+            "text": "it for a very"
+          },
+          {
+            "id": "cmvi643905",
+            "start": 6.52,
+            "end": 7.29,
+            "text": "long time."
+          },
+          {
+            "id": "cmvi643e46",
+            "start": 7.29,
+            "end": 8.67,
+            "text": "They were traders,"
+          },
+          {
+            "id": "cmvi643e47",
+            "start": 8.67,
+            "end": 9.82,
+            "text": "not conquerors,"
+          },
+          {
+            "id": "cmvi643e48",
+            "start": 9.82,
+            "end": 11.59,
+            "text": "and their water wizards"
+          },
+          {
+            "id": "cmvi643e49",
+            "start": 11.59,
+            "end": 13.28,
+            "text": "kept their cities from"
+          },
+          {
+            "id": "cmvi643e4a",
+            "start": 13.28,
+            "end": 14.58,
+            "text": "ever being taken."
+          },
+          {
+            "id": "cmvi643iyb",
+            "start": 14.58,
+            "end": 16.86,
+            "text": "Then Valyria wanted their"
+          },
+          {
+            "id": "cmvi643iyc",
+            "start": 16.86,
+            "end": 18.05,
+            "text": "trade routes,"
+          },
+          {
+            "id": "cmvi643iyd",
+            "start": 18.05,
+            "end": 20.42,
+            "text": "and being peaceful stopped"
+          },
+          {
+            "id": "cmvi643iye",
+            "start": 20.42,
+            "end": 21.88,
+            "text": "being an option."
+          },
+          {
+            "id": "cmvi643nif",
+            "start": 22.88,
+            "end": 24.3,
+            "text": "Prince Garin raised a"
+          },
+          {
+            "id": "cmvi643nig",
+            "start": 24.3,
+            "end": 25.65,
+            "text": "quarter of a million"
+          },
+          {
+            "id": "cmvi643nih",
+            "start": 25.65,
+            "end": 26.66,
+            "text": "men. It was the"
+          },
+          {
+            "id": "cmvi643nii",
+            "start": 26.66,
+            "end": 28.22,
+            "text": "largest army the Rhoyne"
+          },
+          {
+            "id": "cmvi643nij",
+            "start": 28.22,
+            "end": 29.17,
+            "text": "had ever seen."
+          },
+          {
+            "id": "cmvi643rxk",
+            "start": 29.17,
+            "end": 30.97,
+            "text": "Valyria burned it in"
+          },
+          {
+            "id": "cmvi643rxl",
+            "start": 30.97,
+            "end": 32.14,
+            "text": "an afternoon,"
+          },
+          {
+            "id": "cmvi643rxm",
+            "start": 32.14,
+            "end": 33.58,
+            "text": "then hung him in"
+          },
+          {
+            "id": "cmvi643rxn",
+            "start": 33.58,
+            "end": 35.29,
+            "text": "a golden cage above"
+          },
+          {
+            "id": "cmvi643rxo",
+            "start": 35.29,
+            "end": 36.46,
+            "text": "his own city."
+          },
+          {
+            "id": "cmvi643whp",
+            "start": 36.46,
+            "end": 38.13,
+            "text": "He cursed them from"
+          },
+          {
+            "id": "cmvi643whq",
+            "start": 38.13,
+            "end": 39.01,
+            "text": "that cage."
+          },
+          {
+            "id": "cmvi643whr",
+            "start": 39.01,
+            "end": 40.85,
+            "text": "Within days the river"
+          },
+          {
+            "id": "cmvi643whs",
+            "start": 40.85,
+            "end": 42.79,
+            "text": "rose and swallowed the"
+          },
+          {
+            "id": "cmvi643wht",
+            "start": 42.79,
+            "end": 43.75,
+            "text": "city whole."
+          },
+          {
+            "id": "cmvi6441yu",
+            "start": 43.75,
+            "end": 45.43,
+            "text": "One princess refused to"
+          },
+          {
+            "id": "cmvi6441yv",
+            "start": 45.43,
+            "end": 46.16,
+            "text": "die there."
+          },
+          {
+            "id": "cmvi6441yw",
+            "start": 46.16,
+            "end": 48.13,
+            "text": "Nymeria loaded ten thousand"
+          },
+          {
+            "id": "cmvi6441yx",
+            "start": 48.13,
+            "end": 49.66,
+            "text": "ships and sailed west"
+          },
+          {
+            "id": "cmvi6441yy",
+            "start": 49.66,
+            "end": 51.04,
+            "text": "with the survivors."
+          },
+          {
+            "id": "cmvi6446nz",
+            "start": 51.04,
+            "end": 52.8,
+            "text": "She burned the ships"
+          },
+          {
+            "id": "cmvi6446n10",
+            "start": 52.8,
+            "end": 54.29,
+            "text": "on a desert shore"
+          },
+          {
+            "id": "cmvi6446n11",
+            "start": 54.29,
+            "end": 55.61,
+            "text": "so no one could"
+          },
+          {
+            "id": "cmvi6446n12",
+            "start": 55.61,
+            "end": 56.32,
+            "text": "go back."
+          },
+          {
+            "id": "cmvi6446n13",
+            "start": 56.32,
+            "end": 58.34,
+            "text": "Out of that came Dorne."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T13:48:43.439Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP08_ten_thousand_ships_subtitled.mp4"
+      }
     },
     {
       "id": "lwji6f90",
@@ -1472,8 +3380,8 @@
           "prompt": "",
           "negative": "",
           "seed": 73892,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261021_161457.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -1488,12 +3396,12 @@
             "52sj6jti"
           ],
           "seed": 69977,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Interior of a lamplit marble hall, a modest household of silver-haired figures at a long table, the room plainly smaller than its neighbours. Plain white text reading \"HOUSE TARGARYEN\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Of the forty dragonlord families of Valyria, House Targaryen was not important.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "399b75b0-2704-4185-a8d9-600b51454eca",
           "error": null
         },
         {
@@ -1506,12 +3414,12 @@
             "52sj6jti"
           ],
           "seed": 19681,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Slow pan across a wall of ancestral busts, the Targaryen name plate small and set to one side among far grander ones. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They were rich enough, old enough, and nowhere near the top of anyone's list.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "de8d5351-1c40-48c9-99ac-dd16ec5c76eb",
           "error": null
         },
         {
@@ -1524,12 +3432,12 @@
             "52sj6jti"
           ],
           "seed": 86853,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. A young woman wakes in the dark, sits up sharply and stares at nothing, breathing hard, sweat on her face. Plain white text reading \"DAENYS THE DREAMER\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then a daughter of the house began dreaming the same thing, night after night.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "d37a18ec-5a01-45f5-a6cf-cf29e2004817",
           "error": null
         },
         {
@@ -1542,12 +3450,12 @@
             "52sj6jti"
           ],
           "seed": 20515,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Dream imagery: marble towers cracking as fire opens along the ground beneath them, all in silence. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] She dreamed Valyria burning. Not a battle — the land itself coming apart.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "274dfc70-3c63-44be-9b10-aa1c37b72182",
           "error": null
         },
         {
@@ -1560,12 +3468,12 @@
             "52sj6jti"
           ],
           "seed": 4863,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. The father listens without interrupting at a table by candlelight, then rises and starts giving orders to servants. Plain white text reading \"LORD AENAR\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Her father believed her. That decision is the only reason any dragon survived.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "d42f98ff-f184-429e-a3a4-3c34eb9444b8",
           "error": null
         },
         {
@@ -1578,12 +3486,12 @@
             "52sj6jti"
           ],
           "seed": 30306,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Clerks stamping deeds; wagons loaded in a courtyard; a bare volcanic island shown on an unrolled sea chart. Plain white text reading \"DRAGONSTONE\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] He sold everything the family owned in Valyria and bought a rock in the narrow sea.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "a298ee5f-a752-4727-9e09-f6ad12371f59",
           "error": null
         },
         {
@@ -1596,12 +3504,12 @@
             "52sj6jti"
           ],
           "seed": 79746,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Departure at dawn: loaded ships pulling away from a marble harbour while figures on the quay watch and turn away. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Neighbours called it cowardice. Kin called it madness. They sailed anyway, with their dragons.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "7d00b8e2-ab8c-4988-a9e2-d611896edc70",
           "error": null
         },
         {
@@ -1614,16 +3522,217 @@
             "52sj6jti"
           ],
           "seed": 17321,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial approach to a black stone fortress on a bare volcanic island under low cloud, dragons circling the towers. Plain white text reading \"PART 10 — THE DOOM\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] They reached a black castle on a smoking island at the edge of the world. Twelve years remained.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep09_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "5d78c829-b939-40f7-a120-e13fa2852c16",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP09_the_dream_of_fire.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7umvo1c",
+            "start": 0,
+            "end": 2.17,
+            "text": "Of the forty dragonlord"
+          },
+          {
+            "id": "cmvi7umvo1d",
+            "start": 2.17,
+            "end": 4.06,
+            "text": "families of Valyria,"
+          },
+          {
+            "id": "cmvi7umvo1e",
+            "start": 4.06,
+            "end": 7.27,
+            "text": "House Targaryen was not important."
+          },
+          {
+            "id": "cmvi7umyn1f",
+            "start": 7.29,
+            "end": 9.42,
+            "text": "They were rich enough,"
+          },
+          {
+            "id": "cmvi7umyn1g",
+            "start": 9.42,
+            "end": 10.48,
+            "text": "old enough,"
+          },
+          {
+            "id": "cmvi7umyn1h",
+            "start": 10.48,
+            "end": 12.41,
+            "text": "and nowhere near the"
+          },
+          {
+            "id": "cmvi7umyn1i",
+            "start": 12.41,
+            "end": 14.44,
+            "text": "top of anyone's list."
+          },
+          {
+            "id": "cmvi7un1m1j",
+            "start": 14.58,
+            "end": 16.33,
+            "text": "Then a daughter of"
+          },
+          {
+            "id": "cmvi7un1m1k",
+            "start": 16.33,
+            "end": 18.67,
+            "text": "the house began dreaming"
+          },
+          {
+            "id": "cmvi7un1m1l",
+            "start": 18.67,
+            "end": 20.13,
+            "text": "the same thing,"
+          },
+          {
+            "id": "cmvi7un1m1m",
+            "start": 20.13,
+            "end": 21.88,
+            "text": "night after night."
+          },
+          {
+            "id": "cmvi7un4n1n",
+            "start": 21.88,
+            "end": 24.75,
+            "text": "She dreamed Valyria burning."
+          },
+          {
+            "id": "cmvi7un4n1o",
+            "start": 24.75,
+            "end": 26.19,
+            "text": "Not a battle —"
+          },
+          {
+            "id": "cmvi7un4n1p",
+            "start": 26.19,
+            "end": 29.17,
+            "text": "the land itself coming apart."
+          },
+          {
+            "id": "cmvi7un7l1q",
+            "start": 30.85,
+            "end": 32.6,
+            "text": "Her father believed her."
+          },
+          {
+            "id": "cmvi7un7l1r",
+            "start": 32.6,
+            "end": 34.06,
+            "text": "That decision is the"
+          },
+          {
+            "id": "cmvi7un7l1s",
+            "start": 34.06,
+            "end": 36.4,
+            "text": "only reason any dragon survived."
+          },
+          {
+            "id": "cmvi7unak1t",
+            "start": 36.46,
+            "end": 38.47,
+            "text": "He sold everything the"
+          },
+          {
+            "id": "cmvi7unak1u",
+            "start": 38.47,
+            "end": 40.56,
+            "text": "family owned in Valyria"
+          },
+          {
+            "id": "cmvi7unak1v",
+            "start": 40.56,
+            "end": 42.11,
+            "text": "and bought a rock"
+          },
+          {
+            "id": "cmvi7unak1w",
+            "start": 42.11,
+            "end": 43.75,
+            "text": "in the narrow sea."
+          },
+          {
+            "id": "cmvi7undi1x",
+            "start": 43.75,
+            "end": 46.21,
+            "text": "Neighbours called it cowardice."
+          },
+          {
+            "id": "cmvi7undi1y",
+            "start": 46.21,
+            "end": 47.95,
+            "text": "Kin called it madness."
+          },
+          {
+            "id": "cmvi7undi1z",
+            "start": 47.95,
+            "end": 49.46,
+            "text": "They sailed anyway,"
+          },
+          {
+            "id": "cmvi7undi20",
+            "start": 49.46,
+            "end": 50.96,
+            "text": "with their dragons."
+          },
+          {
+            "id": "cmvi7ungr21",
+            "start": 51.04,
+            "end": 52.63,
+            "text": "They reached a black"
+          },
+          {
+            "id": "cmvi7ungr22",
+            "start": 52.63,
+            "end": 54.14,
+            "text": "castle on a smoking"
+          },
+          {
+            "id": "cmvi7ungr23",
+            "start": 54.14,
+            "end": 55.56,
+            "text": "island at the edge"
+          },
+          {
+            "id": "cmvi7ungr24",
+            "start": 55.56,
+            "end": 56.59,
+            "text": "of the world."
+          },
+          {
+            "id": "cmvi7ungr25",
+            "start": 56.59,
+            "end": 58.34,
+            "text": "Twelve years remained."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:37:21.100Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP09_the_dream_of_fire_subtitled.mp4"
+      }
     },
     {
       "id": "aelc1jmf",
@@ -1639,8 +3748,8 @@
           "prompt": "",
           "negative": "",
           "seed": 47054,
-          "file": null,
-          "status": "pending",
+          "file": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\refs\\style_plate_20261021_175020.png",
+          "status": "done",
           "error": null
         }
       ],
@@ -1655,12 +3764,12 @@
             "uhrwvryv"
           ],
           "seed": 9602,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Busy Valyrian street at midday, ordinary commerce, no tension anywhere in the frame. Plain white text reading \"TWELVE YEARS LATER\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] For twelve years, nothing happened. Valyria traded, built, and quietly forgot the warning.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene01.mp4",
+          "durationS": 7.292,
+          "promptId": "ad52aad7-c2f1-4bd0-8927-3d141bf97563",
           "error": null
         },
         {
@@ -1673,12 +3782,12 @@
             "uhrwvryv"
           ],
           "seed": 83002,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Static wide on the mountain range as fourteen columns of fire and ash erupt simultaneously into a clear sky. Plain white text reading \"THE DOOM OF VALYRIA\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Then, on one morning, every one of the fourteen volcanoes went up at the same time.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene02.mp4",
+          "durationS": 7.292,
+          "promptId": "739d11f9-b846-4352-9d83-3197880571db",
           "error": null
         },
         {
@@ -1691,12 +3800,12 @@
             "uhrwvryv"
           ],
           "seed": 39840,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. The landmass fracturing along glowing lines; a marble city slides into a widening chasm as seawater floods in. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The peninsula cracked apart. Hills exploded. The sea came in through the wounds.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene03.mp4",
+          "durationS": 7.292,
+          "promptId": "98f603f4-43a3-49a4-a7ab-83e05d4446e6",
           "error": null
         },
         {
@@ -1709,12 +3818,12 @@
             "uhrwvryv"
           ],
           "seed": 33994,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Ash-choked sky, burning shapes falling; a robed figure with hands raised is engulfed mid-gesture. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Dragons died in the air. Sorcerers died mid-word. It took less than a day.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene04.mp4",
+          "durationS": 7.292,
+          "promptId": "89add8f7-8183-47c7-ad27-0db9d3d72719",
           "error": null
         },
         {
@@ -1727,12 +3836,12 @@
             "uhrwvryv"
           ],
           "seed": 94011,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Aerial over a drowned smoking archipelago where a continent used to be, wrecked stone under shallow water. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] The greatest civilisation men had built was gone, and it left no one behind who understood it.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene05.mp4",
+          "durationS": 7.292,
+          "promptId": "a21075e4-4881-4e65-9561-16f11aee736a",
           "error": null
         },
         {
@@ -1745,12 +3854,12 @@
             "uhrwvryv"
           ],
           "seed": 40223,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Rapid succession: mercenary companies on the march, sacked cities, slave columns, burning ports. Plain white text reading \"THE CENTURY OF BLOOD\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] What followed was a hundred years of everyone taking what they could reach.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene06.mp4",
+          "durationS": 7.292,
+          "promptId": "13e48b43-f36f-4613-a35c-abb96c58cfc1",
           "error": null
         },
         {
@@ -1763,12 +3872,12 @@
             "uhrwvryv"
           ],
           "seed": 92308,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Map-like aerial of the eastern coast with fleets and armies moving against each other in every direction. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] Free cities fought free cities. Old empires dug themselves back up. Nobody ruled anything for long.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene07.mp4",
+          "durationS": 7.292,
+          "promptId": "758817e3-b5e9-45c9-8a34-58df055f8c81",
           "error": null
         },
         {
@@ -1781,16 +3890,235 @@
             "uhrwvryv"
           ],
           "seed": 18689,
-          "promptText": "",
+          "promptText": "Use <Picture 1> as the visual style reference for grade, lighting, haze and lens character.\n\nintegrated_multimodal_description: [Shot 1] Live-action, cinematic, filmed in vertical 9:16 framing, desaturated cold color grade with deep blacks, heavy volumetric haze, handheld-stabilized documentary realism, shallow depth of field. Slow push through a black stone hall to a huge carved table shaped like a continent, a figure standing over it. Plain white text reading \"NEXT: THE CONQUEST\" appears low in the frame. A narrator with a deep, gravelly, slow-paced voice and a neutral British accent (S1) says in an off-screen voiceover: <d>[English] And on one small island in the west, the last dragonlords in the world sat down to plan.</d>\noverall_soundscape: Ambient sound and physical action sounds that match the shot, continuous across the clip.\nnon_diegetic_music: N/A",
           "promptEdited": false,
-          "status": "pending",
-          "clipPath": null,
-          "durationS": null,
-          "promptId": null,
+          "status": "done",
+          "clipPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\clips\\ep10_scene08.mp4",
+          "durationS": 7.292,
+          "promptId": "926d62d2-d463-4547-9560-774ac5e96d95",
           "error": null
         }
       ],
-      "exportPath": null
+      "exportPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP10_the_doom.mp4",
+      "subtitles": {
+        "cues": [
+          {
+            "id": "cmvi7v2ao26",
+            "start": 0,
+            "end": 1.44,
+            "text": "For twelve years,"
+          },
+          {
+            "id": "cmvi7v2ao27",
+            "start": 1.44,
+            "end": 2.88,
+            "text": "nothing happened."
+          },
+          {
+            "id": "cmvi7v2ao28",
+            "start": 2.88,
+            "end": 4.15,
+            "text": "Valyria traded,"
+          },
+          {
+            "id": "cmvi7v2ao29",
+            "start": 4.15,
+            "end": 6.27,
+            "text": "built, and quietly forgot"
+          },
+          {
+            "id": "cmvi7v2ao2a",
+            "start": 6.27,
+            "end": 7.29,
+            "text": "the warning."
+          },
+          {
+            "id": "cmvi7v2df2b",
+            "start": 7.29,
+            "end": 9.21,
+            "text": "Then, on one morning,"
+          },
+          {
+            "id": "cmvi7v2df2c",
+            "start": 9.21,
+            "end": 10.66,
+            "text": "every one of the"
+          },
+          {
+            "id": "cmvi7v2df2d",
+            "start": 10.66,
+            "end": 13.03,
+            "text": "fourteen volcanoes went up"
+          },
+          {
+            "id": "cmvi7v2df2e",
+            "start": 13.03,
+            "end": 14.58,
+            "text": "at the same time."
+          },
+          {
+            "id": "cmvi7v2g82f",
+            "start": 14.58,
+            "end": 17.24,
+            "text": "The peninsula cracked apart."
+          },
+          {
+            "id": "cmvi7v2g82g",
+            "start": 17.24,
+            "end": 18.66,
+            "text": "Hills exploded."
+          },
+          {
+            "id": "cmvi7v2g82h",
+            "start": 18.66,
+            "end": 20.08,
+            "text": "The sea came in"
+          },
+          {
+            "id": "cmvi7v2g82i",
+            "start": 20.08,
+            "end": 21.88,
+            "text": "through the wounds."
+          },
+          {
+            "id": "cmvi7v2j52j",
+            "start": 21.88,
+            "end": 23.83,
+            "text": "Dragons died in the"
+          },
+          {
+            "id": "cmvi7v2j52k",
+            "start": 23.83,
+            "end": 26.81,
+            "text": "air. Sorcerers died mid-word."
+          },
+          {
+            "id": "cmvi7v2j52l",
+            "start": 26.81,
+            "end": 28.55,
+            "text": "It took less than"
+          },
+          {
+            "id": "cmvi7v2j52m",
+            "start": 28.55,
+            "end": 29.17,
+            "text": "a day."
+          },
+          {
+            "id": "cmvi7v2m62n",
+            "start": 29.17,
+            "end": 31.49,
+            "text": "The greatest civilisation men"
+          },
+          {
+            "id": "cmvi7v2m62o",
+            "start": 31.49,
+            "end": 33.01,
+            "text": "had built was gone,"
+          },
+          {
+            "id": "cmvi7v2m62p",
+            "start": 33.01,
+            "end": 34.14,
+            "text": "and it left no"
+          },
+          {
+            "id": "cmvi7v2m62q",
+            "start": 34.14,
+            "end": 36.46,
+            "text": "one behind who understood it."
+          },
+          {
+            "id": "cmvi7v2p62r",
+            "start": 36.46,
+            "end": 38.36,
+            "text": "What followed was a"
+          },
+          {
+            "id": "cmvi7v2p62s",
+            "start": 38.36,
+            "end": 40.86,
+            "text": "hundred years of everyone"
+          },
+          {
+            "id": "cmvi7v2p62t",
+            "start": 40.86,
+            "end": 43.75,
+            "text": "taking what they could reach."
+          },
+          {
+            "id": "cmvi7v2s12u",
+            "start": 44.45,
+            "end": 46.03,
+            "text": "Free cities fought free"
+          },
+          {
+            "id": "cmvi7v2s12v",
+            "start": 46.03,
+            "end": 47.61,
+            "text": "cities. Old empires dug"
+          },
+          {
+            "id": "cmvi7v2s12w",
+            "start": 47.61,
+            "end": 48.92,
+            "text": "themselves back up."
+          },
+          {
+            "id": "cmvi7v2s12x",
+            "start": 48.92,
+            "end": 51.04,
+            "text": "Nobody ruled anything for long."
+          },
+          {
+            "id": "cmvi7v2uy2y",
+            "start": 51.04,
+            "end": 52.43,
+            "text": "And on one small"
+          },
+          {
+            "id": "cmvi7v2uy2z",
+            "start": 52.43,
+            "end": 54.08,
+            "text": "island in the west,"
+          },
+          {
+            "id": "cmvi7v2uy30",
+            "start": 54.08,
+            "end": 56.08,
+            "text": "the last dragonlords in"
+          },
+          {
+            "id": "cmvi7v2uy31",
+            "start": 56.08,
+            "end": 57.64,
+            "text": "the world sat down"
+          },
+          {
+            "id": "cmvi7v2uy32",
+            "start": 57.64,
+            "end": 58.34,
+            "text": "to plan."
+          }
+        ],
+        "style": {
+          "font": "Arial",
+          "size": 5.2,
+          "color": "#ffffff",
+          "outlineColor": "#000000",
+          "outlineWidth": 0.35,
+          "bold": true,
+          "italic": false,
+          "uppercase": false,
+          "position": "bottom",
+          "box": false,
+          "boxOpacity": 0.55,
+          "maxWords": 4
+        },
+        "source": "script",
+        "updatedAt": "2026-10-21T14:37:41.050Z",
+        "outPath": "D:\\Claude\\In_Progress\\02_Web_Apps\\Cursed_Ai\\series\\before-the-dragons\\exports\\EP10_the_doom_subtitled.mp4"
+      }
     }
   ],
   "sources": []

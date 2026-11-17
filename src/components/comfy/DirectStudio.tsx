@@ -56,6 +56,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
   const [prompt, setPrompt] = React.useState("");
   const [negative, setNegative] = React.useState("");
   const [batch, setBatch] = React.useState<string[]>([]);
+  const [batchMode, setBatchMode] = React.useState<"all" | "shown" | "selected">("all");
   const [checkpoints, setCheckpoints] = React.useState<string[]>([]);
   const [checkpoint, setCheckpoint] = React.useState("");
   const [ckptError, setCkptError] = React.useState<string | null>(null);
@@ -299,7 +300,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
 
       <Section title="Prompt" icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
         <div onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); generate(); } }}>
-          <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt onCandidates={setBatch} usageKey={refreshKey} />
+          <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt onCandidates={(t, m) => { setBatch(t); setBatchMode(m || "all"); }} usageKey={refreshKey} />
         </div>
         {engine === "quick" && (
           <div><label className={label + " !mb-1"}>Negative prompt (optional)</label>
@@ -341,7 +342,7 @@ export function DirectStudio({ kind, engine, modelId, toolbar, showHistory, onCl
           <span className="w-8 text-center text-sm font-bold text-white tabular-nums">{count}</span>
           <button onClick={() => setCount(c => Math.min(20, c + 1))} disabled={count >= 20} className="px-2.5 h-full text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-colors"><Plus size={14} /></button>
         </div>
-        {batch.length > 1 && <button onClick={runAll} disabled={engine === "cloud" && hasKey === false} title="Queue every prompt found in the file" className="px-4 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors whitespace-nowrap">{`Run all ${batch.length}${count > 1 ? ` ×${count}` : ""}`}</button>}
+        {(batch.length > 1 || (batchMode !== "all" && batch.length > 0)) && <button onClick={runAll} disabled={engine === "cloud" && hasKey === false} title={batchMode === "selected" ? "Queue only the prompts you ticked" : batchMode === "shown" ? "Queue the prompts that are not hidden" : "Queue every prompt found in the file"} className="px-4 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors whitespace-nowrap">{`Run ${batchMode === "selected" ? `${batch.length} ticked` : batchMode === "shown" ? `${batch.length} shown` : `all ${batch.length}`}${count > 1 ? ` ×${count}` : ""}`}</button>}
       </div>
       {needsPrompt && <p className="text-[11px] text-zinc-600 text-center">Write a prompt (or open a file) to enable Generate.</p>}
       {!needsPrompt && engine === "cloud" && hasKey === false && <p className="text-[11px] text-amber-400 text-center">Add your Gemini key (key icon, top bar) to generate.</p>}

@@ -293,7 +293,8 @@ export function convertUiWorkflow(ui: Json, objectInfo: Json): ConvertResult {
       if (isWidget && !hasValue && !(name in linked) && requiredNames.has(name)) {
         const choices = Array.isArray(typeTag) ? typeTag : options.options;
         if ("default" in options) { value = options.default; hasValue = true; }
-        else if (choices && choices.length) { value = choices[0]; hasValue = true; }
+        // Dynamic combos (COMFY_DYNAMICCOMBO_V3, e.g. SaveVideo "codec") list options as { key, inputs }; the value is the key.
+        else if (choices && choices.length) { value = typeof choices[0] === "object" && choices[0] !== null && "key" in choices[0] ? choices[0].key : choices[0]; hasValue = true; }
       }
 
       if (name in linked) inputs[name] = linked[name];

@@ -147,13 +147,24 @@ export interface QueueRow { id: string; label: string; status: string; detail?: 
 /** The job queue: every waiting / running / paused job with pause, resume and cancel icons. Always shown (with an empty hint) so it is never missing. */
 export function QueueList({ kind, rows, onPause, onResume, onCancel, onRemove }: { kind: Kind; rows: QueueRow[]; onPause: (id: string) => void; onResume: (id: string) => void; onCancel: (id: string) => void; onRemove: (id: string) => void }) {
   const a = ACCENT[kind];
+  // Ticked jobs (a job that left the queue drops out of the selection by itself).
+  const [sel, setSel] = React.useState<Set<string>>(new Set());
+  const ticked = rows.filter(r => sel.has(r.id));
+  const tickable = rows.filter(r => r.cancellable || r.status === "paused");
+  const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const cancelTicked = () => { ticked.forEach(r => (r.status === "paused" ? onRemove(r.id) : onCancel(r.id))); setSel(new Set()); };
   return (
     <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3 space-y-1.5">
-      <p className={label + " !mb-1"}>Queue · {rows.length}</p>
+      <div className="flex items-center gap-3">
+        <p className={label + " !mb-1"}>Queue · {rows.length}</p>
+        {tickable.length > 1 && <button onClick={() => setSel(ticked.length === tickable.length ? new Set() : new Set(tickable.map(r => r.id)))} className="text-[10px] text-zinc-500 hover:text-white mb-1">{ticked.length === tickable.length ? "Untick all" : "Tick all"}</button>}
+        {ticked.length > 0 && <button onClick={cancelTicked} className="ml-auto mb-1 text-[10px] font-bold text-red-300 hover:text-red-200 bg-red-500/10 hover:bg-red-500/20 rounded-lg px-2 py-1">Cancel {ticked.length} ticked</button>}
+      </div>
       {rows.length === 0 && <p className="text-[11px] text-zinc-600">Nothing queued. Jobs you start wait here, and can be paused or cancelled.</p>}
       {rows.map(r => (
         <div key={r.id} className="flex items-center justify-between gap-3 text-xs text-zinc-400">
-          <span className="truncate"><span className={r.status === "running" ? a.text : r.status === "paused" ? "text-amber-400" : "text-zinc-500"}>{r.status}</span> · {r.label}{r.detail ? ` · ${r.detail}` : ""}</span>
+          <input type="checkbox" checked={sel.has(r.id)} disabled={!(r.cancellable || r.status === "paused")} onChange={() => toggle(r.id)} title="Tick to cancel several jobs at once" className="shrink-0 cursor-pointer disabled:opacity-30" />
+          <span className="truncate flex-1"><span className={r.status === "running" ? a.text : r.status === "paused" ? "text-amber-400" : "text-zinc-500"}>{r.status}</span> · {r.label}{r.detail ? ` · ${r.detail}` : ""}</span>
           <span className="flex gap-1 shrink-0">
             {r.status === "paused" ? (
               <>

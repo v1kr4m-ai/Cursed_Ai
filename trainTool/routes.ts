@@ -129,7 +129,7 @@ export function registerTrainTool(app: express.Express, opts: TrainOptions) {
     const comfyStopped = (await stopComfyUi(opts.comfyUrl)).length > 0;
     await new Promise(r => setTimeout(r, 2500));
     if (isRunning("lora")) return bad(res, 409, "A LoRA training run is already active.");
-    const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.base || "flux"}, ${cfg.epochs} epochs${cfg.base ? "" : ", " + cfg.vramPreset})`, p.fluxPython, ["-m", "accelerate.commands.accelerate_cli", ...buildLoraArgs(cfg, p, toml)], { cwd: p.sdScripts, info: loraRunInfo(cfg, p, imageEntries(cfg.datasetDir, 5000).length) });
+    const state = startProcess("lora", `Training LoRA "${cfg.triggerWord}" (${cfg.base || "flux"}, ${cfg.epochs} epochs${cfg.base ? "" : ", " + cfg.vramPreset})`, p.fluxPython, ["-m", "accelerate.commands.accelerate_cli", ...buildLoraArgs(cfg, p, toml)], { cwd: p.sdScripts, env: { HF_HUB_OFFLINE: "1" }, /* tokenizers/text encoders come from the local HF cache; without this kohya tries huggingface.co and fails offline */ info: loraRunInfo(cfg, p, imageEntries(cfg.datasetDir, 5000).length) });
     res.json({ ...state, comfyStopped });
   });
 

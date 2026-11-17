@@ -177,6 +177,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
   const [pendingSetup, setPendingSetup] = React.useState<Setup | null>(null);
   const persistSetups = (list: Setup[]) => { setSetups(list); try { localStorage.setItem(setupKey, JSON.stringify(list)); } catch { /* private window */ } };
   const [batch, setBatch] = React.useState<string[]>([]);
+  const [batchMode, setBatchMode] = React.useState<"all" | "shown" | "selected">("all");
   const [queuing, setQueuing] = React.useState(false);
 
   const wf = workflows.find(w => w.path === selected) || null;
@@ -636,7 +637,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
                 {/* No prompt box for a workflow that takes no prompt (a face expression editor, an upscaler...). */}
                 {wf.needsPrompt && (
                   <Section title={promptTitle} icon={<Type size={14} />} accent={a.text} badge={batch.length > 1 ? `${batch.length} from file` : undefined} defaultOpen>
-                    <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={setBatch} usageKey={history.length} placeholder={promptHint} textLabel={promptKey ? promptTitle : undefined} />
+                    <PromptSource bare kind={kind} modelId={modelId} prompt={prompt} onPrompt={setPrompt} needsPrompt={wf.needsPrompt} onCandidates={(t, m) => { setBatch(t); setBatchMode(m || "all"); }} usageKey={history.length} placeholder={promptHint} textLabel={promptKey ? promptTitle : undefined} />
                   </Section>
                 )}
                 {exprNode && (
@@ -882,7 +883,7 @@ export function WorkflowRunner({ kind, modelId, toolbar, showHistory, onCloseHis
               </div>
               {busy && <button onClick={cancel} title="Cancel the running job" className="px-3.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-colors"><Square size={14} className="fill-current" /></button>}
             </div>
-            {batch.length > 1 && <button onClick={() => submit(batch)} disabled={!canRunBase || queuing} title="Queue every prompt found in the file" className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors">{queuing ? "Queuing..." : `Run all ${batch.length} prompts${count > 1 ? ` ×${count}` : ""}`}</button>}
+            {(batch.length > 1 || (batchMode !== "all" && batch.length > 0)) && <button onClick={() => submit(batch)} disabled={!canRunBase || queuing} title={batchMode === "selected" ? "Queue only the prompts you ticked" : batchMode === "shown" ? "Queue the prompts that are not hidden" : "Queue every prompt found in the file"} className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 font-bold text-xs disabled:opacity-40 transition-colors">{queuing ? "Queuing..." : `Run ${batchMode === "selected" ? `${batch.length} ticked` : batchMode === "shown" ? `${batch.length} shown` : `all ${batch.length}`} prompt${batch.length === 1 ? "" : "s"}${count > 1 ? ` ×${count}` : ""}`}</button>}
             {wf?.isRunnable && (wf.needsPrompt && !prompt.trim() && !wf.builtInPrompt?.trim() ? <p className="text-[11px] text-zinc-600 text-center">Write a prompt to enable Generate.</p> : missingRefs.length > 0 ? <p className="text-[11px] text-amber-400 text-center">Choose the required reference file{missingRefs.length > 1 ? "s" : ""} (or bypass optional ones).</p> : null)}
           </div>
         </div>
